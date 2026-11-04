@@ -2,12 +2,12 @@
    All floor coordinates remain separate from the camera and generated sprites. */
 (()=>{
 'use strict';
-const P=(x,y,z=0)=>[1800+.866*(x-y),260+.5*(x+y)-z];
+const P=(x,y,z=0)=>[2400+.866*(x-y),260+.5*(x+y)-z];
 const points=ps=>ps.map(p=>p.map(n=>Math.round(n*100)/100).join(',')).join(' ');
 const polygon=(ps,fill,stroke='#555d5e',width=1.5,extra='')=>`<polygon points="${points(ps)}" fill="${fill}" stroke="${stroke}" stroke-width="${width}" ${extra}/>`;
 const line=(a,b,color,width=2,extra='')=>`<path d="M${a.join(' ')}L${b.join(' ')}" fill="none" stroke="${color}" stroke-width="${width}" ${extra}/>`;
 const quad=(x,y,w,h,z=0)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(([a,b])=>P(a,b,z));
-const rooms=[{id:'upper',x:60,y:30,w:480,h:680},{id:'corridor',x:540,y:30,w:720,h:730},{id:'hall',x:60,y:760,w:820,h:1080},{id:'middle',x:880,y:760,w:380,h:500},{id:'lower',x:880,y:1290,w:380,h:550}];
+const rooms=[{id:'upper',x:60,y:30,w:480,h:680},{id:'corridor',x:540,y:30,w:720,h:730},{id:'hall',x:60,y:760,w:820,h:1080},{id:'middle',x:880,y:760,w:380,h:500},{id:'lower',x:880,y:1290,w:380,h:550},{id:'extension',x:60,y:1840,w:820,h:620},{id:'extra-office',x:880,y:1870,w:380,h:590},{id:'outdoor',x:60,y:2460,w:1200,h:130}];
 // Screen-space scale uses an adult height of about 113 units; desks stay 54 high.
 const visualMetrics={personScale:1,personVisibleHeight:128*312/352,deskHeight:54,officeChairHeight:69,lectureWidth:74,lectureHeight:88};
 const counters={lecture:0,teamDesks:0,coffee:0,cooler:0,rack:0,lift:0,toilet:0};
@@ -151,7 +151,7 @@ wall(60,710,540,710,110,{tag:'upper-room-end'});
 wall(60,760,540,760,112,{tag:'hall-end'});
 for(const [a,b]of [[760,980],[1060,1260],[1290,1470],[1570,1840]])wall(880,a,880,b,112,{glass:true,tag:'office-glass'});
 wall(880,760,1260,760,100);wall(880,1260,1260,1260,60,{near:true});wall(880,1290,1260,1290,95);
-wall(1260,760,1260,1840,43,{near:true});wall(60,1840,1260,1840,18,{near:true});
+wall(1260,760,1260,1840,43,{near:true});
 wall(886,565,886,760,128,{tag:'service-wall'});wall(886,565,1260,565,128,{tag:'service-turn'});
 wall(1260,30,1260,270,145,{tag:'utility-bank'});wall(1260,350,1260,430,145,{tag:'utility-bank'});
 door(430,565,true);door(270,350,false);
@@ -162,10 +162,40 @@ wall(878,195,1260,195,38,{tag:'kitchen-wall'});
 add(590,1500,box(580,1490,28,22,133,'#e8e8da','#8b9e91',115),'equipment-ceiling');
 for(const [x,y,w]of [[95,150,330],[95,920,330],[400,1170,330],[420,1580,300],[930,950,220],[930,1500,220],[620,350,170]])light(x,y,w);
 for(const [x,y]of [[90,90],[500,95],[910,790],[1220,1220],[915,1780],[90,1770]])plant(x,y);
-const defs=`<defs><linearGradient id="isoWall" x2=".3" y2="1"><stop stop-color="#f4f0df"/><stop offset="1" stop-color="#c4cfc3"/></linearGradient><linearGradient id="isoWindow" x2=".8" y2="1"><stop stop-color="#d8e8dc"/><stop offset=".55" stop-color="#b1cbc5"/><stop offset="1" stop-color="#eddfa9"/></linearGradient><linearGradient id="isoMetal"><stop stop-color="#9eaaaa"/><stop offset=".45" stop-color="#d8dddc"/><stop offset=".5" stop-color="#a8b4b5"/><stop offset="1" stop-color="#c9d1d0"/></linearGradient><radialGradient id="isoLightPool"><stop stop-color="#fff1b6" stop-opacity=".3"/><stop offset="1" stop-color="#fff1b6" stop-opacity="0"/></radialGradient><pattern id="isoFloor" width="94" height="51" patternUnits="userSpaceOnUse"><rect width="94" height="51" fill="#aebbb1"/><path d="M0 0L47 25.5 94 0M0 51L47 25.5 94 51" fill="none" stroke="#97aaa0" stroke-opacity=".19"/><path d="M13 18h3m47 21h2m16-30h4" stroke="#d5d6c3" stroke-opacity=".32"/></pattern></defs>`;
+// Rear extension described by the owner: shared tables, calisthenics tower,
+// one more glass office and a narrow outdoor metal deck.
+addTable(110,1930,250,65);chair(165,2035,true);chair(305,2035,true);
+addTable(505,1930,230,65);chair(555,2035,true);chair(685,2035,true);
+addTable(930,1950,280,65);equipment(990,1980,1);equipment(1150,1980,1);chair(1010,2050,true);chair(1170,2050,true);
+addTable(930,2220,280,65);equipment(990,2250,1);equipment(1150,2250,1);chair(1010,2320,true);chair(1170,2320,true);
+let tower=polygon(quad(180,2140,165,165),'#586a62','#3b4942',2);
+for(const[x,y]of [[205,2170],[305,2170],[205,2260],[305,2260]])tower+=box(x,y,7,7,155,'#536164','#263b39');
+for(const y of [2173,2263])tower+=line(P(208,y,155),P(310,y,155),'#283e3b',7);
+for(const x of [208,308]){tower+=line(P(x,2174,150),P(x,2265,150),'#354c47',6);tower+=line(P(x,2195,75),P(x,2310,75),'#334c45',7);tower+=box(x-9,2210,24,35,83,'#33433d','#223b30',75);}
+tower+=box(245,2160,26,14,118,'#34433c','#263b32',48);
+add(265,2240,tower,'exercise',{footprint:[180,2140,165,175]});
+wall(60,1840,60,2460,110,{tag:'extension-side'});
+wall(880,1840,1260,1840,100,{tag:'extra-office-divider'});
+wall(880,1870,1260,1870,95,{tag:'extra-office-divider'});
+wall(880,1870,880,2110,112,{glass:true,tag:'extra-office-glass'});
+wall(880,2200,880,2460,112,{glass:true,tag:'extra-office-glass'});
+wall(1260,1840,1260,2460,43,{near:true,tag:'extension-edge'});
+wall(60,2460,600,2460,110,{tag:'terrace-boundary'});wall(700,2460,1260,2460,110,{tag:'terrace-boundary'});
+let exit=box(597,2457,6,6,117,'#9aa9a3','#596d64')+box(697,2457,6,6,117,'#9aa9a3','#596d64');
+exit+=line(P(600,2460,115),P(700,2460,115),'#637e72',6);
+exit+=polygon([P(602,2460),P(669,2502),P(669,2502,108),P(602,2460,108)],'#c7d9d2','#536d62',2,'fill-opacity=".35"');
+exit+=line(P(651,2490,49),P(651,2490,61),'#415f50',3);
+const[ex,ey]=P(650,2460,135);exit+=`<rect x="${ex-19}" y="${ey-8}" width="38" height="16" fill="#456d54"/><path d="M${ex-10} ${ey}h20m-5-5 5 5-5 5" stroke="#eef2d7" stroke-width="2" fill="none"/>`;
+add(650,2460,exit,'terrace-door');
+function railing(x1,y1,x2,y2){const length=Math.hypot(x2-x1,y2-y1),n=Math.ceil(length/110);for(let i=0;i<n;i++){const a=[x1+(x2-x1)*i/n,y1+(y2-y1)*i/n],b=[x1+(x2-x1)*(i+1)/n,y1+(y2-y1)*(i+1)/n];const rail=line(P(...a,55),P(...b,55),'#657770',5)+line(P(...a,26),P(...b,26),'#84958c',3)+line(P(...a),P(...a,55),'#63736c',4);add((a[0]+b[0])/2,(a[1]+b[1])/2,rail,'railing');}}
+railing(60,2590,1260,2590);railing(60,2460,60,2590);railing(1260,2460,1260,2590);
+for(const x of [430,850])add(x,2540,box(x-7,2533,14,14,29,'#758780','#40574c')+box(x-9,2531,18,18,32,'#566a5e','#3a5143',29),'deck-ashtray');
+plant(105,2400);plant(1200,2390);
+
+const defs=`<defs><pattern id="isoDeck" width="18" height="18" patternUnits="userSpaceOnUse"><rect width="18" height="18" fill="#7a8d85"/><path d="M0 0l18 18M18 0 0 18" stroke="#a1ada4" stroke-width="1"/><path d="M0 9h18" stroke="#596f61" stroke-width=".6"/></pattern><linearGradient id="isoWall" x2=".3" y2="1"><stop stop-color="#f4f0df"/><stop offset="1" stop-color="#c4cfc3"/></linearGradient><linearGradient id="isoWindow" x2=".8" y2="1"><stop stop-color="#d8e8dc"/><stop offset=".55" stop-color="#b1cbc5"/><stop offset="1" stop-color="#eddfa9"/></linearGradient><linearGradient id="isoMetal"><stop stop-color="#9eaaaa"/><stop offset=".45" stop-color="#d8dddc"/><stop offset=".5" stop-color="#a8b4b5"/><stop offset="1" stop-color="#c9d1d0"/></linearGradient><radialGradient id="isoLightPool"><stop stop-color="#fff1b6" stop-opacity=".3"/><stop offset="1" stop-color="#fff1b6" stop-opacity="0"/></radialGradient><pattern id="isoFloor" width="94" height="51" patternUnits="userSpaceOnUse"><rect width="94" height="51" fill="#aebbb1"/><path d="M0 0L47 25.5 94 0M0 51L47 25.5 94 51" fill="none" stroke="#97aaa0" stroke-opacity=".19"/><path d="M13 18h3m47 21h2m16-30h4" stroke="#d5d6c3" stroke-opacity=".32"/></pattern></defs>`;
 function floors(zones=[]){
- let s=polygon([[60,30],[1260,30],[1260,1840],[60,1840]].map(([x,y])=>P(x,y)), '#354c43','#273f36',12);
- for(const r of rooms)s+=polygon(quad(r.x,r.y,r.w,r.h),'url(#isoFloor)','#7e978a',2);
+ let s=polygon([[60,30],[1260,30],[1260,2590],[60,2590]].map(([x,y])=>P(x,y)), '#354c43','#273f36',12);
+ for(const r of rooms)s+=polygon(quad(r.x,r.y,r.w,r.h),r.id==='outdoor'?'url(#isoDeck)':'url(#isoFloor)','#7e978a',2);
  // The upper-left separation is a substantial wall footprint, not walkable floor.
  s+=polygon(quad(60,710,480,50),'#526b5e','#526b5e',1);
  for(const z of zones.filter(z=>z.virtual))s+=polygon(quad(z.wx,z.wy,z.ww,z.wh),'url(#isoFloor)','#91a58e',5);
@@ -192,12 +222,12 @@ function draw(people=[],zones=[],underlay=''){
 const zoneDefinitions=[{wx:85,wy:65,ww:440,wh:610,seats:[[160,325],[440,430],[155,550],[440,590]]},{wx:910,wy:1320,ww:330,wh:470,seats:[[945,1590],[1215,1440],[940,1750],[1210,1660]]},{wx:910,wy:795,ww:330,wh:440,seats:[[940,1000],[1210,930],[940,1180],[1210,1120]]}];
 // All known participants stay in the scene. These are browsing positions, not assigned seats.
 const participantPlacements={};
-const projectSeats={"vatro-dron":[[155,280],[440,280]],"krechobot":[[155,460],[440,460]],"scholarshot":[[155,640],[440,640]],"specka":[[190,65],[440,65]],"inventarko":[[945,1320],[1060,1320],[1210,1320]],"evidentio":[[945,1590],[1215,1480],[940,1770],[1210,1735]],"herform":[[290,1090],[290,1370]],"domplus":[[320,1240]],"odlikas":[[405,860],[495,960]],"cleaning-nada":[[525,1110]],"yorigora":[[655,1210]],"unmi":[[650,870]]};
+const projectSeats={"vatro-dron":[[155,280],[440,280]],"krechobot":[[155,460],[440,460]],"scholarshot":[[155,640],[440,640]],"specka":[[190,65],[440,65]],"inventarko":[[945,1320],[1060,1320],[1210,1320]],"evidentio":[[225,1155],[225,1330]],"herform":[[300,1000],[300,1500]],"domplus":[[420,1230]],"odlikas":[[405,860],[495,960]],"cleaning-nada":[[680,1100]],"yorigora":[[655,1210]],"unmi":[[650,870]]};
 for(const [slug,seats]of Object.entries(projectSeats)){
  const points=seats.length?seats:[[700,850]],xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
  participantPlacements['project-'+slug]={wx:Math.min(...xs)-30,wy:Math.min(...ys)-100,ww:Math.max(100,Math.max(...xs)-Math.min(...xs)+60),wh:Math.max(150,Math.max(...ys)-Math.min(...ys)+140),seats,labelHeight:120};
 }
-window.BirdOfficeScene={isOccluded:fades,visualMetrics,project:P,quad,bounds,draw,floors,rooms,zoneDefinitions,participantPlacements,lectureScreenRetracted:true,participantZones:zoneDefinitions.slice(0,2),staffZone:zoneDefinitions[2],counters,staticLayers:layers,utilityBank:{x:1260,lift:[430,565],toilet:[270,350]},
- width:3100,height:2200,version:'bird-isometric-v19',home:P(280,300),regions:{staff:P(1075,1015),teams:P(280,300),lecture:P(530,1580),kitchen:P(965,365)},
+window.BirdOfficeScene={isOccluded:fades,visualMetrics,project:P,quad,bounds,draw,floors,rooms,zoneDefinitions,participantPlacements,lectureScreenRetracted:true,participantZones:zoneDefinitions.slice(0,2),staffZone:zoneDefinitions[2],counters,staticLayers:layers,extension:{gym:[180,2140,165,175],door:[650,2460],smokeSpots:[[440,2520],[840,2520]]},utilityBank:{x:1260,lift:[430,565],toilet:[270,350]},
+ width:3800,height:2550,version:'bird-isometric-v20',home:P(280,300),regions:{staff:P(1075,1015),teams:P(280,300),lecture:P(530,1580),kitchen:P(965,365),extension:P(650,2150),outside:P(650,2520)},
  minimap:(zones=[])=>rooms.map(r=>polygon(quad(r.x,r.y,r.w,r.h),r.id==='hall'?'#c4cdb9':'#a1b39f','#5e7b68',9)).join('')+zones.filter(z=>z.virtual).map(z=>polygon(quad(z.wx,z.wy,z.ww,z.wh),'#b5b99b','#5e7b68',9)).join('')};
 })();
