@@ -27,7 +27,7 @@ function sprite(key,x,y,width=64,height,flip=false,z=0){
  const [sx,sy]=P(x,y,z);height=height||width*asset.height/asset.width;
  return `<g transform="translate(${sx} ${sy})${flip?' scale(-1 1)':''}"><ellipse cy="-2" rx="${width*.3}" ry="${width*.1}" fill="#25352f" opacity=".13"/><image href="${asset.url}" x="${-width/2}" y="${-height}" width="${width}" height="${height}"/></g>`;
 }
-function chair(x,y,front=false,flip=false){add(x,y,sprite(front?'chairFront':'chairBack',x,y,53,69,flip),'chair',{footprint:[x-16,y-16,32,32]});}
+function chair(x,y,front=false,flip=false){add(x,y,sprite(front?'chairFront':'chairBack',x,y,53,69,flip),'chair',{anchor:[x,y],front,flip,footprint:[x-16,y-16,32,32]});}
 function equipment(x,y,facing=1){
  // Both monitor planes follow world-y. Opposite seats see opposite faces.
  const panel=[P(x,y-19,65),P(x,y+19,65),P(x,y+19,98),P(x,y-19,98)];

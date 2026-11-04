@@ -99,7 +99,7 @@ function create(scene,roster){
      if(blocked){a.blocked=(a.blocked||0)+dt;if(a.blocked>2&&clock>(a.replanAt||0)){a.replanAt=clock+4;const detour=nav.route(a.pos,a.goal,a.activity==='work'||a.activity==='food',others.map(b=>b.pos));if(detour.length>1){a.path=detour.slice(1);a.blocked=0;}else if(a.blocked>12&&!['away','return','rotate-out'].includes(a.activity)){if(!go(a,'return',a.home)){a.mode='idle';a.activity='walk';a.until=clock+5;} }}break;}
      a.blocked=0;a.facingLeft=(next[0]-a.pos[0])-(next[1]-a.pos[1])<0;a.pos=next;left-=travel;if(travel===distance)a.path.shift();
     }
-    if(!a.path.length){const returning=a.activity==='return';if(returning)a.activity='work';a.mode='idle';a.arrived=clock;a.until=clock+(a.activity==='work'?50:a.activity==='chat'?16:a.activity==='smoke'?20:6)+(a.index%15);a.seated=a.activity==='food'||a.activity==='work'&&(dist(a.pos,a.home)>20||windowSeats.some(p=>dist(a.pos,p)<10));
+    if(!a.path.length){const returning=a.activity==='return';if(returning)a.activity='work';a.mode='idle';a.arrived=clock;a.until=clock+(a.activity==='work'?50:a.activity==='chat'?16:a.activity==='smoke'?20:6)+(a.index%15);a.seated=['food','work'].includes(a.activity)&&scene.staticLayers.some(chair=>chair.kind==='chair'&&chair.anchor&&dist(a.pos,chair.anchor)<12);
      if(a.activity==='coffee'||a.activity==='water'){a.carry=a.activity;a.carryUntil=clock+35;}
      if(['away','rotate-out'].includes(a.activity)){a.mode='departing';a.hidden=false;a.until=clock+1;}
      if(a.activity==='chat')a.celebrate=a.variant===0;
