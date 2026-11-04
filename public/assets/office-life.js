@@ -34,8 +34,8 @@ function create(scene,roster){
  const nav=navigation(scene),actors=new Map(),seats=[[225,263],[375,263],[225,500],[375,500],[997,943],[1143,943],[997,1135],[1143,1135],[998,1488],[1142,1488],[998,1670],[1142,1670]],windowSeats=[[225,1155],[225,1330]];
  let clock=0,serial=0;
  for(const row of roster){const i=serial++,home=row.id==='person-maxim-ilin'?windowSeats[0]:row.id==='person-pavel-isaykov'?windowSeats[1]:row.home;
-  actors.set(row.id,{...row,index:i,home:[...home],pos:[...home],mode:'idle',activity:'work',until:3+(i*7)%24,path:[],round:0,variant:i%7,visited:new Set(),seated:row.id==='person-maxim-ilin'||row.id==='person-pavel-isaykov',hidden:false,carry:null});}
- const choices={walk:[[620,900],[650,1120],[740,940],[650,1280],[600,820],[750,1190],[620,1050]],coffee:[[780,740],[780,780]],water:[[790,850],[750,850]],food:[[1020,58],[1100,126]],away:[[1220,500]]};
+  actors.set(row.id,{...row,index:i,home:[...home],pos:[...home],mode:'idle',activity:'work',until:3+(i*7)%24,path:[],round:0,variant:[...row.id].reduce((n,c)=>n+c.charCodeAt(0),0)%7,visited:new Set(),seated:row.id==='person-maxim-ilin'||row.id==='person-pavel-isaykov',hidden:false,carry:null});}
+ const choices={walk:[[620,900],[650,1120],[740,940],[650,1280],[600,820],[750,1190],[620,1050]],coffee:[[780,740],[780,780]],water:[[790,850],[750,850]],food:[[1020,58]],away:[[1220,500]]};
  function go(a,type,target){const path=nav.route(a.pos,target,type==='work'||type==='food');if(path.length<2)return false;if(type==='work'||type==='food')a.carry=null;a.activity=type;a.visited.add(type);a.path=path.slice(1);a.mode='walking';a.seated=false;a.hidden=false;a.variant=(a.variant+1)%7;a.started=clock;return true;}
  function plan(a){
   const kind=activities[(a.index+a.round++)%7];
@@ -63,9 +63,9 @@ function create(scene,roster){
    if(a.mode==='walking'){
     let left=dt*(35+(a.index%4)*3);
     while(left>0&&a.path.length){const target=a.path[0],distance=dist(a.pos,target);if(distance<.1){a.path.shift();continue;}const travel=Math.min(left,distance),next=[a.pos[0]+(target[0]-a.pos[0])*travel/distance,a.pos[1]+(target[1]-a.pos[1])*travel/distance];
-     const blocked=[...actors.values()].some(b=>b!==a&&!b.hidden&&dist(next,b.pos)<23&&dist(next,b.pos)<dist(a.pos,b.pos));
+     const blocked=[...actors.values()].some(b=>b!==a&&!b.hidden&&dist(next,b.pos)<30&&dist(next,b.pos)<dist(a.pos,b.pos));
      if(blocked){a.blocked=(a.blocked||0)+dt;if(a.blocked>5){a.path=[];a.activity='walk';}break;}
-     a.blocked=0;a.pos=next;left-=travel;if(travel===distance)a.path.shift();
+     a.blocked=0;a.facingLeft=(next[0]-a.pos[0])-(next[1]-a.pos[1])<0;a.pos=next;left-=travel;if(travel===distance)a.path.shift();
     }
     if(!a.path.length){a.mode='idle';a.arrived=clock;a.until=clock+(a.activity==='chat'?15:a.activity==='work'?18:9)+(a.index%7);a.seated=a.activity==='food'||a.activity==='work'&&dist(a.pos,a.home)>20;
      if(a.id==='person-maxim-ilin'||a.id==='person-pavel-isaykov')a.seated=a.activity==='work';
@@ -76,7 +76,7 @@ function create(scene,roster){
    }else if(a.activity==='chat'&&a.partner&&actors.get(a.partner)?.mode==='walking'&&clock<a.started+70){a.until=clock+15;}else if(clock>a.until){a.partner=null;a.targetSeat=null;plan(a);}
   }
  }
- function words(a,lang){if(a.mode==='away')return '';if(a.activity==='chat'&&a.mode==='idle'&&actors.get(a.partner)?.mode==='idle')return Math.floor(clock/2+a.index)%2?'…':'';const list=phrases[a.activity]?.[lang]||phrases[a.activity]?.en;return list&&clock-(a.mode==='walking'?a.started:a.arrived)<3.8?list[a.variant]:'';}
+ function words(a,lang){if(a.mode==='away')return '';const partner=actors.get(a.partner);if(a.activity==='chat'&&a.mode==='idle'&&partner?.mode==='idle'&&partner.activity==='chat'&&dist(a.pos,partner.pos)<90)return Math.floor(clock/2+(a.id<a.partner?0:1))%2?'…':'';const list=phrases[a.activity]?.[lang]||phrases[a.activity]?.en;return list&&clock-(a.mode==='walking'?a.started:a.arrived)<3.8?list[a.variant]:'';}
  return{actors,nav,step,words,get time(){return clock},activities,plan};
 }
 window.BirdOfficeLife={create,navigation,activities};

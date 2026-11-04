@@ -63,7 +63,7 @@ function spriteAvatar(member,p,index=0,selected=false,withName=true){
  const renderWidth=personal?128*frames[0][2]/frames[0][3]:96;
  const imageWidth=personal?member.sprite.width:2752,imageHeight=personal?member.sprite.height:1536;
  const source=personal?member.portraitAsset:appearance==='woman'&&OFFICE_ARTWORK.person2?OFFICE_ARTWORK.person2:OFFICE_ARTWORK.person;
- return `<g class="office-person pixel-person ${selected?'is-selected':''}" data-person="${escape(member.id)}" role="button" tabindex="0" aria-label="${escape(member.name+', '+member.role+', '+p.name)}" style="--pixel-delay:${-(index%7)*1.7}s"><title>${escape(member.name+' · '+member.role)}</title><rect class="pixel-person-hit" x="-70" y="-132" width="140" height="156" rx="18"/><ellipse class="person-ring" cy="-10" rx="36" ry="18"/><ellipse cy="-8" rx="25" ry="8" fill="#263c36" opacity=".2"/><g class="pixel-body" >${frames.map((f,j)=>`<svg class="pixel-frame frame-${j}" x="${-renderWidth/2}" y="-132" width="${renderWidth}" height="128" viewBox="${f.join(' ')}" overflow="hidden"><image href="${source}" width="${imageWidth}" height="${imageHeight}"/></svg>`).join('')}</g>${withName?`<text class="person-name" y="19" text-anchor="middle">${escape(truncate(member.name,16))}</text>`:''}</g>`;
+ return `<g class="office-person pixel-person ${selected?'is-selected':''}" data-person="${escape(member.id)}" role="button" tabindex="0" aria-label="${escape(member.name+', '+member.role+', '+p.name)}" style="--pixel-delay:${-(index%7)*1.7}s"><title>${escape(member.name+' · '+member.role)}</title><rect class="pixel-person-hit" x="-44" y="-128" width="88" height="144" rx="18"/><ellipse class="person-ring" cy="-10" rx="36" ry="18"/><ellipse cy="-8" rx="25" ry="8" fill="#263c36" opacity=".2"/><g class="pixel-body" >${frames.map((f,j)=>`<svg class="pixel-frame frame-${j}" x="${-renderWidth/2}" y="-132" width="${renderWidth}" height="128" viewBox="${f.join(' ')}" overflow="hidden"><image href="${source}" width="${imageWidth}" height="${imageHeight}"/></svg>`).join('')}</g>${withName?`<text class="person-name" y="19" text-anchor="middle">${escape(truncate(member.name,16))}</text>`:''}</g>`;
 }
 let life=null,lifeFrame=0;
 function scene(){
@@ -131,10 +131,10 @@ function startOfficeLife(){
     a.pinned=!a.hidden&&(n.el.matches(':hover,:focus')||selection?.personId===a.id);
     const[x,y]=BirdOfficeScene.project(...a.pos);n.outer.setAttribute('transform',`translate(${x} ${y}) scale(${BirdOfficeScene.visualMetrics.personScale})`);
     n.layer.dataset.depth=a.pos[0]+a.pos[1]+5;n.layer.style.display=a.hidden?'none':'';n.layer.style.opacity=a.mode==='departing'?Math.max(0,1-(life.time-a.arrived)):1;n.el.dataset.activity=a.activity;n.el.dataset.state=a.mode;n.el.dataset.seated=String(a.seated);
-    n.el.classList.toggle('is-walking',a.mode==='walking'&&motionEnabled);n.el.classList.toggle('is-seated',a.seated);
+    n.el.classList.toggle('is-walking',a.mode==='walking'&&motionEnabled);n.el.classList.toggle('is-seated',a.seated);n.el.classList.toggle('is-facing-left',a.seated?['person-maxim-ilin','person-pavel-isaykov'].includes(a.id):a.facingLeft===true);
     if(n.label){n.label.setAttribute('x',x);n.label.setAttribute('y',y+15);n.label.style.display=a.hidden?'none':'';}
-    const asset=window.BIRD_OFFICE_ACTIVITIES?.[a.id];let pose=asset?(a.seated?0:a.carry?2:a.mode==='walking'&&Math.floor(life.time*5)%2?1:-1):-1;
-    if(String(pose)!==n.lastPose){n.lastPose=String(pose);n.body.innerHTML=pose<0?n.base:`<svg class="pixel-frame life-pose" x="-69.82" y="-132" width="139.64" height="128" viewBox="${pose*384} 0 384 352"><image href="${asset.asset}" width="1152" height="352"/></svg>`;}
+    const asset=window.BIRD_OFFICE_ACTIVITIES?.[a.id];let pose=asset?(a.seated?0:a.carry?2:a.mode==='walking'&&Math.floor(life.time*5+a.index*.73)%2?1:-1):-1;
+    if(String(pose)!==n.lastPose){n.lastPose=String(pose);n.body.innerHTML='<g class="life-facing">'+(pose<0?n.base:`<svg class="pixel-frame life-pose" x="-69.82" y="-132" width="139.64" height="128" viewBox="${pose*384} 0 384 352"><image href="${asset.asset}" width="1152" height="352"/></svg>`)+'</g>';}
     let bubble=motionEnabled?life.words(a,language):'';
     const steam=a.carry==='coffee'&&!a.hidden,water=a.carry==='water'&&!a.hidden,walking=a.mode==='walking',working=a.seated;
     const stamp=bubble+'|'+steam+'|'+water+'|'+walking+'|'+working;
