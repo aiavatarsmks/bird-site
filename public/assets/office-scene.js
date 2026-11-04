@@ -154,9 +154,9 @@ wall(886,565,886,760,128,{tag:'service-wall'});wall(886,565,1260,565,128,{tag:'s
 wall(1260,30,1260,270,145,{tag:'utility-bank'});wall(1260,350,1260,430,145,{tag:'utility-bank'});
 door(430,565,true);door(270,350,false);
 wall(878,195,1260,195,38,{tag:'kitchen-wall'});
-// Retractable lecture screen is partly lowered at the agreed front edge.
-const screen=[P(330,1835,55),P(840,1835,55),P(840,1835,118),P(330,1835,118)];
-add(585,1835,polygon(screen,'#f7f5e9','#566b62',3)+line(P(325,1835,121),P(845,1835,121),'#41564d',7),'screen');
+// The lecture screen is retracted in the ordinary office view.
+// A lowered sheet at the front edge obscured the first row of lecture furniture.
+// Keep the approved desks and chairs clear; no screen plane is drawn over them.
 add(590,1500,box(580,1490,28,22,133,'#e8e8da','#8b9e91',115),'equipment-ceiling');
 for(const [x,y,w]of [[95,150,330],[95,920,330],[400,1170,330],[420,1580,300],[930,950,220],[930,1500,220],[620,350,170]])light(x,y,w);
 for(const [x,y]of [[90,90],[500,95],[910,790],[1220,1220],[915,1780],[90,1770]])plant(x,y);
@@ -188,7 +188,7 @@ function draw(people=[],zones=[],underlay=''){
  return {html:defs+floors(zones)+underlay+items.map(i=>`<g class="iso-layer ${i.kind==='wall'?'iso-wall':''} ${i.faded?'is-faded':''}" data-scene-kind="${i.kind}" data-layer-id="${i.id}" ${i.tag?`data-wall-tag="${i.tag}"`:''} ${i.row?`data-row="${i.row}" data-column="${i.column}"`:''} ${i.faded?'data-occluded="true"':''} pointer-events="${i.kind==='person'?'auto':'none'}">${i.html}</g>`).join(''),fadedWalls:hidden};
 }
 const zoneDefinitions=[{wx:85,wy:65,ww:440,wh:610,seats:[[160,325],[440,430],[155,550],[440,590]]},{wx:910,wy:1320,ww:330,wh:470,seats:[[945,1590],[1215,1440],[940,1750],[1210,1660]]},{wx:910,wy:795,ww:330,wh:440,seats:[[940,1000],[1210,930],[940,1180],[1210,1120]]}];
-window.BirdOfficeScene={project:P,quad,bounds,draw,floors,rooms,zoneDefinitions,participantZones:zoneDefinitions.slice(0,2),staffZone:zoneDefinitions[2],counters,staticLayers:layers,utilityBank:{x:1260,lift:[430,565],toilet:[270,350]},
+window.BirdOfficeScene={project:P,quad,bounds,draw,floors,rooms,zoneDefinitions,lectureScreenRetracted:true,participantZones:zoneDefinitions.slice(0,2),staffZone:zoneDefinitions[2],counters,staticLayers:layers,utilityBank:{x:1260,lift:[430,565],toilet:[270,350]},
  width:3100,height:2200,version:'bird-isometric-v19',home:P(280,300),regions:{staff:P(1075,1015),teams:P(280,300),lecture:P(530,1580),kitchen:P(965,365)},
  minimap:(zones=[])=>rooms.map(r=>polygon(quad(r.x,r.y,r.w,r.h),r.id==='hall'?'#c4cdb9':'#a1b39f','#5e7b68',9)).join('')+zones.filter(z=>z.virtual).map(z=>polygon(quad(z.wx,z.wy,z.ww,z.wh),'#b5b99b','#5e7b68',9)).join('')};
 })();
