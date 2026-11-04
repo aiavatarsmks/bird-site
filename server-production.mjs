@@ -20,7 +20,7 @@ Bun.serve({port:Number(Bun.env.PORT||8080),maxRequestBodySize:16384,async fetch(
  const file=files.get(url.pathname);if(!file)return new Response('Not found',{status:404});
  if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
  const body=await readFile(new URL(file,publicRoot));
- const type=file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html';
- return new Response(request.method==='HEAD'?null:body,{headers:{'Content-Type':type+'; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-BIRD-Release':release}});
+ const type=file.endsWith('.webp')?'image/webp':file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html';
+ return new Response(request.method==='HEAD'?null:body,{headers:{'Content-Type':type+(type.startsWith('image/')?'':'; charset=utf-8'),'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-BIRD-Release':release}});
 }});
 console.log('BIRD serving file release',release);
