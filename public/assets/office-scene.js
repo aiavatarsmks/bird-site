@@ -129,7 +129,7 @@ for(const x of [147,267]){
 }
 for(let row=0;row<4;row++)for(let col=0;col<5;col++){
  const x=335+col*102,y=1380+row*110;
- add(x+40,y+55,sprite((row+col)%2?'lectureBlue':'lectureYellow',x+40,y+74,visualMetrics.lectureWidth,visualMetrics.lectureHeight,true),'lecture',{row:row+1,column:col+1,width:visualMetrics.lectureWidth,height:visualMetrics.lectureHeight});counters.lecture++;
+ add(x+40,y+55,sprite((row+col)%2?'lectureBlue':'lectureYellow',x+40,y+74,visualMetrics.lectureWidth,visualMetrics.lectureHeight,true),'lecture',{anchor:[x+40,y+74],row:row+1,column:col+1,width:visualMetrics.lectureWidth,height:visualMetrics.lectureHeight});counters.lecture++;
 }
 // Correct service positions: same face of wall, low by the glass doorway.
 add(850,835,sprite('cooler',850,835,41,105),'service');counters.cooler++;

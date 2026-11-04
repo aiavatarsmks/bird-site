@@ -120,12 +120,16 @@ function form(){return `<section class="office-form-section" id="office-new-proj
 function rememberDraft(){const f=root.querySelector('#office-project-form');if(!f)return;draft={name:f.elements.name.value,description:f.elements.description.value,stage:f.elements.stage.value,members:[...f.querySelectorAll('[data-member-name]')].map((e,i)=>({name:e.value,role:f.querySelector(`[data-member-role="${i}"]`).value,avatar:f.querySelector(`[data-member-avatar="${i}"]`).value}))};}
 function render(){if(!root)return;const oldQueryFocus=document.activeElement?.id==='office-search';const oldQueryCursor=root.querySelector('#office-search')?.selectionStart;root.innerHTML=`<div class="incubator"><a class="office-skip" href="#office-map">${text('skip')}</a>${embedded?'':`<header class="office-header"><div class="office-brand">BIRD</div><div class="office-langs" role="group" aria-label="Language">${['en','hr','ru'].map((lang,i)=>`<button data-language="${lang}" aria-label="${['English','Hrvatski','Русский'][i]}" aria-pressed="${language===lang}">${lang.toUpperCase()}</button>`).join('')}</div></header>`}<div class="office-intro">${embedded&&typeof teamsViewNav==='function'?teamsViewNav('office'):''}<h1>${text('brand')}</h1><button class="office-primary" data-action="add">+ ${text('add')}</button></div><div class="office-grid"><div><div class="office-board ${controlsOpen?'is-expanded':''}"><div class="office-toolbar"><div class="office-search"><label for="office-search">${text('find')}</label><input id="office-search" type="search" placeholder="${text('placeholder')}" value="${escape(query)}"></div>${teamGroups()}<div class="camera-tools"><button data-action="motion" aria-pressed="${motionEnabled}">${text(motionEnabled?'pause':'resume')}</button><button data-action="zoom-out" aria-label="${text('zoomOut')}">−</button><button data-action="zoom-in" aria-label="${text('zoomIn')}">+</button><button data-action="fit">${text('fit')}</button></div></div>${navigator()}<div class="office-viewport-wrap"><div class="office-canvas" id="office-map">${scene()}</div>${miniMap()}</div><div class="office-board-footer"><span>${text('hint')}</span><span>${text('teams')}: ${store.state.projects.length} · ${text('people')}: ${store.state.projects.reduce((n,p)=>n+p.members.length,0)}</span></div></div></div><aside class="office-side ${selection?'has-selection':''}" id="office-card" aria-live="polite">${sideCard()}</aside></div><p class="office-live" role="status">${message?text(message):''}</p>${formOpen?form():''}</div>`;document.documentElement.lang=language;if(!embedded)document.title=text('brand')+' · BIRD';bind();if(!camera||camera.layoutId!==layout.id)homeView();else applyCamera();if(oldQueryFocus){const input=root.querySelector('#office-search');input.focus({preventScroll:true});input.setSelectionRange(oldQueryCursor,oldQueryCursor);}watchSize();startOfficeLife();}
 function occupiedSeat(a){
- if(!a.seated||!window.BIRD_OFFICE_SEATED?.[a.id])return null;
+ const routine=window.BIRD_OFFICE_ROUTINES?.[a.id];
+ if(a.activity==='exercise'&&a.mode==='idle'&&routine?.exercise){const chair=BirdOfficeScene.staticLayers.find(x=>x.kind==='exercise');return{chair,asset:routine.exercise,facing:'se',frame:life.time-a.arrived<5?1:Math.floor((life.time-a.arrived)/2)%2+1,flip:false,kind:'exercise'};}
+ if(!a.seated)return null;
+ if(routine?.lecture){const chair=BirdOfficeScene.staticLayers.find(x=>x.kind==='lecture'&&x.anchor&&Math.hypot(a.pos[0]-x.anchor[0],a.pos[1]-x.anchor[1])<18);if(chair)return{chair,asset:routine.lecture,facing:'sw',frame:(chair.row+chair.column)%2?1:2,flip:a.id!=='person-quynh-tran',kind:'lecture'};}
+ if(!window.BIRD_OFFICE_SEATED?.[a.id])return null;
  const chairs=BirdOfficeScene.staticLayers.filter(x=>x.kind==='chair'&&x.anchor),chair=chairs.find(c=>Math.hypot(a.pos[0]-c.anchor[0],a.pos[1]-c.anchor[1])<18);if(!chair)return null;
  const desks=BirdOfficeScene.staticLayers.filter(x=>x.kind==='desk-top').map(x=>{const[dx,dy,w,h]=x.footprint;return[Math.max(dx,Math.min(dx+w,a.pos[0])),Math.max(dy,Math.min(dy+h,a.pos[1]))];});
  desks.sort((b,c)=>Math.hypot(b[0]-a.pos[0],b[1]-a.pos[1])-Math.hypot(c[0]-a.pos[0],c[1]-a.pos[1]));if(!desks.length)return null;
  const dx=desks[0][0]-a.pos[0],dy=desks[0][1]-a.pos[1],facing=Math.abs(dx)>Math.abs(dy)?dx>0?'se':'nw':dy<0?'ne':'sw',asset=BIRD_OFFICE_SEATED[a.id],front=facing==='se'||facing==='sw';
- return{chair,asset,facing,frame:front?1:2,flip:front?facing!==asset.frontFacing:facing!==asset.rearFacing};
+ return{chair,asset,facing,frame:front?1:2,flip:front?facing!==asset.frontFacing:facing!==asset.rearFacing,kind:'chair'};
 }
 
 function startOfficeLife(){
@@ -140,6 +144,8 @@ function startOfficeLife(){
   const views=[['base',n.body.querySelector('.frame-0')?.outerHTML||n.base]];
   if(activity)for(let i=0;i<3;i++)views.push([String(i),`<svg class="pixel-frame life-pose" x="-69.82" y="-132" width="139.64" height="128" viewBox="${i*384} 0 384 352"><image href="${activity.asset}" width="1152" height="352"/></svg>`]);
   if(chair)for(const i of [1,2]){const h=chair.renderHeight,w=h*384/352;views.push(['chair-'+i,`<svg class="pixel-frame life-pose life-chair-pose" x="${-w/2}" y="${-h*332/352}" width="${w}" height="${h}" viewBox="${i*384} 0 384 352"><image href="${chair.asset}" width="1152" height="352"/></svg>`]);}
+  const routine=window.BIRD_OFFICE_ROUTINES?.[n.id];
+  for(const kind of ['lecture','exercise']){const asset=routine?.[kind];if(!asset)continue;for(const i of [1,2]){const h=asset.renderHeight,w=h*384/352;views.push([kind+'-'+i,`<svg class="pixel-frame life-pose life-${kind}-pose" x="${-w/2}" y="${-h*332/352}" width="${w}" height="${h}" viewBox="${i*384} 0 384 352"><image href="${asset.asset}" width="1152" height="352"/></svg>`]);}}
   n.body.innerHTML='<g class="life-facing">'+views.map(([key,html])=>`<g data-life-pose="${key}" style="visibility:${key==='base'?'visible':'hidden'}">${html}</g>`).join('')+'</g>';
   n.poses=[...n.body.querySelectorAll('[data-life-pose]')];n.lastPose='base';
  }
@@ -148,14 +154,14 @@ function startOfficeLife(){
   if(motionEnabled&&!document.hidden)life.step(dt);
   if(now-paint>32){paint=now;const actorPositions=[],occupiedChairs=new Set();
    for(const n of nodes){const a=life.actors.get(n.id);if(!a)continue;
-    a.pinned=!a.hidden&&(n.el.matches(':hover,:focus'));
+    a.pinned=!a.hidden&&(n.el.matches(':hover'));
     const[x,y]=BirdOfficeScene.project(...a.pos);n.outer.setAttribute('transform',`translate(${x} ${y}) scale(${BirdOfficeScene.visualMetrics.personScale})`);
     n.layer.dataset.depth=a.pos[0]+a.pos[1]+5;n.layer.style.display=a.hidden?'none':'';n.layer.style.opacity=a.mode==='departing'?Math.max(0,1-(life.time-a.arrived)):1;n.el.dataset.activity=a.activity;n.el.dataset.state=a.mode;n.el.dataset.seated=String(a.seated);
-    const seat=occupiedSeat(a);if(seat)occupiedChairs.add(seat.chair.id);n.el.dataset.seatFacing=seat?.facing||'';n.el.dataset.occupiedChair=seat?.chair.id||'';
+    const seat=occupiedSeat(a);if(seat&&!a.hidden)occupiedChairs.add(seat.chair.id);n.el.dataset.seatFacing=seat?.facing||'';n.el.dataset.occupiedChair=seat?.chair.id||'';
     n.el.classList.toggle('is-walking',a.mode==='walking'&&motionEnabled);n.el.classList.toggle('is-seated',a.seated);n.el.classList.toggle('is-facing-left',seat?seat.flip:a.seated?['person-maxim-ilin','person-pavel-isaykov'].includes(a.id):a.facingLeft===true);
     if(n.label){n.label.setAttribute('x',x);n.label.setAttribute('y',y+15);n.label.style.display=a.hidden?'none':'';}
     const asset=window.BIRD_OFFICE_ACTIVITIES?.[a.id];
-    const poseKey=seat?'chair-'+seat.frame:asset?String(a.seated?0:a.carry?2:a.mode==='walking'?1:'base'):'base';
+    const poseKey=seat?seat.kind+'-'+seat.frame:asset?String(a.seated?0:a.carry?2:a.mode==='walking'?1:'base'):'base';
     if(poseKey!==n.lastPose){n.lastPose=poseKey;for(const view of n.poses)view.style.visibility=view.dataset.lifePose===poseKey?'visible':'hidden';n.el.querySelector('.person-ring')?.setAttribute('cy',seat?'0':'-10');}
     let bubble=motionEnabled?life.words(a,language):'';
     const steam=a.carry==='coffee'&&!a.hidden,water=a.carry==='water'&&!a.hidden,walking=a.mode==='walking',working=a.seated;
@@ -167,7 +173,7 @@ function startOfficeLife(){
     if(a.celebrate&&a.activity==='chat'&&life.time-a.arrived<3&&window.BirdOfficeFX){let fx=n.overlay.querySelector('.life-pixelfx');if(!fx){fx=document.createElementNS(ns,'image');fx.setAttribute('class','life-pixelfx');fx.setAttribute('x','-80');fx.setAttribute('y','-180');fx.setAttribute('width','160');fx.setAttribute('height','112');n.overlay.append(fx);}fx.setAttribute('href',BirdOfficeFX.confetti(life.time-a.arrived,a.index));}else n.overlay.querySelector('.life-pixelfx')?.remove();
     if(!a.hidden)actorPositions.push({x,y,depth:Number(n.layer.dataset.depth)});
    }
-   for(const chair of BirdOfficeScene.staticLayers.filter(x=>x.kind==='chair')){const layer=svg.querySelector(`[data-layer-id="${chair.id}"]`);if(layer)layer.style.visibility=occupiedChairs.has(chair.id)?'hidden':'';}
+   for(const chair of BirdOfficeScene.staticLayers.filter(x=>['chair','lecture','exercise'].includes(x.kind))){const layer=svg.querySelector(`[data-layer-id="${chair.id}"]`);if(layer)layer.style.visibility=occupiedChairs.has(chair.id)?'hidden':'';}
    svg.querySelector('[data-wall-tag="elevator"]')?.classList.toggle('life-door-active',[...life.actors.values()].some(a=>a.mode==='departing'));
    for(const wall of BirdOfficeScene.staticLayers.filter(x=>x.kind==='wall')){const el=svg.querySelector(`[data-layer-id="${wall.id}"]`);const faded=BirdOfficeScene.isOccluded(wall,actorPositions);el?.classList.toggle('is-faded',faded);if(el)el.dataset.occluded=String(faded);}
    const layers=[...staticNodes,...nodes.map(n=>n.layer)].filter(n=>n.dataset.ground!=='true');layers.sort((a,b)=>Number(a.dataset.depth)-Number(b.dataset.depth));
