@@ -20,15 +20,21 @@ function navigation(scene){
   const inFloor=scene.rooms.some(r=>x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h);
   if(inFloor&&!blocks.some(([a,b,w,h])=>x>a-10&&x<a+w+10&&y>b-10&&y<b+h+10)&&!walls.some(([a,b,c,d])=>a===c?Math.abs(x-a)<14&&y>Math.min(b,d)-12&&y<Math.max(b,d)+12:Math.abs(y-b)<14&&x>Math.min(a,c)-12&&x<Math.max(a,c)+12))cells.set(x+','+y,[x,y]);
  }
- const nearest=p=>[...cells.values()].reduce((a,b)=>dist(a,p)<dist(b,p)?a:b);
- function route(from,to,seated=false){
-  const start=nearest(from),goal=nearest(to),key=p=>p.join(','),open=[start],came=new Map(),seen=new Set([key(start)]);
+ const within=(p,r)=>p[0]>r[0]-10&&p[0]<r[0]+r[2]+10&&p[1]>r[1]-10&&p[1]<r[1]+r[3]+10;
+ const wallHit=p=>walls.some(([a,b,c,d])=>a===c?Math.abs(p[0]-a)<14&&p[1]>Math.min(b,d)-12&&p[1]<Math.max(b,d)+12:Math.abs(p[1]-b)<14&&p[0]>Math.min(a,c)-12&&p[0]<Math.max(a,c)+12);
+ const canStep=(from,to,seated=false)=>!(!wallHit(from)&&wallHit(to))&&!blocks.some(r=>within(to,r)&&!within(from,r)&&!(seated&&chairs.includes(r)));
+ const nearest=(p,blocked=new Set())=>[...cells.values()].filter(v=>!blocked.has(v.join(','))).reduce((a,b)=>dist(a,p)<dist(b,p)?a:b);
+ function route(from,to,seated=false,avoid=[]){
+  const key=p=>p.join(','),blocked=new Set();
+  for(const other of avoid)for(let dx=-2;dx<=2;dx++)for(let dy=-2;dy<=2;dy++){const p=[Math.round(other[0]/STEP)*STEP+dx*STEP,Math.round(other[1]/STEP)*STEP+dy*STEP];if(dist(p,other)<30)blocked.add(key(p));}
+  const start=nearest(from,blocked),goal=nearest(to);if(blocked.has(key(goal)))return [];
+  const open=[start],came=new Map(),seen=new Set([key(start)]);
   for(let i=0;i<open.length;i++){
    const p=open[i];if(key(p)===key(goal)){const result=[p];let k=key(p);while(came.has(k)){const prev=came.get(k);result.push(prev);k=key(prev);}return [from,...result.reverse(),...(seated&&dist(goal,to)<55?[to]:[])];}
-   for(const [dx,dy]of [[STEP,0],[-STEP,0],[0,STEP],[0,-STEP]]){const n=[p[0]+dx,p[1]+dy],k=key(n);if(cells.has(k)&&!seen.has(k)){seen.add(k);came.set(k,p);open.push(n);}}
+   for(const [dx,dy]of [[STEP,0],[-STEP,0],[0,STEP],[0,-STEP]]){const n=[p[0]+dx,p[1]+dy],k=key(n);if(cells.has(k)&&!seen.has(k)&&!blocked.has(k)){seen.add(k);came.set(k,p);open.push(n);}}
   }return [];
  }
- return{route,free,cells};
+ return{route,free,cells,canStep};
 }
 function create(scene,roster){
  const nav=navigation(scene),actors=new Map(),seats=[[225,263],[375,263],[225,500],[375,500],[997,943],[1143,943],[997,1135],[1143,1135],[998,1488],[1142,1488],[998,1670],[1142,1670]],windowSeats=[[225,1155],[225,1330]];
@@ -36,7 +42,7 @@ function create(scene,roster){
  for(const row of roster){const i=serial++,home=row.id==='person-maxim-ilin'?windowSeats[0]:row.id==='person-pavel-isaykov'?windowSeats[1]:row.home;
   actors.set(row.id,{...row,index:i,home:[...home],pos:[...home],mode:'idle',activity:'work',until:3+(i*7)%24,path:[],round:0,variant:[...row.id].reduce((n,c)=>n+c.charCodeAt(0),0)%7,visited:new Set(),seated:row.id==='person-maxim-ilin'||row.id==='person-pavel-isaykov',hidden:false,carry:null});}
  const choices={walk:[[620,900],[650,1120],[740,940],[650,1280],[600,820],[750,1190],[620,1050]],coffee:[[780,740],[780,780]],water:[[790,850],[750,850]],food:[[1020,58]],away:[[1220,500]]};
- function go(a,type,target){const path=nav.route(a.pos,target,type==='work'||type==='food');if(path.length<2)return false;if(type==='work'||type==='food')a.carry=null;a.activity=type;a.visited.add(type);a.path=path.slice(1);a.mode='walking';a.seated=false;a.hidden=false;a.variant=(a.variant+1)%7;a.started=clock;return true;}
+ function go(a,type,target){const path=nav.route(a.pos,target,type==='work'||type==='food',[...actors.values()].filter(b=>b!==a&&!b.hidden).map(b=>b.pos));if(path.length<2)return false;if(type==='work'||type==='food')a.carry=null;a.activity=type;a.visited.add(type);a.goal=[...target];a.path=path.slice(1);a.mode='walking';a.seated=false;a.hidden=false;a.variant=(a.variant+1)%7;a.started=clock;return true;}
  function plan(a){
   const kind=activities[(a.index+a.round++)%7];
   if(kind==='chat'){
@@ -63,8 +69,8 @@ function create(scene,roster){
    if(a.mode==='walking'){
     let left=dt*(35+(a.index%4)*3);
     while(left>0&&a.path.length){const target=a.path[0],distance=dist(a.pos,target);if(distance<.1){a.path.shift();continue;}const travel=Math.min(left,distance),next=[a.pos[0]+(target[0]-a.pos[0])*travel/distance,a.pos[1]+(target[1]-a.pos[1])*travel/distance];
-     const blocked=[...actors.values()].some(b=>b!==a&&!b.hidden&&dist(next,b.pos)<30&&dist(next,b.pos)<dist(a.pos,b.pos));
-     if(blocked){a.blocked=(a.blocked||0)+dt;if(a.blocked>5){a.path=[];a.activity='walk';}break;}
+     const blocked=!nav.canStep(a.pos,next,(a.activity==='work'||a.activity==='food')&&a.path.length===1)||[...actors.values()].some(b=>b!==a&&!b.hidden&&dist(next,b.pos)<30&&dist(next,b.pos)<dist(a.pos,b.pos));
+     if(blocked){a.blocked=(a.blocked||0)+dt;if(a.blocked>1.5&&clock>(a.replanAt||0)){a.replanAt=clock+2;const detour=nav.route(a.pos,a.goal,a.activity==='work'||a.activity==='food',[...actors.values()].filter(b=>b!==a&&!b.hidden).map(b=>b.pos));if(detour.length>1){a.path=detour.slice(1);a.blocked=0;}else if(a.blocked>12&&!['away','return'].includes(a.activity)){a.path=[];a.activity='walk';}}break;}
      a.blocked=0;a.facingLeft=(next[0]-a.pos[0])-(next[1]-a.pos[1])<0;a.pos=next;left-=travel;if(travel===distance)a.path.shift();
     }
     if(!a.path.length){a.mode='idle';a.arrived=clock;a.until=clock+(a.activity==='chat'?15:a.activity==='work'?18:9)+(a.index%7);a.seated=a.activity==='food'||a.activity==='work'&&dist(a.pos,a.home)>20;
