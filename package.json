@@ -1,0 +1,14 @@
+{
+  "name": "bird-study-notes",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun server-production.mjs",
+    "check": "node --check assets/app.js && node --check server-production.mjs",
+    "build": "node build-site.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
