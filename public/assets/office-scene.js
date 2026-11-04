@@ -188,7 +188,14 @@ function draw(people=[],zones=[],underlay=''){
  return {html:defs+floors(zones)+underlay+items.map(i=>`<g class="iso-layer ${i.kind==='wall'?'iso-wall':''} ${i.faded?'is-faded':''}" data-scene-kind="${i.kind}" data-layer-id="${i.id}" ${i.tag?`data-wall-tag="${i.tag}"`:''} ${i.row?`data-row="${i.row}" data-column="${i.column}"`:''} ${i.faded?'data-occluded="true"':''} pointer-events="${i.kind==='person'?'auto':'none'}">${i.html}</g>`).join(''),fadedWalls:hidden};
 }
 const zoneDefinitions=[{wx:85,wy:65,ww:440,wh:610,seats:[[160,325],[440,430],[155,550],[440,590]]},{wx:910,wy:1320,ww:330,wh:470,seats:[[945,1590],[1215,1440],[940,1750],[1210,1660]]},{wx:910,wy:795,ww:330,wh:440,seats:[[940,1000],[1210,930],[940,1180],[1210,1120]]}];
-window.BirdOfficeScene={project:P,quad,bounds,draw,floors,rooms,zoneDefinitions,lectureScreenRetracted:true,participantZones:zoneDefinitions.slice(0,2),staffZone:zoneDefinitions[2],counters,staticLayers:layers,utilityBank:{x:1260,lift:[430,565],toilet:[270,350]},
+// All known participants stay in the scene. These are browsing positions, not assigned seats.
+const participantPlacements={};
+const projectSeats={"vatro-dron":[[155,280],[440,280]],"krechobot":[[155,460],[440,460]],"scholarshot":[[155,640],[440,640]],"specka":[[190,65],[440,65]],"inventarko":[[945,1320],[1060,1320],[1210,1320]],"evidentio":[[945,1590],[1215,1480],[940,1770],[1210,1735]],"herform":[[290,1090],[290,1370]],"domplus":[[320,1240]],"odlikas":[[405,860],[495,960]],"cleaning-nada":[[525,1110]],"yorigora":[[655,1210]],"unmi":[]};
+for(const [slug,seats]of Object.entries(projectSeats)){
+ const points=seats.length?seats:[[700,850]],xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
+ participantPlacements['project-'+slug]={wx:Math.min(...xs)-30,wy:Math.min(...ys)-100,ww:Math.max(100,Math.max(...xs)-Math.min(...xs)+60),wh:Math.max(150,Math.max(...ys)-Math.min(...ys)+140),seats,labelHeight:120};
+}
+window.BirdOfficeScene={project:P,quad,bounds,draw,floors,rooms,zoneDefinitions,participantPlacements,lectureScreenRetracted:true,participantZones:zoneDefinitions.slice(0,2),staffZone:zoneDefinitions[2],counters,staticLayers:layers,utilityBank:{x:1260,lift:[430,565],toilet:[270,350]},
  width:3100,height:2200,version:'bird-isometric-v19',home:P(280,300),regions:{staff:P(1075,1015),teams:P(280,300),lecture:P(530,1580),kitchen:P(965,365)},
  minimap:(zones=[])=>rooms.map(r=>polygon(quad(r.x,r.y,r.w,r.h),r.id==='hall'?'#c4cdb9':'#a1b39f','#5e7b68',9)).join('')+zones.filter(z=>z.virtual).map(z=>polygon(quad(z.wx,z.wy,z.ww,z.wh),'#b5b99b','#5e7b68',9)).join('')};
 })();

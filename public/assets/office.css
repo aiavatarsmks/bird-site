@@ -92,3 +92,6 @@ body.office-page{height:100dvh;overflow:hidden}
 .office-page .top-nav{order:0;width:auto}.office-page .langs{order:0;margin-left:auto}
 .office-page .wrap.office-wrap{overflow:clip}
 .office-page .office-live{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);margin:0;padding:0}
+
+/* Reveal one team label while browsing, so labels never blanket all participants. */
+.office-team-label{visibility:hidden;pointer-events:none}.office-team-label.is-selected,.office-team-label.is-active{visibility:visible;pointer-events:auto}
