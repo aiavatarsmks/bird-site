@@ -106,3 +106,7 @@ body.office-page{height:100dvh;overflow:hidden}
 /* The life controller owns sprite visibility; idle/hover opacity keyframes
    must never blank a moving or seated body. Only position is animated. */
 .office-scene .pixel-body .pixel-frame{animation:none!important;opacity:1!important}
+
+/* Veo frames supply the full gait; never add a second procedural bounce. */
+.office-scene .has-walk-cycle .pixel-body{animation:none!important}
+.life-carry{pointer-events:none}

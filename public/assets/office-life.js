@@ -120,11 +120,11 @@ function create(scene,roster){
    if(a.mode==='departing'){if(clock>a.until){a.mode=a.rotationOut?'offsite':'away';a.hidden=true;a.until=clock+15+a.index%10;}continue;}
    if(a.mode==='away'){if(clock>a.until){a.pos=[1220,500];if(visible(a).some(b=>dist(b.pos,a.pos)<60)||!fitsArea(a.pos,visible(a).map(b=>b.pos))||!go(a,'return',a.home)){a.hidden=true;a.until=clock+4;}}continue;}
    if(a.mode==='walking'){
-    let left=dt*(32+(a.index%4)*3);
+    a.moving=false;let left=dt*(54+(a.index%4)*3);
     while(left>0&&a.path.length){const target=a.path[0],distance=dist(a.pos,target);if(distance<.1){a.path.shift();continue;}const travel=Math.min(left,distance),next=[a.pos[0]+(target[0]-a.pos[0])*travel/distance,a.pos[1]+(target[1]-a.pos[1])*travel/distance],others=visible(a);
      const blocked=!nav.canStep(a.pos,next,(['work','food','return','lecture','exercise','staff-in'].includes(a.activity))&&a.path.length===1)||!fitsArea(next,others.map(b=>b.pos))||others.some(b=>dist(next,b.pos)<45&&dist(next,b.pos)<dist(a.pos,b.pos));
      if(blocked){a.blocked=(a.blocked||0)+dt;if(a.blocked>2&&clock>(a.replanAt||0)){a.replanAt=clock+4;const detour=nav.route(a.pos,a.goal,['work','food','return','lecture','exercise','staff-in'].includes(a.activity),others.map(b=>b.pos));if(detour.length>1){a.path=detour.slice(1);a.blocked=0;}else if(a.blocked>12&&!['away','return','rotate-out'].includes(a.activity)){if(!go(a,'return',a.home)){a.mode='idle';a.activity='walk';a.until=clock+5;} }}break;}
-     a.blocked=0;a.facingLeft=(next[0]-a.pos[0])-(next[1]-a.pos[1])<0;a.pos=next;left-=travel;if(travel===distance)a.path.shift();
+     a.blocked=0;a.moving=true;a.walkDistance=(a.walkDistance||0)+travel;a.walkBack=(next[0]+next[1])<(a.pos[0]+a.pos[1]);a.facingLeft=(next[0]-a.pos[0])-(next[1]-a.pos[1])<0;a.pos=next;left-=travel;if(travel===distance)a.path.shift();
     }
     if(!a.path.length){const returning=a.activity==='return'||a.activity==='staff-in';if(a.activity==='staff-in')staffShift.nextAt=clock+60;if(returning)a.activity='work';a.mode='idle';a.arrived=clock;a.until=clock+(a.activity==='work'?26:a.activity==='lecture'?30:a.activity==='exercise'?18:a.activity==='chat'?16:a.activity==='smoke'?20:6)+(a.index%15);a.seated=['food','work','lecture'].includes(a.activity)&&scene.staticLayers.some(chair=>['chair','lecture'].includes(chair.kind)&&chair.anchor&&dist(a.pos,chair.anchor)<12);
      if(a.activity==='coffee'||a.activity==='water'){a.carry=a.activity;a.carryUntil=clock+35;}
