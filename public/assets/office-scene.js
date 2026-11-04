@@ -8,6 +8,8 @@ const polygon=(ps,fill,stroke='#555d5e',width=1.5,extra='')=>`<polygon points="$
 const line=(a,b,color,width=2,extra='')=>`<path d="M${a.join(' ')}L${b.join(' ')}" fill="none" stroke="${color}" stroke-width="${width}" ${extra}/>`;
 const quad=(x,y,w,h,z=0)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(([a,b])=>P(a,b,z));
 const rooms=[{id:'upper',x:60,y:30,w:480,h:680},{id:'corridor',x:540,y:30,w:720,h:730},{id:'hall',x:60,y:760,w:820,h:1080},{id:'middle',x:880,y:760,w:380,h:500},{id:'lower',x:880,y:1290,w:380,h:550}];
+// Screen-space scale uses an adult height of about 113 units; desks stay 54 high.
+const visualMetrics={personScale:1,personVisibleHeight:128*312/352,deskHeight:54,officeChairHeight:69,lectureWidth:74,lectureHeight:88};
 const counters={lecture:0,teamDesks:0,coffee:0,cooler:0,rack:0,lift:0,toilet:0};
 const layers=[];let serial=0;
 function add(x,y,html,kind='furniture',extra={}){layers.push({id:'iso-'+serial++,depth:x+y,html,kind,...extra});}
@@ -127,7 +129,7 @@ for(const x of [147,267]){
 }
 for(let row=0;row<4;row++)for(let col=0;col<5;col++){
  const x=335+col*102,y=1380+row*110;
- add(x+40,y+55,sprite((row+col)%2?'lectureBlue':'lectureYellow',x+40,y+74,108,128,true),'lecture',{row:row+1,column:col+1});counters.lecture++;
+ add(x+40,y+55,sprite((row+col)%2?'lectureBlue':'lectureYellow',x+40,y+74,visualMetrics.lectureWidth,visualMetrics.lectureHeight,true),'lecture',{row:row+1,column:col+1,width:visualMetrics.lectureWidth,height:visualMetrics.lectureHeight});counters.lecture++;
 }
 // Correct service positions: same face of wall, low by the glass doorway.
 add(850,835,sprite('cooler',850,835,41,105),'service');counters.cooler++;
@@ -173,7 +175,7 @@ function bounds(x,y,w,h,pad=0){const ps=quad(x,y,w,h);return{x:Math.min(...ps.ma
 function pointInside(p,poly){let inside=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if(((a[1]>p[1])!==(b[1]>p[1]))&&(p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0]))inside=!inside;}return inside;}
 function fades(w,people){
  if(!w.polygon)return false;
- return people.some(person=>person.depth<w.depth+12&&[-88,-65,-40,-12].some(y=>[-33,-16,0,16,33].some(x=>pointInside([person.x+x,person.y+y],w.polygon))));
+ return people.some(person=>person.depth<w.depth+12&&[-120,-90,-60,-25,-12].some(y=>[-33,-16,0,16,33].some(x=>pointInside([person.x+x,person.y+y],w.polygon))));
 }
 function draw(people=[],zones=[],underlay=''){
  const items=layers.map(item=>({...item}));
@@ -195,7 +197,7 @@ for(const [slug,seats]of Object.entries(projectSeats)){
  const points=seats.length?seats:[[700,850]],xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
  participantPlacements['project-'+slug]={wx:Math.min(...xs)-30,wy:Math.min(...ys)-100,ww:Math.max(100,Math.max(...xs)-Math.min(...xs)+60),wh:Math.max(150,Math.max(...ys)-Math.min(...ys)+140),seats,labelHeight:120};
 }
-window.BirdOfficeScene={project:P,quad,bounds,draw,floors,rooms,zoneDefinitions,participantPlacements,lectureScreenRetracted:true,participantZones:zoneDefinitions.slice(0,2),staffZone:zoneDefinitions[2],counters,staticLayers:layers,utilityBank:{x:1260,lift:[430,565],toilet:[270,350]},
+window.BirdOfficeScene={visualMetrics,project:P,quad,bounds,draw,floors,rooms,zoneDefinitions,participantPlacements,lectureScreenRetracted:true,participantZones:zoneDefinitions.slice(0,2),staffZone:zoneDefinitions[2],counters,staticLayers:layers,utilityBank:{x:1260,lift:[430,565],toilet:[270,350]},
  width:3100,height:2200,version:'bird-isometric-v19',home:P(280,300),regions:{staff:P(1075,1015),teams:P(280,300),lecture:P(530,1580),kitchen:P(965,365)},
  minimap:(zones=[])=>rooms.map(r=>polygon(quad(r.x,r.y,r.w,r.h),r.id==='hall'?'#c4cdb9':'#a1b39f','#5e7b68',9)).join('')+zones.filter(z=>z.virtual).map(z=>polygon(quad(z.wx,z.wy,z.ww,z.wh),'#b5b99b','#5e7b68',9)).join('')};
 })();

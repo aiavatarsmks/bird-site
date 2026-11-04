@@ -74,7 +74,7 @@ function scene(){
    const seat=seats[i]||[zone.wx+55+(i%4)*95,zone.wy+140+Math.floor(i/4)*105];
    const [x,y]=native.project(...seat);
    nameLabels.push(`<text data-name-for="${escape(m.id)}" class="scene-person-label person-name ${selection?.personId===m.id?'is-selected':''} ${!matches(p)?'is-dimmed':''}" x="${x}" y="${y+15}" text-anchor="middle">${escape(truncate(m.name,16))}</text>`);
-   people.push({x,y,depth:seat[0]+seat[1]+5,memberId:m.id,html:`<g class="${!matches(p)?'is-dimmed':''}" transform="translate(${x} ${y}) scale(.75)">${spriteAvatar(m,p,i,selection?.personId===m.id,false)}</g>`});
+   people.push({x,y,depth:seat[0]+seat[1]+5,memberId:m.id,html:`<g class="${!matches(p)?'is-dimmed':''}" transform="translate(${x} ${y}) scale(${native.visualMetrics.personScale})">${spriteAvatar(m,p,i,selection?.personId===m.id,false)}</g>`});
   });
   const [lx,ly]=native.project(zone.wx+35,zone.wy+40,zone.labelHeight||80);
   labels.push(`<g class="office-map-label office-team-label ${chosen?'is-selected':''} ${!matches(p)?'is-dimmed':''}" data-label-x="${lx}" data-label-y="${ly}" data-label-project="${escape(p.id)}" data-project="${escape(p.id)}" role="button" tabindex="0" aria-label="${escape(p.name)}"><rect width="200" height="38" rx="3" fill="#fcfaf3" stroke="${color(p)}" stroke-width="2"/><circle cx="16" cy="19" r="4" fill="${color(p)}"/><text x="29" y="25" font-size="14" fill="#263d34">${escape(truncate(p.name,21))}</text>${zone.virtual?`<text x="2" y="44" font-size="10" fill="#e8f0de">${text('extension')}</text>`:''}</g>`);
@@ -87,7 +87,7 @@ function scene(){
   const seat=staffZone.seats[i],[x,y]=native.project(...seat),id='staff-bird-'+(i+1);
   const member={id,name:staffTitle+' · '+(i+1),role:staffRole,portraitAsset:'assets/'+id+'.webp',avatarAppearance:'illustrative',sprite:{width:1152,height:352,frames:[[0,0,384,352],[384,0,384,352],[768,0,384,352]]}};
   nameLabels.push(`<text data-name-for="${id}" class="scene-person-label person-name" x="${x}" y="${y+15}" text-anchor="middle">${escape(staffRole)}</text>`);
-  people.push({x,y,depth:seat[0]+seat[1]+5,memberId:id,html:`<g transform="translate(${x} ${y}) scale(.75)">${spriteAvatar(member,{name:staffTitle},i,Boolean(selection?.staff),false).replace('data-person=','data-staff=')}</g>`});
+  people.push({x,y,depth:seat[0]+seat[1]+5,memberId:id,html:`<g transform="translate(${x} ${y}) scale(${native.visualMetrics.personScale})">${spriteAvatar(member,{name:staffTitle},i,Boolean(selection?.staff),false).replace('data-person=','data-staff=')}</g>`});
  }
  const [sx,sy]=native.project(staffZone.wx+35,staffZone.wy+40,80);
  labels.push(`<g class="office-map-label office-staff-label" data-label-x="${sx}" data-label-y="${sy}" data-action="staff" role="button" tabindex="0" aria-label="${escape(staffTitle)}"><rect width="200" height="38" rx="3" fill="#fcfaf3" stroke="#627a65" stroke-width="2"/><circle cx="16" cy="19" r="4" fill="#627a65"/><text x="29" y="25" font-size="14" fill="#263d34">${escape(staffTitle)}</text></g>`);
