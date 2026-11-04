@@ -102,3 +102,7 @@ body.office-page{height:100dvh;overflow:hidden}
 .is-seated[data-person="person-maxim-ilin"] .pixel-body,.is-seated[data-person="person-pavel-isaykov"] .pixel-body{transform:none}.is-facing-left .life-facing{transform:scaleX(-1)}.is-facing-left .life-water{transform:translateX(-44px)}
 .is-walking .pixel-body{animation-delay:var(--pixel-delay)}.is-facing-left .life-typing{transform:translateX(-44px)}.is-facing-left .life-steam{animation-name:life-steam-left}@keyframes life-steam-left{0%{opacity:0;transform:translate(-22px,-72px)}30%{opacity:.9}100%{opacity:0;transform:translate(-24px,-82px)}}
 .life-smoke{pointer-events:none;animation:life-smoke 2.8s steps(6,end) infinite}@keyframes life-smoke{0%{opacity:0;transform:translate(0,2px)}25%{opacity:.7}100%{opacity:0;transform:translate(6px,-10px)}}.motion-paused .life-smoke{animation-play-state:paused}@media(prefers-reduced-motion:reduce){.life-smoke{animation:none}}
+
+/* The life controller owns sprite visibility; idle/hover opacity keyframes
+   must never blank a moving or seated body. Only position is animated. */
+.office-scene .pixel-body .pixel-frame{animation:none!important;opacity:1!important}

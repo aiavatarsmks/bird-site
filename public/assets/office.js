@@ -133,24 +133,30 @@ function startOfficeLife(){
  const svg=root.querySelector('.office-scene'),ns='http://www.w3.org/2000/svg';
  const nodes=[...svg.querySelectorAll('[data-person],[data-staff]')].map(el=>{const id=el.dataset.person||el.dataset.staff,body=el.querySelector('.pixel-body'),overlay=document.createElementNS(ns,'g');overlay.setAttribute('class','life-overlay');overlay.setAttribute('aria-hidden','true');el.append(overlay);return{id,el,body,base:body.innerHTML,outer:el.parentElement,layer:el.parentElement.parentElement,label:svg.querySelector(`[data-name-for="${id}"]`),overlay,lastPose:'',lastBubble:''};});
  const staticNodes=[...svg.querySelectorAll(':scope > .iso-layer')].filter(el=>el.dataset.sceneKind!=='person');
+ // Keep decoded sprite nodes mounted. Replacing SVG images during every step
+ // caused a blank paint and restarted the idle frame opacity animations.
+ for(const n of nodes){
+  const activity=window.BIRD_OFFICE_ACTIVITIES?.[n.id],chair=window.BIRD_OFFICE_SEATED?.[n.id];
+  const views=[['base',n.body.querySelector('.frame-0')?.outerHTML||n.base]];
+  if(activity)for(let i=0;i<3;i++)views.push([String(i),`<svg class="pixel-frame life-pose" x="-69.82" y="-132" width="139.64" height="128" viewBox="${i*384} 0 384 352"><image href="${activity.asset}" width="1152" height="352"/></svg>`]);
+  if(chair)for(const i of [1,2]){const h=chair.renderHeight,w=h*384/352;views.push(['chair-'+i,`<svg class="pixel-frame life-pose life-chair-pose" x="${-w/2}" y="${-h*332/352}" width="${w}" height="${h}" viewBox="${i*384} 0 384 352"><image href="${chair.asset}" width="1152" height="352"/></svg>`]);}
+  n.body.innerHTML='<g class="life-facing">'+views.map(([key,html])=>`<g data-life-pose="${key}" style="visibility:${key==='base'?'visible':'hidden'}">${html}</g>`).join('')+'</g>';
+  n.poses=[...n.body.querySelectorAll('[data-life-pose]')];n.lastPose='base';
+ }
  let last=performance.now(),paint=0;
  function update(now){if(!root||!svg.isConnected)return;const dt=Math.min(.15,(now-last)/1000);last=now;
   if(motionEnabled&&!document.hidden)life.step(dt);
-  if(now-paint>90){paint=now;const actorPositions=[],occupiedChairs=new Set();
+  if(now-paint>32){paint=now;const actorPositions=[],occupiedChairs=new Set();
    for(const n of nodes){const a=life.actors.get(n.id);if(!a)continue;
-    a.pinned=!a.hidden&&(n.el.matches(':hover,:focus')||selection?.personId===a.id);
+    a.pinned=!a.hidden&&(n.el.matches(':hover,:focus'));
     const[x,y]=BirdOfficeScene.project(...a.pos);n.outer.setAttribute('transform',`translate(${x} ${y}) scale(${BirdOfficeScene.visualMetrics.personScale})`);
     n.layer.dataset.depth=a.pos[0]+a.pos[1]+5;n.layer.style.display=a.hidden?'none':'';n.layer.style.opacity=a.mode==='departing'?Math.max(0,1-(life.time-a.arrived)):1;n.el.dataset.activity=a.activity;n.el.dataset.state=a.mode;n.el.dataset.seated=String(a.seated);
     const seat=occupiedSeat(a);if(seat)occupiedChairs.add(seat.chair.id);n.el.dataset.seatFacing=seat?.facing||'';n.el.dataset.occupiedChair=seat?.chair.id||'';
     n.el.classList.toggle('is-walking',a.mode==='walking'&&motionEnabled);n.el.classList.toggle('is-seated',a.seated);n.el.classList.toggle('is-facing-left',seat?seat.flip:a.seated?['person-maxim-ilin','person-pavel-isaykov'].includes(a.id):a.facingLeft===true);
     if(n.label){n.label.setAttribute('x',x);n.label.setAttribute('y',y+15);n.label.style.display=a.hidden?'none':'';}
-    const asset=window.BIRD_OFFICE_ACTIVITIES?.[a.id];let pose=asset?(a.seated?0:a.carry?2:a.mode==='walking'&&Math.floor(life.time*5+a.index*.73)%2?1:-1):-1;
-    const poseKey=seat?'chair-'+seat.frame:String(pose);
-    if(poseKey!==n.lastPose){n.lastPose=poseKey;let art;
-     if(seat){const h=seat.asset.renderHeight,w=h*384/352;art=`<svg class="pixel-frame life-pose life-chair-pose" x="${-w/2}" y="${-h*332/352}" width="${w}" height="${h}" viewBox="${seat.frame*384} 0 384 352"><image href="${seat.asset.asset}" width="1152" height="352"/></svg>`;}
-     else art=pose<0?n.base:`<svg class="pixel-frame life-pose" x="-69.82" y="-132" width="139.64" height="128" viewBox="${pose*384} 0 384 352"><image href="${asset.asset}" width="1152" height="352"/></svg>`;
-     n.body.innerHTML='<g class="life-facing">'+art+'</g>';n.el.querySelector('.person-ring')?.setAttribute('cy',seat?'0':'-10');
-    }
+    const asset=window.BIRD_OFFICE_ACTIVITIES?.[a.id];
+    const poseKey=seat?'chair-'+seat.frame:asset?String(a.seated?0:a.carry?2:a.mode==='walking'?1:'base'):'base';
+    if(poseKey!==n.lastPose){n.lastPose=poseKey;for(const view of n.poses)view.style.visibility=view.dataset.lifePose===poseKey?'visible':'hidden';n.el.querySelector('.person-ring')?.setAttribute('cy',seat?'0':'-10');}
     let bubble=motionEnabled?life.words(a,language):'';
     const steam=a.carry==='coffee'&&!a.hidden,water=a.carry==='water'&&!a.hidden,walking=a.mode==='walking',working=a.seated;
     const stamp=bubble+'|'+steam+'|'+water+'|'+walking+'|'+working+'|'+(a.activity==='smoke'&&a.mode==='idle');

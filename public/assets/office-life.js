@@ -45,7 +45,7 @@ function create(scene,roster){
  const nav=navigation(scene),actors=new Map(),seats=[[225,263],[375,263],[225,500],[375,500],[997,943],[1143,943],[997,1135],[1143,1135],[998,1488],[1142,1488],[998,1670],[1142,1670],[1010,2050],[1170,2050],[1010,2320],[1170,2320]],windowSeats=[[225,1155],[225,1330]];
  let clock=0,serial=0;
  for(const row of roster){const i=serial++,home=row.id==='person-maxim-ilin'?windowSeats[0]:row.id==='person-pavel-isaykov'?windowSeats[1]:row.home;
-  actors.set(row.id,{...row,index:i,home:[...home],pos:[...home],mode:'idle',activity:'work',until:15+(i*13)%55,path:[],round:0,variant:[...row.id].reduce((n,c)=>n+c.charCodeAt(0),0)%7,visited:new Set(),seated:row.id==='person-maxim-ilin'||row.id==='person-pavel-isaykov',hidden:false,carry:null});}
+  actors.set(row.id,{...row,index:i,home:[...home],pos:[...home],mode:'idle',activity:'work',until:2+(i*7)%17,path:[],round:0,variant:[...row.id].reduce((n,c)=>n+c.charCodeAt(0),0)%7,visited:new Set(),seated:row.id==='person-maxim-ilin'||row.id==='person-pavel-isaykov',hidden:false,carry:null});}
  const groups=new Map();for(const a of actors.values())if(a.projectId){if(!groups.has(a.projectId))groups.set(a.projectId,[]);groups.get(a.projectId).push(a.id);}
  const rotations=[...groups.values()].filter(ids=>ids.length>2).map(ids=>{const absent=ids[ids.length-1],a=actors.get(absent);a.mode='offsite';a.hidden=true;return{ids,absent,nextAt:100,turn:0,departing:null,retryAt:0};});
  const visible=except=>[...actors.values()].filter(b=>b!==except&&!b.hidden);
@@ -73,7 +73,7 @@ function create(scene,roster){
   if(kind==='work'){
    const candidates=a.id==='person-maxim-ilin'?[windowSeats[0]]:a.id==='person-pavel-isaykov'?[windowSeats[1]]:a.id.startsWith('staff-')?seats.slice(4,8):seats.filter((_,i)=>i<4||i>7);
    const preferred=[...candidates].sort((b,c)=>dist(a.home,b)-dist(a.home,c)).find(p=>!visible(a).some(b=>dist(b.pos,p)<50||b.goal&&b.mode==='walking'&&dist(b.goal,p)<50));
-   a.targetSeat=preferred||a.home;if(dist(a.pos,a.targetSeat)<10){a.until=clock+45+a.index%25;return;}if(go(a,'work',a.targetSeat))return;
+   a.targetSeat=preferred||a.home;if(dist(a.pos,a.targetSeat)<10){a.seated=scene.staticLayers.some(c=>c.kind==='chair'&&c.anchor&&dist(a.pos,c.anchor)<12);a.until=clock+22+a.index%15;return;}if(go(a,'work',a.targetSeat))return;
   }else if(kind==='away'&&smokers.has(a.id)){const spot=a.id==='person-pavel-isaykov'?[440,2520]:[840,2520];if(go(a,'smoke',spot))return;
   }else if(choices[kind]&&!atStation(kind,a)){
    const targets=[...choices[kind]].sort((b,c)=>dist(a.home,b)-dist(a.home,c));for(const target of targets)if(go(a,kind,target))return;
@@ -99,7 +99,7 @@ function create(scene,roster){
      if(blocked){a.blocked=(a.blocked||0)+dt;if(a.blocked>2&&clock>(a.replanAt||0)){a.replanAt=clock+4;const detour=nav.route(a.pos,a.goal,a.activity==='work'||a.activity==='food',others.map(b=>b.pos));if(detour.length>1){a.path=detour.slice(1);a.blocked=0;}else if(a.blocked>12&&!['away','return','rotate-out'].includes(a.activity)){if(!go(a,'return',a.home)){a.mode='idle';a.activity='walk';a.until=clock+5;} }}break;}
      a.blocked=0;a.facingLeft=(next[0]-a.pos[0])-(next[1]-a.pos[1])<0;a.pos=next;left-=travel;if(travel===distance)a.path.shift();
     }
-    if(!a.path.length){const returning=a.activity==='return';if(returning)a.activity='work';a.mode='idle';a.arrived=clock;a.until=clock+(a.activity==='work'?50:a.activity==='chat'?16:a.activity==='smoke'?20:6)+(a.index%15);a.seated=['food','work'].includes(a.activity)&&scene.staticLayers.some(chair=>chair.kind==='chair'&&chair.anchor&&dist(a.pos,chair.anchor)<12);
+    if(!a.path.length){const returning=a.activity==='return';if(returning)a.activity='work';a.mode='idle';a.arrived=clock;a.until=clock+(a.activity==='work'?24:a.activity==='chat'?16:a.activity==='smoke'?20:6)+(a.index%15);a.seated=['food','work'].includes(a.activity)&&scene.staticLayers.some(chair=>chair.kind==='chair'&&chair.anchor&&dist(a.pos,chair.anchor)<12);
      if(a.activity==='coffee'||a.activity==='water'){a.carry=a.activity;a.carryUntil=clock+35;}
      if(['away','rotate-out'].includes(a.activity)){a.mode='departing';a.hidden=false;a.until=clock+1;}
      if(a.activity==='chat')a.celebrate=a.variant===0;
