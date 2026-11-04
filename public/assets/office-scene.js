@@ -190,7 +190,7 @@ function draw(people=[],zones=[],underlay=''){
 const zoneDefinitions=[{wx:85,wy:65,ww:440,wh:610,seats:[[160,325],[440,430],[155,550],[440,590]]},{wx:910,wy:1320,ww:330,wh:470,seats:[[945,1590],[1215,1440],[940,1750],[1210,1660]]},{wx:910,wy:795,ww:330,wh:440,seats:[[940,1000],[1210,930],[940,1180],[1210,1120]]}];
 // All known participants stay in the scene. These are browsing positions, not assigned seats.
 const participantPlacements={};
-const projectSeats={"vatro-dron":[[155,280],[440,280]],"krechobot":[[155,460],[440,460]],"scholarshot":[[155,640],[440,640]],"specka":[[190,65],[440,65]],"inventarko":[[945,1320],[1060,1320],[1210,1320]],"evidentio":[[945,1590],[1215,1480],[940,1770],[1210,1735]],"herform":[[290,1090],[290,1370]],"domplus":[[320,1240]],"odlikas":[[405,860],[495,960]],"cleaning-nada":[[525,1110]],"yorigora":[[655,1210]],"unmi":[]};
+const projectSeats={"vatro-dron":[[155,280],[440,280]],"krechobot":[[155,460],[440,460]],"scholarshot":[[155,640],[440,640]],"specka":[[190,65],[440,65]],"inventarko":[[945,1320],[1060,1320],[1210,1320]],"evidentio":[[945,1590],[1215,1480],[940,1770],[1210,1735]],"herform":[[290,1090],[290,1370]],"domplus":[[320,1240]],"odlikas":[[405,860],[495,960]],"cleaning-nada":[[525,1110]],"yorigora":[[655,1210]],"unmi":[[650,870]]};
 for(const [slug,seats]of Object.entries(projectSeats)){
  const points=seats.length?seats:[[700,850]],xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
  participantPlacements['project-'+slug]={wx:Math.min(...xs)-30,wy:Math.min(...ys)-100,ww:Math.max(100,Math.max(...xs)-Math.min(...xs)+60),wh:Math.max(150,Math.max(...ys)-Math.min(...ys)+140),seats,labelHeight:120};
