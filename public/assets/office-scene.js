@@ -188,7 +188,7 @@ function draw(people=[],zones=[],underlay=''){
  return {html:defs+floors(zones)+underlay+items.map(i=>`<g class="iso-layer ${i.kind==='wall'?'iso-wall':''} ${i.faded?'is-faded':''}" data-scene-kind="${i.kind}" data-layer-id="${i.id}" ${i.tag?`data-wall-tag="${i.tag}"`:''} ${i.row?`data-row="${i.row}" data-column="${i.column}"`:''} ${i.faded?'data-occluded="true"':''} pointer-events="${i.kind==='person'?'auto':'none'}">${i.html}</g>`).join(''),fadedWalls:hidden};
 }
 const zoneDefinitions=[{wx:85,wy:65,ww:440,wh:610,seats:[[160,325],[440,430],[155,550],[440,590]]},{wx:910,wy:1320,ww:330,wh:470,seats:[[945,1590],[1215,1440],[940,1750],[1210,1660]]},{wx:910,wy:795,ww:330,wh:440,seats:[[940,1000],[1210,930],[940,1180],[1210,1120]]}];
-window.BirdOfficeScene={project:P,quad,bounds,draw,floors,rooms,zoneDefinitions,counters,staticLayers:layers,utilityBank:{x:1260,lift:[430,565],toilet:[270,350]},
- width:3100,height:2200,version:'bird-isometric-v19',home:P(280,300),regions:{teams:P(280,300),lecture:P(530,1580),kitchen:P(965,365)},
+window.BirdOfficeScene={project:P,quad,bounds,draw,floors,rooms,zoneDefinitions,participantZones:zoneDefinitions.slice(0,2),staffZone:zoneDefinitions[2],counters,staticLayers:layers,utilityBank:{x:1260,lift:[430,565],toilet:[270,350]},
+ width:3100,height:2200,version:'bird-isometric-v19',home:P(280,300),regions:{staff:P(1075,1015),teams:P(280,300),lecture:P(530,1580),kitchen:P(965,365)},
  minimap:(zones=[])=>rooms.map(r=>polygon(quad(r.x,r.y,r.w,r.h),r.id==='hall'?'#c4cdb9':'#a1b39f','#5e7b68',9)).join('')+zones.filter(z=>z.virtual).map(z=>polygon(quad(z.wx,z.wy,z.ww,z.wh),'#b5b99b','#5e7b68',9)).join('')};
 })();
