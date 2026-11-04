@@ -27,7 +27,7 @@ function sprite(key,x,y,width=64,height,flip=false,z=0){
  const [sx,sy]=P(x,y,z);height=height||width*asset.height/asset.width;
  return `<g transform="translate(${sx} ${sy})${flip?' scale(-1 1)':''}"><ellipse cy="-2" rx="${width*.3}" ry="${width*.1}" fill="#25352f" opacity=".13"/><image href="${asset.url}" x="${-width/2}" y="${-height}" width="${width}" height="${height}"/></g>`;
 }
-function chair(x,y,front=false,flip=false){add(x,y,sprite(front?'chairFront':'chairBack',x,y,53,69,flip));}
+function chair(x,y,front=false,flip=false){add(x,y,sprite(front?'chairFront':'chairBack',x,y,53,69,flip),'chair',{footprint:[x-16,y-16,32,32]});}
 function equipment(x,y,facing=1){
  // Both monitor planes follow world-y. Opposite seats see opposite faces.
  const panel=[P(x,y-19,65),P(x,y+19,65),P(x,y+19,98),P(x,y-19,98)];
@@ -89,7 +89,7 @@ function wall(x1,y1,x2,y2,height=122,{glass=false,window=false,near=false,tag=''
    const mid=[(u[0]+v[0])/2,(u[1]+v[1])/2];s+=line(P(...mid,18),P(...mid,height-15),'#3c5351',3);
    s+=line(P(...u,62),P(...v,62),'#566d67',2);
   }
-  add((a[0]+b[0])/2,(a[1]+b[1])/2,s,'wall',{polygon:poly,tag,near,height});
+  add((a[0]+b[0])/2,(a[1]+b[1])/2,s,'wall',{polygon:poly,worldSegment:[...a,...b],tag,near,height});
  }
 }
 function door(y1,y2,isLift){
@@ -146,7 +146,7 @@ add(1080,168,kitchen,'kitchen');add(1060,95,table(970,80,185,25),'desk');chair(1
 // Windows, room walls, service corner, flush elevator and toilet bank.
 wall(60,30,1260,30,145);
 wall(60,30,60,710,145);wall(60,760,60,1840,145,{window:true,tag:'windows'});
-wall(540,30,540,710,110,{tag:'upper-partition'});
+wall(540,30,540,550,110,{tag:'upper-partition'});wall(540,650,540,710,110,{tag:'upper-partition'});
 wall(60,710,540,710,110,{tag:'upper-room-end'});
 wall(60,760,540,760,112,{tag:'hall-end'});
 for(const [a,b]of [[760,980],[1060,1260],[1290,1470],[1570,1840]])wall(880,a,880,b,112,{glass:true,tag:'office-glass'});
@@ -187,7 +187,7 @@ function draw(people=[],zones=[],underlay=''){
  items.push(...people.map(p=>({...p,kind:'person',id:'person-'+p.memberId})));
  const priority={'desk-leg':0,wall:1,'desk-top':2,equipment:3,person:4};items.forEach((item,i)=>item.order=i);
  items.sort((a,b)=>(a.kind==='ground'?-1:0)-(b.kind==='ground'?-1:0)||a.depth-b.depth||(priority[a.kind]||0)-(priority[b.kind]||0)||a.order-b.order);
- return {html:defs+floors(zones)+underlay+items.map(i=>`<g class="iso-layer ${i.kind==='wall'?'iso-wall':''} ${i.faded?'is-faded':''}" data-scene-kind="${i.kind}" data-layer-id="${i.id}" ${i.tag?`data-wall-tag="${i.tag}"`:''} ${i.row?`data-row="${i.row}" data-column="${i.column}"`:''} ${i.faded?'data-occluded="true"':''} pointer-events="${i.kind==='person'?'auto':'none'}">${i.html}</g>`).join(''),fadedWalls:hidden};
+ return {html:defs+floors(zones)+underlay+items.map(i=>`<g class="iso-layer ${i.kind==='wall'?'iso-wall':''} ${i.faded?'is-faded':''}" data-scene-kind="${i.kind}" data-layer-id="${i.id}" data-depth="${i.depth}" data-ground="${i.kind==='ground'}" ${i.tag?`data-wall-tag="${i.tag}"`:''} ${i.row?`data-row="${i.row}" data-column="${i.column}"`:''} ${i.faded?'data-occluded="true"':''} pointer-events="${i.kind==='person'?'auto':'none'}">${i.html}</g>`).join(''),fadedWalls:hidden};
 }
 const zoneDefinitions=[{wx:85,wy:65,ww:440,wh:610,seats:[[160,325],[440,430],[155,550],[440,590]]},{wx:910,wy:1320,ww:330,wh:470,seats:[[945,1590],[1215,1440],[940,1750],[1210,1660]]},{wx:910,wy:795,ww:330,wh:440,seats:[[940,1000],[1210,930],[940,1180],[1210,1120]]}];
 // All known participants stay in the scene. These are browsing positions, not assigned seats.
@@ -197,7 +197,7 @@ for(const [slug,seats]of Object.entries(projectSeats)){
  const points=seats.length?seats:[[700,850]],xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
  participantPlacements['project-'+slug]={wx:Math.min(...xs)-30,wy:Math.min(...ys)-100,ww:Math.max(100,Math.max(...xs)-Math.min(...xs)+60),wh:Math.max(150,Math.max(...ys)-Math.min(...ys)+140),seats,labelHeight:120};
 }
-window.BirdOfficeScene={visualMetrics,project:P,quad,bounds,draw,floors,rooms,zoneDefinitions,participantPlacements,lectureScreenRetracted:true,participantZones:zoneDefinitions.slice(0,2),staffZone:zoneDefinitions[2],counters,staticLayers:layers,utilityBank:{x:1260,lift:[430,565],toilet:[270,350]},
+window.BirdOfficeScene={isOccluded:fades,visualMetrics,project:P,quad,bounds,draw,floors,rooms,zoneDefinitions,participantPlacements,lectureScreenRetracted:true,participantZones:zoneDefinitions.slice(0,2),staffZone:zoneDefinitions[2],counters,staticLayers:layers,utilityBank:{x:1260,lift:[430,565],toilet:[270,350]},
  width:3100,height:2200,version:'bird-isometric-v19',home:P(280,300),regions:{staff:P(1075,1015),teams:P(280,300),lecture:P(530,1580),kitchen:P(965,365)},
  minimap:(zones=[])=>rooms.map(r=>polygon(quad(r.x,r.y,r.w,r.h),r.id==='hall'?'#c4cdb9':'#a1b39f','#5e7b68',9)).join('')+zones.filter(z=>z.virtual).map(z=>polygon(quad(z.wx,z.wy,z.ww,z.wh),'#b5b99b','#5e7b68',9)).join('')};
 })();
