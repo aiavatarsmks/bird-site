@@ -98,7 +98,9 @@ function create(scene,roster,options={}){
  for(const id of mentorIds)actors.set(id,{id,mentor:true,index:serial++,home:[...LIFT],pos:[...LIFT],mode:'offsite',activity:'mentor',until:Infinity,path:[],round:0,variant:0,visited:new Set(),seated:false,hidden:true,carry:null});
  const mentorVisit={active:null,last:null,nextAt:options.firstMentorAt??150,stayUntil:0,line:0,lineAt:0};
  const visible=except=>[...actors.values()].filter(b=>b!==except&&!b.hidden);
- const walkers=()=>[...actors.values()].filter(b=>b.mode==='walking').length;
+ // BIRD staff have right of way: they never count against the walker limit and others step around them.
+ const isStaff=a=>a.id.startsWith('staff-');
+ const walkers=()=>[...actors.values()].filter(b=>b.mode==='walking'&&!isStaff(b)).length;
  const speech={lines:new Map(),events:[],dialogue:null,nextAt:6,turn:0,used:new Set()};
  const say=(a,text)=>speech.lines.set(a.id,{text,until:clock+LINE_SECONDS});
  const note=(a,kind)=>{if(SOLO[kind])speech.events.push({id:a.id,kind,at:clock});if(speech.events.length>20)speech.events.shift();};
@@ -123,7 +125,7 @@ function create(scene,roster,options={}){
  const choices={walk:[[620,920],[470,1190],[650,680],[700,340],[650,2140],[730,2320],[1080,2120]],coffee:[[780,740]],water:[[790,850]],food:[[1020,58]]};
  const atStation=(kind,except)=>visible(except).some(b=>b.activity===kind&&['walking','idle','departing'].includes(b.mode));
  function go(a,type,target){
-  if(a.mode!=='walking'&&walkers()>=MAX_WALKERS)return false;
+  if(!isStaff(a)&&a.mode!=='walking'&&walkers()>=MAX_WALKERS)return false;
   const others=visible(a);if(!fitsArea(target,others.map(b=>b.mode==='walking'?b.goal:b.pos)))return false;
   const path=nav.route(a.pos,target,['work','food','return','lecture','exercise','staff-in'].includes(type),others.map(b=>b.pos));if(path.length<2)return false;
   if(['work','food','return','lecture','exercise','staff-in'].includes(type)||type==='smoke')a.carry=null;if(type==='return')a.rotationOut=false;
@@ -131,7 +133,7 @@ function create(scene,roster,options={}){
   a.activity=type;a.visited.add(type==='smoke'?'away':type);if(type==='smoke')a.visited.add('smoke');a.goal=[...target];a.path=path.slice(1);a.mode='walking';a.seated=false;a.hidden=false;a.variant=(a.variant+1)%7;a.started=clock;return true;
  }
  function plan(a){
-  if(walkers()>=MAX_WALKERS-1){a.until=clock+7+a.index%5;return;}
+  if(!isStaff(a)&&walkers()>=MAX_WALKERS-1){a.until=clock+7+a.index%5;return;}
   // BIRD staff never leave: at least two stay at their desks, the others sometimes get coffee, water or stretch their legs.
   if(a.id.startsWith('staff-')){
    const roaming=staffIds.filter(id=>id!==a.id&&(actors.get(id).activity!=='work'||actors.get(id).mode==='walking')).length;
@@ -244,7 +246,7 @@ function create(scene,roster,options={}){
    if(a.mode==='walking'){
     a.moving=false;let left=dt*(54+(a.index%4)*3);
     while(left>0&&a.path.length){const target=a.path[0],distance=dist(a.pos,target);if(distance<.1){a.path.shift();continue;}const travel=Math.min(left,distance),next=[a.pos[0]+(target[0]-a.pos[0])*travel/distance,a.pos[1]+(target[1]-a.pos[1])*travel/distance],others=visible(a);
-     const blocked=!nav.canStep(a.pos,next,(['work','food','return','lecture','exercise','staff-in'].includes(a.activity))&&a.path.length===1)||!fitsArea(next,others.map(b=>b.pos))||others.some(b=>dist(next,b.pos)<45&&dist(next,b.pos)<dist(a.pos,b.pos));
+     const blocked=!nav.canStep(a.pos,next,(['work','food','return','lecture','exercise','staff-in'].includes(a.activity))&&a.path.length===1)||!fitsArea(next,others.map(b=>b.pos))||!isStaff(a)&&others.some(b=>dist(next,b.pos)<45&&dist(next,b.pos)<dist(a.pos,b.pos));
      if(blocked){a.blocked=(a.blocked||0)+dt;if(a.blocked>2&&clock>(a.replanAt||0)){a.replanAt=clock+4;const detour=nav.route(a.pos,a.goal,['work','food','return','lecture','exercise','staff-in'].includes(a.activity),others.map(b=>b.pos));if(detour.length>1){a.path=detour.slice(1);a.blocked=0;}else if(a.blocked>12&&!['away','return','rotate-out','staff-out','mentor-visit'].includes(a.activity)){if(!go(a,'return',a.home)){a.mode='idle';a.activity='walk';a.until=clock+5;} }}break;}
      a.blocked=0;a.moving=true;a.walkDistance=(a.walkDistance||0)+travel;a.walkBack=(next[0]+next[1])<(a.pos[0]+a.pos[1]);a.facingLeft=(next[0]-a.pos[0])-(next[1]-a.pos[1])<0;a.pos=next;left-=travel;if(travel===distance)a.path.shift();
     }
