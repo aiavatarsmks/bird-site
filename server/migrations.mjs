@@ -134,4 +134,16 @@ CREATE TABLE IF NOT EXISTS help_confirmations(id TEXT PRIMARY KEY,helper_project
 CREATE TABLE IF NOT EXISTS project_milestones(id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(id),title TEXT NOT NULL,due TEXT,done_at TEXT,author TEXT NOT NULL,created TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS project_metrics(id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(id),name TEXT NOT NULL,value TEXT NOT NULL,measured_on TEXT NOT NULL,author TEXT NOT NULL,visibility TEXT NOT NULL DEFAULT 'team' CHECK(visibility IN ('team','public')),created TEXT NOT NULL);
 `},
+ {id:4,name:'task-catalogue-and-admin-marking',sql:`
+ALTER TABLE task_templates ADD COLUMN completion_mode TEXT NOT NULL DEFAULT 'participant';
+ALTER TABLE task_templates ADD COLUMN pick_mode TEXT NOT NULL DEFAULT 'assigned';
+CREATE TABLE IF NOT EXISTS form_hooks(id TEXT PRIMARY KEY,secret_hash TEXT NOT NULL UNIQUE,kind TEXT NOT NULL CHECK(kind IN ('task','attendance')),task_id TEXT,lecture_id TEXT,label TEXT NOT NULL DEFAULT '',created_by TEXT NOT NULL,created TEXT NOT NULL,revoked_at TEXT,last_used TEXT);
+CREATE TABLE IF NOT EXISTS import_runs(id TEXT PRIMARY KEY,kind TEXT NOT NULL,source TEXT NOT NULL,target TEXT NOT NULL,rows INTEGER NOT NULL,applied INTEGER NOT NULL,created_by TEXT NOT NULL,created TEXT NOT NULL);
+`},
+ {id:5,name:'checkins-outcomes-announcements',sql:`
+CREATE TABLE IF NOT EXISTS checkins(id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(id),week TEXT NOT NULL,metric_name TEXT NOT NULL DEFAULT '',metric_value TEXT NOT NULL DEFAULT '',goal TEXT NOT NULL DEFAULT '',blocker TEXT NOT NULL DEFAULT '',needs_help INTEGER NOT NULL DEFAULT 0,author TEXT NOT NULL,created TEXT NOT NULL,updated TEXT NOT NULL,UNIQUE(project_id,week));
+CREATE TABLE IF NOT EXISTS project_outcomes(id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(id),kind TEXT NOT NULL CHECK(kind IN ('funding','hire','company','customer','revenue')),funding_type TEXT NOT NULL DEFAULT '',amount INTEGER,currency TEXT NOT NULL DEFAULT 'EUR',happened_on TEXT NOT NULL,note TEXT NOT NULL DEFAULT '',author TEXT NOT NULL,created TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS announcements(id TEXT PRIMARY KEY,title TEXT NOT NULL,body TEXT NOT NULL,pinned INTEGER NOT NULL DEFAULT 0,author TEXT NOT NULL,created TEXT NOT NULL,archived_at TEXT);
+CREATE TABLE IF NOT EXISTS announcement_reads(user_id TEXT NOT NULL,announcement_id TEXT NOT NULL,read_at TEXT NOT NULL,PRIMARY KEY(user_id,announcement_id));
+`},
 ];

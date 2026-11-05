@@ -60,3 +60,14 @@ export async function saveLecture(ctx,id){
  return json({lecture:lectureView(ctx.db.query('SELECT * FROM lectures WHERE id=?').get(lectureId))},id?200:201);
 }
 export function adminLectures(ctx){requireAdmin(ctx);return json({items:ctx.db.query('SELECT * FROM lectures ORDER BY date').all().map(l=>lectureView(l))});}
+
+export async function bulkVerify(ctx){
+ const admin=requireAdmin(ctx),body=await readJson(ctx.request);
+ const lectureId=text(body.lectureId,{max:80},'lectureId');if(!ctx.db.query('SELECT 1 FROM lectures WHERE id=?').get(lectureId))fail(404,'NOT_FOUND');
+ const ids=Array.isArray(body.userIds)?body.userIds.slice(0,500):[];const now=nowIso();let changed=0;
+ ctx.db.transaction(()=>{for(const userId of ids){if(!ctx.db.query('SELECT 1 FROM users WHERE id=?').get(userId))continue;
+  const r=ctx.db.query("INSERT INTO attendance(user_id,lecture_id,kind,verified_by,created,updated) VALUES(?,?,'verified_by_admin',?,?,?) ON CONFLICT(user_id,lecture_id) DO UPDATE SET kind='verified_by_admin',verified_by=excluded.verified_by,updated=excluded.updated WHERE attendance.kind<>'verified_by_admin'").run(userId,lectureId,admin.id,now,now);
+  if(r.changes){changed++;ctx.hooks?.onEvent?.(ctx,{type:'attendance',userId,lectureId});}}
+  audit(ctx.db,admin.id,'attendance.bulk','lecture',lectureId,{changed});})();
+ return json({changed});
+}

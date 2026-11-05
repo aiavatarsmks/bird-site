@@ -46,9 +46,11 @@ function cleanTask(body){
   reviewer_user_id:body.reviewerUserId?text(body.reviewerUserId,{max:80},'reviewerUserId'):null,
   visibility:oneOf(body.visibility||'participants',['participants','team'],'visibility'),
   week_id:body.weekId?text(body.weekId,{max:80},'weekId'):null,
+  completion_mode:oneOf(body.completionMode||'participant',['participant','admin_only'],'completionMode'),
+  pick_mode:oneOf(body.pickMode||'assigned',['assigned','catalog'],'pickMode'),
  };
 }
-export function taskView(t){return {id:t.id,key:t.key,type:t.type,scope:t.scope,xp:t.xp,counterTarget:t.counter_target,requiresReview:!!t.requires_review,selfReport:!!t.self_report,repeatRule:t.repeat_rule,checklist:JSON.parse(t.checklist),translations:JSON.parse(t.translations),status:t.status,audience:t.audience,dueAt:t.due_at,timezone:t.timezone,reviewerUserId:t.reviewer_user_id,visibility:t.visibility,official:!!t.official,weekId:t.week_id,version:t.version,updated:t.updated};}
+export function taskView(t){return {id:t.id,key:t.key,type:t.type,scope:t.scope,xp:t.xp,counterTarget:t.counter_target,requiresReview:!!t.requires_review,selfReport:!!t.self_report,repeatRule:t.repeat_rule,checklist:JSON.parse(t.checklist),translations:JSON.parse(t.translations),status:t.status,audience:t.audience,dueAt:t.due_at,timezone:t.timezone,reviewerUserId:t.reviewer_user_id,visibility:t.visibility,official:!!t.official,weekId:t.week_id,completionMode:t.completion_mode||'participant',pickMode:t.pick_mode||'assigned',version:t.version,updated:t.updated};}
 
 // Admin: templates -----------------------------------------------------------
 export async function createTask(ctx){
@@ -56,7 +58,7 @@ export async function createTask(ctx){
  const t=cleanTask(body),id=newId('task'),now=nowIso();
  const key=body.key?text(body.key,{max:60},'key'):null;
  if(key&&!/^[a-z0-9-]+$/.test(key))fail(400,'INVALID_FIELDS',{field:'key'});
- try{ctx.db.query(`INSERT INTO task_templates(id,key,week_id,type,scope,xp,counter_target,requires_review,self_report,repeat_rule,checklist,translations,status,audience,due_at,timezone,reviewer_user_id,visibility,created_by,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'draft',?,?,?,?,?,?,?,?)`).run(id,key,t.week_id,t.type,t.scope,t.xp,t.counter_target,t.requires_review,t.self_report,t.repeat_rule,t.checklist,t.translations,t.audience,t.due_at,t.timezone,t.reviewer_user_id,t.visibility,admin.id,now,now);}
+ try{ctx.db.query(`INSERT INTO task_templates(id,key,week_id,type,scope,xp,counter_target,requires_review,self_report,repeat_rule,checklist,translations,status,audience,due_at,timezone,reviewer_user_id,visibility,completion_mode,pick_mode,created_by,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'draft',?,?,?,?,?,?,?,?,?,?)`).run(id,key,t.week_id,t.type,t.scope,t.xp,t.counter_target,t.requires_review,t.self_report,t.repeat_rule,t.checklist,t.translations,t.audience,t.due_at,t.timezone,t.reviewer_user_id,t.visibility,t.completion_mode,t.pick_mode,admin.id,now,now);}
  catch(e){if(String(e.message).includes('UNIQUE'))fail(409,'CONFLICT');throw e;}
  audit(ctx.db,admin.id,'task.create','task',id,{});
  return json({task:taskView(ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(id))},201);
@@ -67,7 +69,7 @@ export async function updateTask(ctx,id){
  if(Number(body.version)!==current.version)fail(409,'CONFLICT',{currentVersion:current.version});
  if(current.status!=='draft'&&(body.type!==current.type||body.scope!==current.scope))fail(409,'INVALID_STATE');
  const t=cleanTask(body);
- ctx.db.query('UPDATE task_templates SET week_id=?,type=?,scope=?,xp=?,counter_target=?,requires_review=?,self_report=?,repeat_rule=?,checklist=?,translations=?,audience=?,due_at=?,reviewer_user_id=?,visibility=?,version=version+1,updated=? WHERE id=? AND version=?').run(t.week_id,t.type,t.scope,t.xp,t.counter_target,t.requires_review,t.self_report,t.repeat_rule,t.checklist,t.translations,t.audience,t.due_at,t.reviewer_user_id,t.visibility,nowIso(),id,current.version);
+ ctx.db.query('UPDATE task_templates SET week_id=?,type=?,scope=?,xp=?,counter_target=?,requires_review=?,self_report=?,repeat_rule=?,checklist=?,translations=?,audience=?,due_at=?,reviewer_user_id=?,visibility=?,completion_mode=?,pick_mode=?,version=version+1,updated=? WHERE id=? AND version=?').run(t.week_id,t.type,t.scope,t.xp,t.counter_target,t.requires_review,t.self_report,t.repeat_rule,t.checklist,t.translations,t.audience,t.due_at,t.reviewer_user_id,t.visibility,t.completion_mode,t.pick_mode,nowIso(),id,current.version);
  audit(ctx.db,admin.id,'task.update','task',id,{});
  return json({task:taskView(ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(id))});
 }
@@ -123,7 +125,7 @@ export async function assignTask(ctx,id){
 
 /** Gives a new or newly linked participant the active tasks of their set. */
 export function assignForUser(db,user){
- const tasks=db.query("SELECT * FROM task_templates WHERE status='published' AND audience='all_participants' AND (due_at IS NULL OR due_at>?)").all(nowIso());
+ const tasks=db.query("SELECT * FROM task_templates WHERE status='published' AND audience='all_participants' AND pick_mode='assigned' AND (due_at IS NULL OR due_at>?)").all(nowIso());
  const projects=db.query("SELECT p.id FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') AND p.status<>'archived'").all(user.id);
  for(const task of tasks){
   const period=periodFor(task);
@@ -209,6 +211,7 @@ const editable=(task,s)=>['draft','changes_requested'].includes(s.status)||(task
 
 export async function saveAnswerDraft(ctx,id){
  const {user,assignment,task}=loadAssignment(ctx,id,{forWrite:true});
+ if(task.completion_mode==='admin_only')fail(403,'FORBIDDEN');
  const body=await readJson(ctx.request);
  const content=cleanAnswer(ctx,task,assignment,body.content,false);
  const s=ensureSubmission(ctx.db,assignment,user.id);
@@ -224,6 +227,7 @@ export async function submitAnswer(ctx,id){
  const body=await readJson(ctx.request);
  const idem=ctx.request.headers.get('idempotency-key');
  if(idem&&!/^[A-Za-z0-9_-]{8,80}$/.test(idem))fail(400,'BAD_REQUEST');
+ if(task.completion_mode==='admin_only')fail(403,'FORBIDDEN');
  const s0=ensureSubmission(ctx.db,assignment,user.id);
  if(idem){const prior=ctx.db.query('SELECT revision FROM submission_revisions WHERE submission_id=? AND idem_key=?').get(s0.id,idem);if(prior)return json({assignment:assignmentView(ctx.db,assignment,task,{full:true}),replayed:true});}
  const content=cleanAnswer(ctx,task,assignment,body.content,true);
@@ -264,6 +268,7 @@ function accept(db,{submissionId,revision,task,assignment,reviewer,comment,submi
  db.query("UPDATE assignments SET status='done' WHERE id=?").run(assignment.id);
  const beneficiary=task.scope==='personal'?{type:'user',id:assignment.user_id}:{type:'project',id:assignment.project_id};
  award(db,{...beneficiary,amount:task.xp,sourceKey:rewardKey(task,assignment),reason:'task:'+(task.key||task.id),actor:reviewer});
+ if(!submitter)return;
  badgeForRule(db,submitter,'submission.accepted');
  if(task.key==='presentation'||task.type==='attachment')badgeForRule(db,submitter,'presentation.accepted');
  if(task.key==='help-team')badgeForRule(db,submitter,'help.confirmed');
@@ -361,4 +366,57 @@ export function onProjectUpdate(db,{userId,projectId,visibility}){
   db.query("UPDATE submissions SET revision=?,status='submitted',updated=? WHERE id=?").run(revision,now,s.id);
   accept(db,{submissionId:s.id,revision,task,assignment:a,reviewer:null,comment:'',submitter:userId});
  })();
+}
+
+// Catalogue: participants pick optional tasks for themselves or their team --------------
+export function catalog(ctx){
+ const user=requireUser(ctx),projects=myProjectIds(ctx.db,user.id);
+ const tasks=ctx.db.query("SELECT * FROM task_templates WHERE status='published' AND pick_mode='catalog' AND (due_at IS NULL OR due_at>?) ORDER BY xp DESC,created").all(nowIso());
+ return json({items:tasks.map(t=>{
+  const taken=t.scope==='personal'?ctx.db.query("SELECT id FROM assignments WHERE task_id=? AND user_id=?").all(t.id,user.id):projects.length?ctx.db.query(`SELECT id,project_id FROM assignments WHERE task_id=? AND project_id IN (${projects.map(()=>'?').join(',')})`).all(t.id,...projects):[];
+  return {...taskView(t),taken:taken.map(a=>({assignmentId:a.id,projectId:a.project_id||null})),projects:t.scope==='team'?projects.map(id=>({id,name:JSON.parse(ctx.db.query('SELECT draft FROM projects WHERE id=?').get(id).draft).name})):[]};
+ })});
+}
+export async function takeTask(ctx,taskId){
+ const user=requireUser(ctx),body=await readJson(ctx.request);
+ const task=ctx.db.query("SELECT * FROM task_templates WHERE id=? AND status='published' AND pick_mode='catalog'").get(taskId);if(!task)fail(404,'NOT_FOUND');
+ let target;
+ if(task.scope==='team'){const pid=text(body.projectId,{max:80},'projectId');if(!['owner','editor','member'].includes(membership(ctx.db,pid,user.id)))fail(403,'FORBIDDEN');target={id:pid};}
+ else target={id:user.id};
+ const period=periodFor(task);
+ assignAll(ctx.db,task,[target],period);
+ const a=ctx.db.query('SELECT * FROM assignments WHERE task_id=? AND user_id=? AND project_id=? AND period=?').get(task.id,task.scope==='personal'?user.id:'',task.scope==='team'?target.id:'',period);
+ audit(ctx.db,user.id,'task.take','task',task.id,{project:task.scope==='team'?target.id:null});
+ return json({assignmentId:a.id},201);
+}
+
+/** Organiser marks a task as done for teams or people (admin-only tasks, offline results, form imports). */
+export function markDone(db,{task,userId='',projectId='',note='',actor,source='admin'}){
+ const period=periodFor(task);
+ db.query('INSERT OR IGNORE INTO assignments(id,task_id,user_id,project_id,period,created) VALUES(?,?,?,?,?,?)').run(newId('asg'),task.id,task.scope==='personal'?userId:'',task.scope==='team'?projectId:'',period,nowIso());
+ const a=db.query('SELECT * FROM assignments WHERE task_id=? AND user_id=? AND project_id=? AND period=?').get(task.id,task.scope==='personal'?userId:'',task.scope==='team'?projectId:'',period);
+ const s=ensureSubmission(db,a,actor);
+ if(s.status==='accepted'&&task.repeat_rule!=='weekly_reward')return false;
+ const revision=s.revision+1,now=nowIso();
+ db.query('INSERT INTO submission_revisions(submission_id,revision,content,submitted_by,created) VALUES(?,?,?,?,?)').run(s.id,revision,JSON.stringify({note,markedBy:source}),actor,now);
+ db.query("UPDATE submissions SET status='submitted',revision=?,updated=? WHERE id=?").run(revision,now,s.id);
+ const submitter=task.scope==='personal'?userId:null;
+ accept(db,{submissionId:s.id,revision,task,assignment:a,reviewer:actor,comment:note,submitter});
+ return true;
+}
+export async function adminMark(ctx,taskId){
+ const admin=requireAdmin(ctx),body=await readJson(ctx.request);
+ const task=ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(taskId);if(!task)fail(404,'NOT_FOUND');
+ if(task.status!=='published')fail(409,'INVALID_STATE');
+ const ids=(task.scope==='personal'?body.userIds:body.projectIds);
+ if(!Array.isArray(ids)||!ids.length||ids.length>500)fail(400,'INVALID_FIELDS',{field:task.scope==='personal'?'userIds':'projectIds'});
+ const note=text(body.note??'',{max:500,multiline:true},'note');
+ let marked=0,skipped=0;
+ ctx.db.transaction(()=>{for(const id of ids){
+  const exists=task.scope==='personal'?ctx.db.query("SELECT 1 FROM users WHERE id=? AND status='active'").get(id):ctx.db.query("SELECT 1 FROM projects WHERE id=? AND status<>'archived'").get(id);
+  if(!exists){skipped++;continue;}
+  if(markDone(ctx.db,{task,userId:id,projectId:id,note,actor:admin.id}))marked++;else skipped++;
+ }
+ audit(ctx.db,admin.id,'task.mark','task',task.id,{marked,skipped});})();
+ return json({marked,skipped});
 }

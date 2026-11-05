@@ -5,6 +5,7 @@ import {audit,requireAdmin,requireOwner,PERMISSION_MATRIX} from './permissions.m
 import {publicUser} from './auth.mjs';
 import {projectXp,userXp} from './progress.mjs';
 import {notify} from './notifications.mjs';
+import {riskSignals,streak} from './cohort.mjs';
 
 /** One row per project: status, team and personal points, attendance, open and waiting tasks. */
 export function projectsOverview(ctx){
@@ -24,6 +25,7 @@ export function projectsOverview(ctx){
    teamXp:projectXp(ctx.db,p.id),personalXp:personal,totalXp:projectXp(ctx.db,p.id)+personal,
    attendance:{selfReported:attendance.find(a=>a.kind==='self_reported')?.n||0,verified:attendance.find(a=>a.kind==='verified_by_admin')?.n||0,lecturesHeld:lectures},
    tasks:{total:assignments.length,done:assignments.filter(a=>a.sub==='accepted').length,waitingReview:assignments.filter(a=>a.sub==='submitted').length,open:open.length},
+   risk:riskSignals(ctx.db,p.id,ids),streak:streak(ctx.db,p.id),
    todo:open.slice(0,6).map(a=>({assignmentId:a.id,title:JSON.parse(a.translations),xp:a.xp,dueAt:a.due_at,status:a.sub})),
   };
  });
@@ -33,7 +35,7 @@ export function projectsOverview(ctx){
 export function listUsers(ctx){
  requireAdmin(ctx);const {limit,offset}=page(ctx.url,100);const q=(ctx.url.searchParams.get('q')||'').slice(0,60).toLowerCase();
  const rows=ctx.db.query("SELECT * FROM users WHERE (?1='' OR lower(login) LIKE ?2 OR lower(display_name) LIKE ?2) ORDER BY created DESC LIMIT ?3 OFFSET ?4").all(q,'%'+q+'%',limit+1,offset);
- return json({items:rows.slice(0,limit).map(u=>({...publicUser(u),email:undefined,status:u.status,created:u.created,xp:userXp(ctx.db,u.id)})),hasMore:rows.length>limit});
+ return json({items:rows.slice(0,limit).map(u=>({...publicUser(u),email:undefined,status:u.status,created:u.created,xp:userXp(ctx.db,u.id),lectures:ctx.db.query('SELECT count(*) n FROM attendance WHERE user_id=?').get(u.id).n,tasksDone:ctx.db.query("SELECT count(*) n FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.user_id=? AND s.status='accepted'").get(u.id).n,projects:ctx.db.query("SELECT json_extract(p.draft,'$.name') name FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL").all(u.id).map(r=>r.name)})),hasMore:rows.length>limit});
 }
 /** Only the platform owner changes program roles. The changed user's sessions are revoked. */
 export async function setRole(ctx,userId){

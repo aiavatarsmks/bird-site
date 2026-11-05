@@ -80,11 +80,39 @@ export const EXAMPLE_TASKS=[
   t:T(['Weekly report','A short note for the assigned week.','What did the team do this week, what did you learn and what is next? Three short answers are enough.','The report for the assigned week is sent.'],
    ['Tjedno izvješće','Kratka bilješka za zadani tjedan.','Što je tim radio ovaj tjedan, što ste naučili i što slijedi? Dovoljna su tri kratka odgovora.','Izvješće za zadani tjedan je poslano.'],
    ['Недельный отчёт','Короткая заметка за назначенную неделю.','Что команда сделала за неделю, что вы узнали и что дальше? Достаточно трёх коротких ответов.','Отчёт за назначенную неделю отправлен.'])},
+ {key:'pitch-ten-people',type:'counter',scope:'personal',xp:30,counterTarget:10,pick:'catalog',
+  t:T(['Pitch to ten people','Ten short pitches to anyone: friends, family, strangers at a café.','Count each pitch. At ten, write which sentence made people lean in.','Ten pitches and one useful sentence.'],
+   ['Pitchajte desetero ljudi','Deset kratkih pitcheva bilo kome: prijateljima, obitelji, strancima u kafiću.','Brojite svaki pitch. Kod deset napišite koja je rečenica najviše zainteresirala ljude.','Deset pitcheva i jedna korisna rečenica.'],
+   ['Запитчить десяти людям','Десять коротких питчей кому угодно: друзьям, семье, незнакомцам в кафе.','Считайте каждый питч. На десяти напишите, какая фраза больше всего зацепила слушателей.','Десять питчей и одна полезная фраза.'])},
+ {key:'linkedin-post',type:'link',scope:'personal',xp:15,pick:'catalog',
+  t:T(['Post about your project','One public post on LinkedIn or another network.','Write what you are building and what you are looking for. Paste the link here.','A public post with a link.'],
+   ['Objavite nešto o projektu','Jedna javna objava na LinkedInu ili drugoj mreži.','Napišite što gradite i što tražite. Ovdje zalijepite poveznicu.','Javna objava s poveznicom.'],
+   ['Написать пост о проекте','Одна публичная запись в LinkedIn или другой сети.','Напишите, что вы делаете и что ищете. Вставьте сюда ссылку.','Публичный пост со ссылкой.'])},
+ {key:'video-pitch',type:'link',scope:'team',xp:25,pick:'catalog',
+  t:T(['Record a 60-second video pitch','Short, clear, phone camera is fine.','Problem, solution, who it is for, what you ask for. Upload anywhere and paste the link.','A link to a video of about one minute.'],
+   ['Snimite video pitch od 60 sekundi','Kratko i jasno, kamera mobitela je dovoljna.','Problem, rješenje, za koga je, što tražite. Učitajte bilo gdje i zalijepite poveznicu.','Poveznica na video od oko jedne minute.'],
+   ['Записать видео-питч на 60 секунд','Коротко и ясно, камеры телефона достаточно.','Проблема, решение, для кого, что вы просите. Загрузите куда угодно и вставьте ссылку.','Ссылка на видео примерно на минуту.'])},
+ {key:'landing-test',type:'link',scope:'team',xp:30,pick:'catalog',
+  t:T(['Test demand with a landing page','A one-page site with a sign-up button.','Publish a simple page, share it, and write how many people visited and signed up.','A link and two numbers: visitors and sign-ups.'],
+   ['Provjerite potražnju landing stranicom','Stranica s gumbom za prijavu.','Objavite jednostavnu stranicu, podijelite je i napišite koliko je ljudi posjetilo i prijavilo se.','Poveznica i dva broja: posjetitelji i prijave.'],
+   ['Проверить спрос лендингом','Одностраничный сайт с кнопкой записи.','Опубликуйте простую страницу, поделитесь ею и напишите, сколько людей зашло и оставило заявку.','Ссылка и два числа: посетители и заявки.'])},
+ {key:'mentor-session',type:'text',scope:'team',xp:15,pick:'catalog',
+  t:T(['Book a mentor conversation','Get outside eyes on your hardest question.','Meet a mentor or an organiser. Write the question you brought and the one piece of advice you will act on.','One question and one action.'],
+   ['Dogovorite razgovor s mentorom','Neka netko izvana pogleda vaše najteže pitanje.','Nađite se s mentorom ili organizatorom. Napišite pitanje koje ste donijeli i jedan savjet koji ćete primijeniti.','Jedno pitanje i jedna radnja.'],
+   ['Поговорить с ментором','Свежий взгляд на самый сложный вопрос.','Встретьтесь с ментором или организатором. Напишите вопрос, с которым пришли, и один совет, который примените.','Один вопрос и одно действие.'])},
+ {key:'first-paying-customer',type:'team_result',scope:'team',xp:100,completion:'admin_only',
+  t:T(['First paying customer','The first real payment for your product or service.','Tell the organisers when it happens. They mark it here.','Confirmed by the organisers.'],
+   ['Prvi kupac koji plaća','Prva stvarna uplata za vaš proizvod ili uslugu.','Javite organizatorima kad se dogodi. Oni to ovdje označavaju.','Potvrdili organizatori.'],
+   ['Первый платящий клиент','Первая настоящая оплата за ваш продукт или услугу.','Сообщите организаторам, когда это случится. Они отметят это здесь.','Подтверждено организаторами.'])},
+ {key:'demo-day-ready',type:'team_result',scope:'team',xp:50,completion:'admin_only',
+  t:T(['Ready for demo day','Deck, one-pager and a rehearsed pitch.','Organisers mark this after a rehearsal.','Confirmed by the organisers after a rehearsal.'],
+   ['Spremni za demo dan','Prezentacija, jedna stranica i uvježban pitch.','Organizatori ovo označavaju nakon probe.','Potvrdili organizatori nakon probe.'],
+   ['Готовы к демо-дню','Презентация, one-pager и отрепетированный питч.','Организаторы отмечают это после репетиции.','Подтверждено организаторами после репетиции.'])},
 ];
 function seedTasks(db,now){
  for(const task of EXAMPLE_TASKS){
   const translations=Object.fromEntries(Object.entries(task.t).map(([l,[title,goal,instructions,criteria]])=>[l,{title,goal,instructions,criteria}]));
-  db.query(`INSERT INTO task_templates(id,key,program_id,type,scope,xp,counter_target,requires_review,self_report,repeat_rule,checklist,translations,status,audience,created,updated) VALUES(?,?,'bird-2026',?,?,?,?,?,1,?,?,?,'published','all_participants',?,?) ON CONFLICT(key) DO NOTHING`)
-   .run('task-'+task.key,task.key,task.type,task.scope,task.xp,task.counterTarget||0,task.requiresReview?1:0,task.repeatRule||'once',JSON.stringify(task.checklist||[]),JSON.stringify(translations),now,now);
+  db.query(`INSERT INTO task_templates(id,key,program_id,type,scope,xp,counter_target,requires_review,self_report,repeat_rule,checklist,translations,status,audience,completion_mode,pick_mode,created,updated) VALUES(?,?,'bird-2026',?,?,?,?,?,1,?,?,?,'published','all_participants',?,?,?,?) ON CONFLICT(key) DO NOTHING`)
+   .run('task-'+task.key,task.key,task.type,task.scope,task.xp,task.counterTarget||0,task.requiresReview?1:0,task.repeatRule||'once',JSON.stringify(task.checklist||[]),JSON.stringify(translations),task.completion||'participant',task.pick||'assigned',now,now);
  }
 }

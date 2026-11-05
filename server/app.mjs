@@ -14,6 +14,8 @@ import * as tasks from './tasks.mjs';
 import * as progress from './progress.mjs';
 import * as notifications from './notifications.mjs';
 import * as admin from './admin.mjs';
+import * as imports from './imports.mjs';
+import * as cohort from './cohort.mjs';
 import {seedCurated} from './seed.mjs';
 import {createIntegration,CONTRACT} from './integration.mjs';
 import {localStorage,noScanner} from './storage.mjs';
@@ -28,6 +30,8 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  const migration=migrate(db,{backupDir:config.backupDir,log});
  data??=JSON.parse(readFileSync(new URL('../data/projects-public.json',import.meta.url),'utf8'));
  seedCurated(db,data);
+ // New published tasks reach existing participants too (idempotent).
+ for(const u of db.query("SELECT * FROM users WHERE status='active'").all())tasks.assignForUser(db,u);
  const bootstrap=auth.ensureOwnerBootstrap(db,config);
  if(bootstrap.status!=='completed')log('Owner bootstrap invitation is waiting in the private data directory');
  const directory=createDirectoryHandler(db);
@@ -143,6 +147,29 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('PUT','/api/admin/lectures/:id',(ctx,p)=>lectures.saveLecture(ctx,p.id),{auth:user});
  on('GET','/api/admin/attendance',ctx=>lectures.adminAttendance(ctx),{auth:user});
  on('POST','/api/admin/attendance',ctx=>lectures.verifyAttendance(ctx),{auth:user});
+ // Catalogue, marking, imports, cohort tools
+ on('GET','/api/catalog',ctx=>tasks.catalog(ctx),{auth:user});
+ on('POST','/api/catalog/:id/take',(ctx,p)=>tasks.takeTask(ctx,p.id),{auth:user});
+ on('POST','/api/admin/tasks/:id/mark',(ctx,p)=>tasks.adminMark(ctx,p.id),{auth:user});
+ on('POST','/api/admin/attendance/bulk',ctx=>lectures.bulkVerify(ctx),{auth:user});
+ on('POST','/api/admin/import/preview',ctx=>imports.importPreview(ctx),{auth:user});
+ on('POST','/api/admin/import/apply',ctx=>imports.importApply(ctx),{auth:user});
+ on('GET','/api/admin/form-hooks',ctx=>imports.listHooks(ctx),{auth:user});
+ on('POST','/api/admin/form-hooks',ctx=>imports.createHook(ctx),{auth:user});
+ on('DELETE','/api/admin/form-hooks/:id',(ctx,p)=>imports.revokeHook(ctx,p.id),{auth:user});
+ on('GET','/api/projects/:id/checkins',(ctx,p)=>cohort.listCheckins(ctx,p.id),{auth:user});
+ on('POST','/api/projects/:id/checkins',(ctx,p)=>cohort.saveCheckin(ctx,p.id),{auth:user});
+ on('GET','/api/projects/:id/outcomes',(ctx,p)=>cohort.listOutcomes(ctx,p.id),{auth:user});
+ on('POST','/api/projects/:id/outcomes',(ctx,p)=>cohort.addOutcome(ctx,p.id),{auth:user});
+ on('DELETE','/api/projects/:id/outcomes/:oid',(ctx,p)=>cohort.deleteOutcome(ctx,p.id,p.oid),{auth:user});
+ on('GET','/api/admin/checkins',ctx=>cohort.adminCheckins(ctx),{auth:user});
+ on('GET','/api/admin/export.csv',ctx=>cohort.exportCsv(ctx),{auth:user});
+ on('GET','/api/announcements',ctx=>cohort.listAnnouncements(ctx));
+ on('POST','/api/announcements/read',ctx=>cohort.readAnnouncements(ctx),{auth:user});
+ on('POST','/api/admin/announcements',ctx=>cohort.createAnnouncement(ctx),{auth:user});
+ on('DELETE','/api/admin/announcements/:id',(ctx,p)=>cohort.archiveAnnouncement(ctx,p.id),{auth:user});
+ on('GET','/api/teams/ranking',ctx=>cohort.teamRanking(ctx));
+ on('GET','/api/calendar.ics',ctx=>cohort.calendar(ctx));
  on('GET','/api/admin/audit',ctx=>admin.auditLog(ctx),{auth:user});
  on('GET','/api/admin/settings',ctx=>admin.settings(ctx),{auth:user});
 
@@ -156,6 +183,8 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
     return integration.handle(ctx,url.pathname.slice('/api/integration/v1/'.length));
    }
    if(url.pathname.startsWith('/api/profiles'))return directory(request,ctx.ip);
+   // Google Apps Script calls this server-to-server with its own secret; no browser cookie or Origin.
+   if(url.pathname==='/api/forms/hook'&&request.method==='POST')return await imports.hook(ctx);
    if(MUTATING.has(request.method))checkOrigin(request,config);
    auth.loadSession(ctx);
    const route=routes.find(r=>r.method===request.method&&r.re.test(url.pathname));
