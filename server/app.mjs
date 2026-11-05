@@ -239,7 +239,7 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
   const file=staticFiles.get(url.pathname);if(!file)return new Response('Not found',{status:404});
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
   let body;try{body=await readFile(publicDir+'/'+file);}catch{return new Response('Not found',{status:404});}
-  const type=file.endsWith('.webp')?'image/webp':file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html';
+  const type=file.endsWith('.png')?'image/png':file.endsWith('.webp')?'image/webp':file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html';
   const headers={'Content-Type':type+(type.startsWith('image/')?'':'; charset=utf-8'),'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-BIRD-Release':releaseInfo.release,'Referrer-Policy':'same-origin'};
   // The office may be framed only by the allowed city origin (light visit); other pages not at all.
   if(type==='text/html')headers['Content-Security-Policy']=`frame-ancestors 'self' ${config.cityOrigins.join(' ')}`;
