@@ -33,7 +33,7 @@ const go=h=>{if(location.hash===h)render();else location.hash=h;};
 
 // Layout -------------------------------------------------------------------------
 function shell(active,body){
- const tabs=[['#/account',tr('overview'),'overview'],['#/account/tasks',tr('tasks'),'tasks'],['#/account/progress',tr('progress'),'progress'],['#/account/character',tr('character'),'character'],['#/account/settings',tr('settings'),'settings'],...(isAdmin()?[['#/admin',tr('admin'),'admin']]:[])];
+ const tabs=[['#/account',tr('overview'),'overview'],['#/account/tasks',tr('tasks'),'tasks'],['#/account/mentors',tr('mentors'),'mentors'],['#/account/progress',tr('progress'),'progress'],['#/account/character',tr('character'),'character'],['#/account/settings',tr('settings'),'settings'],...(isAdmin()?[['#/admin',tr('admin'),'admin']]:[])];
  return `<div class="acc"><div class="acc-head"><div><span class="eyebrow">${esc(tr('urole_'+me.role))}</span><h1>${esc(me.displayName)}</h1></div><a class="acc-office" href="#/office">${tr('office')} ↗</a></div><nav class="acc-tabs" aria-label="${tr('nav')}">${tabs.map(([h,l,k])=>`<a href="${h}" ${k===active?'aria-current="page"':''}>${esc(l)}${k==='overview'&&cache.unread?` <b class="acc-dot">${cache.unread}</b>`:''}</a>`).join('')}</nav>${flashHtml()}<div class="acc-body">${body}</div><p class="acc-small">${tr('unofficial')}</p></div>`;
 }
 function flashHtml(){if(!flash)return '';const f=flash;flash=null;return `<p class="acc-flash ${f.error?'is-error':''}" role="${f.error?'alert':'status'}">${f.html}</p>`;}
@@ -116,6 +116,13 @@ function answerContent(form,type){
  return c;
 }
 
+async function mentorsView(){
+ const [slots,projects]=await Promise.all([api('GET','/api/office-hours'),api('GET','/api/projects?mine=1')]);
+ const teams=projects.items.filter(p=>['owner','editor','member'].includes(p.role)&&p.status!=='archived');
+ const byDay={};for(const x of slots.items){const d=x.startsAt.slice(0,10);(byDay[d]||=[]).push(x);}
+ const future=x=>Date.parse(x.startsAt)>Date.now();
+ return shell('mentors',`<p class="acc-note">${tr('officeNote')}</p>${Object.keys(byDay).length?Object.entries(byDay).map(([d,list])=>`<section class="acc-card"><h2>${date(d)}</h2><ul class="acc-list">${list.map(x=>`<li><div><strong>${new Intl.DateTimeFormat(loc[lang],{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Zagreb'}).format(new Date(x.startsAt))} · ${esc(x.mentorName)}</strong><small>${esc(x.topic)}${x.topic?' · ':''}${x.durationMin} min${x.location?' · '+esc(x.location):''}</small>${x.mine?`<small>${tr('yourBooking')}: ${esc(x.projectName)}${x.question?' · '+esc(x.question):''}</small>`:''}</div><span class="acc-actions">${x.mine?(future(x)?`<button data-act="unbook" data-id="${esc(x.id)}">${tr('cancelBooking')}</button>`:`<form data-form="meeting-note" data-id="${esc(x.id)}" class="acc-inline">${field('note',tr('meetingNote'),{value:x.note,attrs:'maxlength="2000"'})}<button class="acc-secondary">${tr('save')}</button></form>`):x.booked?`<span class="acc-chip">${tr('bookedOther')}</span>`:future(x)&&teams.length?`<form data-form="book" data-id="${esc(x.id)}" class="acc-inline">${teams.length>1?select('projectId',tr('project'),teams.map(p=>[p.id,p.name]),teams[0].id):`<input type="hidden" name="projectId" value="${esc(teams[0].id)}">`}${field('question',tr('question'),{attrs:'maxlength="500"'})}<button class="acc-primary">${tr('book')}</button></form>`:''}</span></li>`).join('')}</ul></section>`).join(''):empty()}`);
+}
 async function progressView(){
  const [p,rank]=await Promise.all([api('GET','/api/progress'),api('GET','/api/teams/ranking')]);
  const mine=new Set(p.teams.map(t=>t.projectId));
@@ -189,7 +196,7 @@ async function projectView(id,tab='edit'){
 
 // Admin ------------------------------------------------------------------------------
 function adminShell(active,body){
- const tabs=[['overview',tr('overview')],['checkins',tr('checkins')],['reviews',tr('reviews')],['tasks',tr('tasks')],['lectures',tr('lectures')],['import',tr('import')],['news',tr('announcements')],['claims',tr('claims')],['users',tr('users')],['audit',tr('audit')]];
+ const tabs=[['overview',tr('overview')],['checkins',tr('checkins')],['reviews',tr('reviews')],['tasks',tr('tasks')],['lectures',tr('lectures')],['import',tr('import')],['news',tr('announcements')],['mentors',tr('mentors')],['claims',tr('claims')],['users',tr('users')],['audit',tr('audit')]];
  return shell('admin',`<nav class="acc-tabs acc-subtabs">${tabs.map(([k,l])=>`<a href="#/admin/${k}" ${k===active?'aria-current="page"':''}>${esc(l)}</a>`).join('')}</nav>${body}`);
 }
 async function adminView(tab='overview',id){
@@ -254,6 +261,10 @@ async function adminView(tab='overview',id){
   const [qs,tl]=await Promise.all([api('GET','/api/quests'),api('GET','/api/admin/tasks?status=published')]);
   return adminShell(tab,`<form data-form="quest" class="acc-card"><h2>${tr('newQuest')}</h2>${['en','hr','ru'].map(l=>field('qt_'+l,tr('title')+' '+l.toUpperCase(),{required:l==='en',attrs:'maxlength="120"'})).join('')}${select('taskId',tr('tasks'),tl.items.map(x=>[x.id,x.translations.en.title]),'')}${field('target',tr('target'),{type:'number',value:8,attrs:'min="1" max="1000"'})}<button class="acc-secondary">${tr('save')}</button><ul class="acc-list">${qs.items.map(q=>`<li><span>${esc(pick(q.title))} · ${q.done}/${q.target}</span><button type="button" data-act="quest-close" data-id="${esc(q.id)}">${tr('close')}</button></li>`).join('')}</ul></form><form data-form="announcement" class="acc-card"><h2>${tr('newAnnouncement')}</h2>${field('title',tr('title'),{required:true,attrs:'maxlength="160"'})}${field('body',tr('answer'),{type:'textarea',required:true,attrs:'rows="4" maxlength="4000"'})}<label class="acc-check"><input type="checkbox" name="pinned"> ${tr('pinned')}</label><button class="acc-primary">${tr('publish')}</button></form><ul class="acc-list">${n.items.map(x=>`<li><div><strong>${x.pinned?'📌 ':''}${esc(x.title)}</strong><p class="acc-pre">${esc(x.body)}</p><small>${date(x.created,true)} · ${x.readBy}/${x.audience} ${tr('readBy')}</small></div><button data-act="news-archive" data-id="${esc(x.id)}">${tr('archive').split(' ')[0]}</button></li>`).join('')}</ul>`);
  }
+ if(tab==='mentors'){
+  const slots=await api('GET','/api/office-hours');
+  return adminShell(tab,`<form data-form="slot" class="acc-card"><h2>${tr('newSlot')}</h2><div class="acc-inline">${field('mentorName',tr('mentorName'),{required:true,attrs:'maxlength="100"'})}${field('topic',tr('topic'),{attrs:'maxlength="200"'})}</div><div class="acc-inline">${field('startsAt',tr('startsAt'),{type:'datetime-local',required:true})}${field('durationMin',tr('duration'),{type:'number',value:30,attrs:'min="10" max="240"'})}${field('location',tr('location'),{attrs:'maxlength="200"'})}</div><button class="acc-primary">${tr('save')}</button></form><ul class="acc-list">${slots.items.map(x=>`<li><div><strong>${date(x.startsAt,true)} · ${esc(x.mentorName)}</strong><small>${esc(x.topic)}${x.booked?` · ${tr('bookedOther')}: ${esc(x.projectName||'')}${x.question?' · '+esc(x.question):''}${x.note?' · '+esc(x.note):''}`:''}</small></div><button data-act="slot-cancel" data-id="${esc(x.id)}">${tr('cancelSlot')}</button></li>`).join('')}</ul>`);
+ }
  if(tab==='audit'){
   const a=await api('GET','/api/admin/audit');
   return adminShell(tab,`<ul class="acc-list acc-audit">${a.items.map(x=>`<li><code>${esc(x.action)}</code><span>${esc(x.actor)} · ${esc(x.targetType)}:${esc(x.targetId)}</span><small>${date(x.created,true)}</small></li>`).join('')}</ul>`);
@@ -275,6 +286,7 @@ async function render(){
   else if(p[1]==='tasks')html=await tasksView();
   else if(p[1]==='task')html=await taskView(p[2]);
   else if(p[1]==='progress')html=await progressView();
+  else if(p[1]==='mentors')html=await mentorsView();
   else if(p[1]==='character')html=await characterView();
   else if(p[1]==='settings')html=await settingsView();
   else if(p[1]==='new-project')html=shell('overview',`<a class="acc-back" href="#/account">← ${tr('myProjects')}</a><h2>${tr('newProject')}</h2>${projectForm(null)}`);
@@ -347,6 +359,9 @@ async function onSubmit(e){
    if(btn?.value==='apply'){const r=await api('POST','/api/admin/import/apply',body);cache.importPreview=null;setFlash(`${tr('apply')}: ${r.applied}/${r.total}`);render();return;}
    const r=await api('POST','/api/admin/import/preview',body);cache.importPreview={...body,...r};render();return;}
   if(kind==='hook'){const r=await api('POST','/api/admin/form-hooks',{kind:f.get('kind'),lectureId:f.get('lectureId'),taskId:f.get('taskId'),label:f.get('label')});cache.hookSecret=r.secret;render();return;}
+  if(kind==='slot'){await api('POST','/api/admin/office-hours',{mentorName:f.get('mentorName'),topic:f.get('topic'),startsAt:new Date(f.get('startsAt')).toISOString(),durationMin:Number(f.get('durationMin')),location:f.get('location')});setFlash(tr('saved'));render();return;}
+  if(kind==='book'){await api('POST',`/api/office-hours/${encodeURIComponent(form.dataset.id)}/book`,{projectId:f.get('projectId'),question:f.get('question')});setFlash(tr('saved'));render();return;}
+  if(kind==='meeting-note'){await api('POST',`/api/office-hours/${encodeURIComponent(form.dataset.id)}/note`,{note:f.get('note')});setFlash(tr('saved'));render();return;}
   if(kind==='quest'){await api('POST','/api/admin/quests',{title:{en:f.get('qt_en'),hr:f.get('qt_hr'),ru:f.get('qt_ru')},taskId:f.get('taskId'),target:Number(f.get('target'))});setFlash(tr('saved'));render();return;}
   if(kind==='announcement'){await api('POST','/api/admin/announcements',{title:f.get('title'),body:f.get('body'),pinned:f.get('pinned')==='on'});setFlash(tr('saved'));render();return;}
   if(kind==='lecture'){await api('POST','/api/admin/lectures',{date:f.get('date'),speaker:f.get('speaker'),title:{en:f.get('title_en'),hr:f.get('title_hr'),ru:f.get('title_ru')}});render();return;}
@@ -384,6 +399,8 @@ async function onClick(e){
   else if(act==='verify'){await api('POST','/api/admin/attendance',{userId:d.user,lectureId:d.lecture});render();}
   else if(act==='user-status'){await api('PUT',`/api/admin/users/${encodeURIComponent(d.id)}/status`,{status:d.status});render();}
   else if(act==='take'){const r=await api('POST',`/api/catalog/${encodeURIComponent(d.id)}/take`,d.project?{projectId:d.project}:{});go('#/account/task/'+r.assignmentId);}
+  else if(act==='unbook'){await api('DELETE',`/api/office-hours/${encodeURIComponent(d.id)}/book`);render();}
+  else if(act==='slot-cancel'){await api('DELETE','/api/admin/office-hours/'+encodeURIComponent(d.id));render();}
   else if(act==='quest-close'){await api('DELETE','/api/admin/quests/'+encodeURIComponent(d.id));render();}
   else if(act==='news-read'){await api('POST','/api/announcements/read',{});render();}
   else if(act==='news-archive'){await api('DELETE','/api/admin/announcements/'+encodeURIComponent(d.id));render();}

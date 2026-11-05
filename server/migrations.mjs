@@ -153,4 +153,8 @@ CREATE TABLE IF NOT EXISTS announcement_reads(user_id TEXT NOT NULL,announcement
  {id:6,name:'cohort-quests',sql:`
 CREATE TABLE IF NOT EXISTS cohort_quests(id TEXT PRIMARY KEY,title TEXT NOT NULL,task_id TEXT NOT NULL REFERENCES task_templates(id),target INTEGER NOT NULL,created_by TEXT NOT NULL,created TEXT NOT NULL,closed_at TEXT);
 `},
+ {id:7,name:'office-hours',sql:`
+CREATE TABLE IF NOT EXISTS office_hours(id TEXT PRIMARY KEY,mentor_name TEXT NOT NULL,topic TEXT NOT NULL DEFAULT '',starts_at TEXT NOT NULL,duration_min INTEGER NOT NULL DEFAULT 30,location TEXT NOT NULL DEFAULT '',created_by TEXT NOT NULL,created TEXT NOT NULL,cancelled_at TEXT);
+CREATE TABLE IF NOT EXISTS office_hour_bookings(slot_id TEXT PRIMARY KEY REFERENCES office_hours(id),project_id TEXT NOT NULL REFERENCES projects(id),booked_by TEXT NOT NULL,question TEXT NOT NULL DEFAULT '',note TEXT NOT NULL DEFAULT '',created TEXT NOT NULL);
+`},
 ];
