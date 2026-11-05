@@ -102,3 +102,5 @@ pre.acc-pre{font:inherit;background:#f7f5ef;padding:10px;border-radius:6px;margi
 .acc-script{font:12px/1.5 ui-monospace,Menlo,monospace;background:#1f2622;color:#e6efe2;padding:12px;border-radius:8px;overflow:auto;white-space:pre}
 .acc-catalog li{align-items:flex-start}
 .acc-achievement{position:fixed;z-index:3000;left:50%;top:84px;transform:translateX(-50%);width:min(440px,92vw);image-rendering:pixelated;pointer-events:none}
+.acc-bar{height:12px;border-radius:6px;background:#e7e5da;overflow:hidden;margin:6px 0}.acc-bar span{display:block;height:100%;background:linear-gradient(90deg,#6b886c,#d6b56a)}.acc-quest b{font-size:20px}
+@media(max-width:420px){.office-page .site-header .top-nav a[href="#/"]{display:none}}

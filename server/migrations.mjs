@@ -146,4 +146,7 @@ CREATE TABLE IF NOT EXISTS project_outcomes(id TEXT PRIMARY KEY,project_id TEXT 
 CREATE TABLE IF NOT EXISTS announcements(id TEXT PRIMARY KEY,title TEXT NOT NULL,body TEXT NOT NULL,pinned INTEGER NOT NULL DEFAULT 0,author TEXT NOT NULL,created TEXT NOT NULL,archived_at TEXT);
 CREATE TABLE IF NOT EXISTS announcement_reads(user_id TEXT NOT NULL,announcement_id TEXT NOT NULL,read_at TEXT NOT NULL,PRIMARY KEY(user_id,announcement_id));
 `},
+ {id:6,name:'cohort-quests',sql:`
+CREATE TABLE IF NOT EXISTS cohort_quests(id TEXT PRIMARY KEY,title TEXT NOT NULL,task_id TEXT NOT NULL REFERENCES task_templates(id),target INTEGER NOT NULL,created_by TEXT NOT NULL,created TEXT NOT NULL,closed_at TEXT);
+`},
 ];

@@ -128,6 +128,7 @@ window.BIRD_ACCOUNT_TEXT={
  bulkVerify:{en:'Verify attendance for several people',hr:'Potvrdi prisustvo za više osoba',ru:'Подтвердить посещение нескольким людям'},
  people:{en:'People',hr:'Osobe',ru:'Люди'},tasksDoneShort:{en:'tasks',hr:'zadaci',ru:'задания'},lecturesShort:{en:'lectures',hr:'predavanja',ru:'лекции'},
  rules:{en:'How points work',hr:'Kako se računaju bodovi',ru:'Как начисляются баллы'},fundingType:{en:'Funding type',hr:'Vrsta financiranja',ru:'Тип финансирования'},
+ quest:{en:'Cohort quest',hr:'Zajednička misija',ru:'Общий квест когорты'},questNote:{en:'One goal for all teams together.',hr:'Jedan cilj za sve timove zajedno.',ru:'Одна цель для всех команд вместе.'},newQuest:{en:'New cohort quest',hr:'Nova zajednička misija',ru:'Новый общий квест'},target:{en:'Target number',hr:'Ciljani broj',ru:'Целевое число'},questDone:{en:'Done together!',hr:'Zajedno smo uspjeli!',ru:'Сделали вместе!'},
  acceptInvite:{en:'Use invitation',hr:'Iskoristi pozivnicu',ru:'Принять приглашение'},
  revoke:{en:'Revoke',hr:'Opozovi',ru:'Отозвать'},
  updates:{en:'Updates',hr:'Novosti',ru:'Обновления'},

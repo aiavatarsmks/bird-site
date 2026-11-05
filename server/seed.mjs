@@ -26,6 +26,8 @@ export function seedCurated(db,data,lectures=LECTURES){
   db.query("INSERT INTO programs(id,name,created) VALUES('bird-2026',?,?) ON CONFLICT(id) DO NOTHING").run(JSON.stringify({en:'BIRD Incubator 2026',hr:'BIRD Inkubator 2026',ru:'Инкубатор BIRD 2026'}),now);
   seedBadges(db);
   seedTasks(db,now);
+  // A first shared goal for the cohort (organisers can close it and add others).
+  if(!db.query('SELECT 1 FROM cohort_quests').get()&&db.query("SELECT 1 FROM task_templates WHERE id='task-user-interviews'").get())db.query("INSERT INTO cohort_quests(id,title,task_id,target,created_by,created) VALUES('quest-user-interviews',?, 'task-user-interviews',8,'system',?)").run(JSON.stringify({en:'8 teams talk to five users each',hr:'8 timova razgovara s po pet korisnika',ru:'8 команд поговорили с пятью пользователями'}),now);
  })();
 }
 

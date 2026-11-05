@@ -139,3 +139,18 @@ export function calendar(ctx){
   return ['BEGIN:VEVENT',`UID:${l.id}@bird-notes`,`DTSTAMP:${stamp}`,`DTSTART;VALUE=DATE:${d}`,`DTEND;VALUE=DATE:${next}`,`SUMMARY:${esc('BIRD: '+(t.en||l.id))}`,...(l.speaker?[`DESCRIPTION:${esc(l.speaker)}`]:[]),'END:VEVENT'].join('\r\n');});
  return new Response(['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//BIRD study notes//EN','X-WR-CALNAME:BIRD lectures','X-WR-TIMEZONE:Europe/Zagreb',...events,'END:VCALENDAR',''].join('\r\n'),{headers:{'Content-Type':'text/calendar; charset=utf-8','Cache-Control':'public, max-age=900'}});
 }
+
+// Cohort quest: one shared goal for all teams, counted from accepted results of a task.
+function questView(db,q){
+ const done=db.query("SELECT count(*) n FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.task_id=? AND s.status='accepted'").get(q.task_id).n;
+ return {id:q.id,title:JSON.parse(q.title),target:q.target,done:Math.min(done,q.target),complete:done>=q.target,closed:!!q.closed_at,created:q.created};
+}
+export function listQuests(ctx){return json({items:ctx.db.query('SELECT * FROM cohort_quests WHERE closed_at IS NULL ORDER BY created DESC LIMIT 5').all().map(q=>questView(ctx.db,q))});}
+export async function createQuest(ctx){
+ const admin=requireAdmin(ctx),body=await readJson(ctx.request);
+ const title={en:text(body.title?.en,{min:1,max:120},'title.en'),hr:text(body.title?.hr??'',{max:120},'title.hr'),ru:text(body.title?.ru??'',{max:120},'title.ru')};
+ const taskId=text(body.taskId,{max:80},'taskId');if(!ctx.db.query("SELECT 1 FROM task_templates WHERE id=?").get(taskId))fail(400,'INVALID_FIELDS',{field:'taskId'});
+ const id=newId('quest');ctx.db.query('INSERT INTO cohort_quests(id,title,task_id,target,created_by,created) VALUES(?,?,?,?,?,?)').run(id,JSON.stringify(title),taskId,int(body.target,{min:1,max:1000},'target'),admin.id,nowIso());
+ audit(ctx.db,admin.id,'quest.create','quest',id,{});return json({id},201);
+}
+export function closeQuest(ctx,id){const admin=requireAdmin(ctx);ctx.db.query('UPDATE cohort_quests SET closed_at=? WHERE id=?').run(nowIso(),id);audit(ctx.db,admin.id,'quest.close','quest',id,{});return json({ok:true});}

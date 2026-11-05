@@ -150,6 +150,7 @@ function occupiedSeat(a){
 // Team points and check-in streaks from the public ranking, shown on team labels.
 async function decorateTeamLabels(){
  if(!store.real||cityMode||!root)return;
+ try{const q=(await (await fetch('/api/quests',{credentials:'same-origin'})).json()).items?.[0];const wrap=root?.querySelector('.office-viewport-wrap');if(q&&wrap&&!wrap.querySelector('.office-quest')){const el=document.createElement('a');el.className='office-quest';el.href='#/account';el.innerHTML=`<span>${q.complete?'🎉':'🎯'} ${escape(q.title[language]||q.title.en)}</span><b>${q.done}/${q.target}</b><i style="width:${Math.round(q.done/q.target*100)}%"></i>`;wrap.append(el);}}catch{}
  let data;try{data=await (await fetch('/api/teams/ranking',{credentials:'same-origin'})).json();}catch{return;}
  if(!root)return;
  for(const t of data.items||[]){const label=root.querySelector(`[data-label-project="${t.projectId}"]`);if(!label||!t.teamXp&&!t.streak)continue;
