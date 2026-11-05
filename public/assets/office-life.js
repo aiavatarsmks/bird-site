@@ -65,7 +65,6 @@ function navigation(scene){
  }
  return{route,free,cells,canStep};
 }
-const STAFF_SHIFT=120;
 // Mentors are visitors: one at a time, roughly every ten minutes, a short stay near the teams.
 const MENTOR_EVERY=600,MENTOR_STAY=150,MENTOR_SPOTS=[[620,920],[470,1190],[650,680]];
 const MENTOR_LINES=['Hi team! How is the pitch going?','Who wants quick feedback?','Talk to five customers this week!','Great progress, folks!','Book my office hours if you need help.','What is your biggest blocker?'];
@@ -88,15 +87,13 @@ function create(scene,roster,options={}){
  {const inside=new Set(['person-maxim-ilin','person-pavel-isaykov','person-antun-matijasec','person-javier-garcia-zaballos'].filter(id=>actors.has(id)));
   for(const ids of groups.values())if(!ids.some(id=>inside.has(id)))inside.add(ids[0]);
   for(const a of participants)if(inside.size<presence.target)inside.add(a.id);
-  for(const a of participants){a.enteredAt=0;a.offSince=-Infinity;if(!inside.has(a.id)){a.mode='offsite';a.hidden=true;}}}
+  for(const a of participants){a.enteredAt=0;a.offSince=-30-a.index;if(!inside.has(a.id)){a.mode='offsite';a.hidden=true;}}}
  // Start with varied, useful occupations already spread across the floor.
  const gymActor=actors.get('person-antun-matijasec');if(gymActor){gymActor.pos=[260,2240];gymActor.activity='exercise';gymActor.seated=false;gymActor.arrived=0;gymActor.until=22;gymActor.visited.add('exercise');}
  const outsideActor=actors.get('person-javier-garcia-zaballos');if(outsideActor){outsideActor.pos=[840,2520];outsideActor.activity='smoke';outsideActor.seated=false;outsideActor.arrived=0;outsideActor.until=24;outsideActor.visited.add('smoke');outsideActor.visited.add('away');}
- // BIRD staff take turns at the desk: a new order on every visit, one shift change every two minutes.
+ // The whole BIRD team works in its office at the same time (owner's choice, 5 Nov); no shifts.
  const random=options.random||Math.random,staffIds=[...actors.keys()].filter(id=>id.startsWith('staff-'));
- for(let i=staffIds.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[staffIds[i],staffIds[j]]=[staffIds[j],staffIds[i]];}
- const staffShift={active:staffIds[0],index:0,nextAt:STAFF_SHIFT,departing:false};
- for(const id of staffIds.slice(1)){actors.get(id).hidden=true;actors.get(id).mode='offsite';}
+ const staffShift={active:staffIds[0],index:0,nextAt:Infinity,departing:false};
  const mentorIds=(options.mentors||[]).map(m=>m.id).filter(id=>!actors.has(id));
  for(const id of mentorIds)actors.set(id,{id,mentor:true,index:serial++,home:[...LIFT],pos:[...LIFT],mode:'offsite',activity:'mentor',until:Infinity,path:[],round:0,variant:0,visited:new Set(),seated:false,hidden:true,carry:null});
  const mentorVisit={active:null,last:null,nextAt:options.firstMentorAt??150,stayUntil:0,line:0,lineAt:0};
@@ -135,7 +132,16 @@ function create(scene,roster,options={}){
  }
  function plan(a){
   if(walkers()>=MAX_WALKERS-1){a.until=clock+7+a.index%5;return;}
-  if(a.id.startsWith('staff-')){a.until=clock+60;return;}
+  // BIRD staff never leave: at least two stay at their desks, the others sometimes get coffee, water or stretch their legs.
+  if(a.id.startsWith('staff-')){
+   const roaming=staffIds.filter(id=>id!==a.id&&(actors.get(id).activity!=='work'||actors.get(id).mode==='walking')).length;
+   const kind=['work','coffee','work','water','work','walk','work','chat'][(a.index+a.round++)%8];
+   if(roaming<staffIds.length-2&&kind!=='work'&&walkers()<MAX_WALKERS-2&&!presence.swaps.length){
+    if(kind==='chat'){const hubs=[[620,920],[650,680],[700,550]].sort((b,c)=>dist(a.pos,b)-dist(a.pos,c));for(const hub of hubs)if(go(a,'staff-break',hub)){a.until=clock+25;return;}}
+    else if(!atStation(kind,a)){const targets=[...choices[kind]].sort((b,c)=>dist(a.home,b)-dist(a.home,c));for(const target of targets)if(go(a,kind,target))return;}
+   }
+   a.until=clock+35+a.index%25;return;
+  }
   if(a.mentor){a.until=clock+20;return;}
   const schedule=exerciseIds.has(a.id)?['work','exercise','coffee','work','water','walk','food','chat','away']:lectureIds.includes(a.id)?['work','coffee','lecture','water','work','chat','food','away']:['work','coffee','water','work','chat','food','walk','away'];
   const next=schedule[(a.index+a.round++)%schedule.length],kind=smokers.has(a.id)&&!a.visited.has('smoke')?'away':exerciseIds.has(a.id)&&!a.visited.has('exercise')?'exercise':next;
@@ -170,9 +176,12 @@ function create(scene,roster,options={}){
   const absent=[...presence.absentSince.entries()].sort((x,y)=>x[1]-y[1]).map(([id])=>id),reserved=new Set(presence.swaps.map(w=>w.in));
   const count=participants.filter(inOffice).length+presence.swaps.filter(w=>w.in&&!w.out).length;
   const pool=participants.filter(a=>a.mode==='offsite'&&!reserved.has(a.id)&&(clock-a.offSince>=30||absent.includes(a.projectId)));
-  pool.sort((x,y)=>(absent.includes(x.projectId)?absent.indexOf(x.projectId):99)-(absent.includes(y.projectId)?absent.indexOf(y.projectId):99)||teamPresent(x)-teamPresent(y)||x.offSince-y.offSince||(x.index+presence.turn)%7-(y.index+presence.turn)%7);
+  // Nobody waits outside for ever: after three minutes a person goes to the front of the queue.
+  const long=a=>clock-a.offSince>180?0:1;
+  pool.sort((x,y)=>(absent.includes(x.projectId)?absent.indexOf(x.projectId):99)-(absent.includes(y.projectId)?absent.indexOf(y.projectId):99)||long(x)-long(y)||teamPresent(x)-teamPresent(y)||x.offSince-y.offSince||(x.index+presence.turn)%7-(y.index+presence.turn)%7);
   const incoming=forced||pool[0];
-  const leaving=participants.filter(a=>inOffice(a)&&!a.hidden&&!a.pinned&&a.mode==='idle'&&!a.partner&&clock-a.enteredAt>40&&!presence.swaps.some(w=>w.out===a.id)&&(incoming&&a.projectId===incoming.projectId?true:teamPresent(a)>1||!presence.absentSince.size));
+  // An overdue team cannot wait for the ideal candidate: anyone settled enough may make room.
+  const leaving=participants.filter(a=>inOffice(a)&&!a.hidden&&!a.pinned&&(forced?a.mode==='idle'||a.mode==='walking'&&!['away','rotate-out','return'].includes(a.activity):a.mode==='idle'&&!a.partner&&clock-a.enteredAt>40)&&!presence.swaps.some(w=>w.out===a.id)&&(incoming&&a.projectId===incoming.projectId?true:teamPresent(a)>1));
   leaving.sort((x,y)=>Number(!!y.wantsOut)-Number(!!x.wantsOut)||teamPresent(y)-teamPresent(x)||x.enteredAt-y.enteredAt||(x.index+presence.turn)%5-(y.index+presence.turn)%5);
   presence.turn++;
   if(count<presence.target&&incoming){arrive(incoming);return true;}
@@ -188,7 +197,7 @@ function create(scene,roster,options={}){
    else if(out.activity!=='away'||clock-swap.at>90){out.rotationOut=false;presence.swaps.splice(presence.swaps.indexOf(swap),1);if(out.activity==='away'&&!go(out,'return',out.home)){out.mode='idle';out.until=clock+3;}}
   }
   const waiting=[...presence.absentSince.entries()].filter(([pid,since])=>!presence.swaps.some(w=>w.in&&actors.get(w.in).projectId===pid));
-  const overdue=waiting.find(([,since])=>clock-since>presence.maxTeamAbsence-25);
+  const overdue=waiting.find(([,since])=>clock-since>presence.maxTeamAbsence-60);
   // An overdue team takes the next free place: it replaces a waiting arrival or starts a swap, so the count never goes over.
   if(overdue){const a=participants.find(b=>b.projectId===overdue[0]&&b.mode==='offsite');if(a){
    const pending=presence.swaps.find(w=>w.in&&actors.get(w.in).projectId!==overdue[0]);
@@ -239,7 +248,7 @@ function create(scene,roster,options={}){
      if(blocked){a.blocked=(a.blocked||0)+dt;if(a.blocked>2&&clock>(a.replanAt||0)){a.replanAt=clock+4;const detour=nav.route(a.pos,a.goal,['work','food','return','lecture','exercise','staff-in'].includes(a.activity),others.map(b=>b.pos));if(detour.length>1){a.path=detour.slice(1);a.blocked=0;}else if(a.blocked>12&&!['away','return','rotate-out','staff-out','mentor-visit'].includes(a.activity)){if(!go(a,'return',a.home)){a.mode='idle';a.activity='walk';a.until=clock+5;} }}break;}
      a.blocked=0;a.moving=true;a.walkDistance=(a.walkDistance||0)+travel;a.walkBack=(next[0]+next[1])<(a.pos[0]+a.pos[1]);a.facingLeft=(next[0]-a.pos[0])-(next[1]-a.pos[1])<0;a.pos=next;left-=travel;if(travel===distance)a.path.shift();
     }
-    if(!a.path.length){const returning=a.activity==='return'||a.activity==='staff-in';if(a.activity==='staff-in')staffShift.nextAt=clock+STAFF_SHIFT;if(returning)a.activity='work';a.mode='idle';a.arrived=clock;a.until=clock+(a.activity==='work'?26:a.activity==='lecture'?30:a.activity==='exercise'?18:a.activity==='chat'?16:a.activity==='smoke'?20:6)+(a.index%15);a.seated=['food','work','lecture'].includes(a.activity)&&scene.staticLayers.some(chair=>['chair','lecture'].includes(chair.kind)&&chair.anchor&&dist(a.pos,chair.anchor)<12);
+    if(!a.path.length){const returning=a.activity==='return'||a.activity==='staff-in';if(returning)a.activity='work';a.mode='idle';a.arrived=clock;a.until=clock+(a.activity==='work'?26:a.activity==='lecture'?30:a.activity==='exercise'?18:a.activity==='chat'?16:a.activity==='smoke'?20:6)+(a.index%15);a.seated=['food','work','lecture'].includes(a.activity)&&scene.staticLayers.some(chair=>['chair','lecture'].includes(chair.kind)&&chair.anchor&&dist(a.pos,chair.anchor)<12);
      if(a.activity==='coffee'||a.activity==='water'){a.carry=a.activity;a.carryUntil=clock+35;}
      if(['away','rotate-out','staff-out'].includes(a.activity)){a.mode='departing';a.hidden=false;a.until=clock+1;}
      if(a.activity==='chat')a.celebrate=a.variant===0;

@@ -80,14 +80,16 @@
  const initials=name=>String(name||'?').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
  const face=(me,size)=>me?.hasAvatar?`<img src="/api/avatars/me?v=${photoVersion}" alt="" width="${size}" height="${size}">`:`<span>${me?esc(initials(me.displayName)):'👤'}</span>`;
  /** First frame of an office character sheet (three frames side by side). */
- const sprite=(src,cls='')=>src?`<span class="hud-sprite ${cls}" style="background-image:url('${esc(src)}')" aria-hidden="true"></span>`:'';
+ /** Living character: breathes, now and then turns its head or waves (frames 1–3 of the sheet). Each one on its own beat. */
+ const sprite=(src,cls='')=>{if(!src)return '';const beat=[...src].reduce((n,c)=>n+c.charCodeAt(0),0);return `<span class="hud-sprite ${cls}" style="--beat:-${beat%11}s;--breath:-${(beat%7)/3}s" aria-hidden="true"><span class="hud-sprite-img" style="background-image:url('${esc(src)}')"></span></span>`;};
  const day=iso=>new Intl.DateTimeFormat({en:'en-GB',hr:'hr-HR',ru:'ru-RU'}[lang],{day:'numeric',month:'short',timeZone:'Europe/Zagreb'}).format(new Date(iso+'T12:00:00Z'));
 
  const BUTTONS=[['tasks','✓'],['teams','◆'],['lectures','▤'],['mentors','✦']];
+ const myCharacter=()=>{const c=data?.profile?.character;const m=c&&context.member?.(c.personId);return m?.img?m:null;};
  function dock(){
   const me=data?.me,count=data?.tasks.length||0;
   return `<div class="hud-dock" role="toolbar" aria-label="BIRD">
-   ${me?`<button class="hud-btn hud-face" data-hud="profile" aria-pressed="${open==='profile'}" aria-label="${t('profile')}">${face(me,44)}</button>${data.messages.length?`<b class="hud-badge hud-badge-face" aria-label="${t('messages')}">${data.messages.length}</b>`:''}`:`<button class="hud-btn hud-guest" data-hud="profile" aria-pressed="${open==='profile'}"><span aria-hidden="true">👤</span><small>${t('signIn')}</small></button>`}
+   ${me?`<button class="hud-btn hud-face ${myCharacter()?'hud-face-char':''}" data-hud="profile" aria-pressed="${open==='profile'}" aria-label="${t('profile')}">${myCharacter()?sprite(myCharacter().img,'hud-sprite-dock'):face(me,44)}</button>${data.messages.length?`<b class="hud-badge hud-badge-face" aria-label="${t('messages')}">${data.messages.length}</b>`:''}`:`<button class="hud-btn hud-guest" data-hud="profile" aria-pressed="${open==='profile'}"><span aria-hidden="true">👤</span><small>${t('signIn')}</small></button>`}
    ${BUTTONS.map(([k,icon])=>`<button class="hud-btn" data-hud="${k}" aria-pressed="${open===k}"><span aria-hidden="true">${icon}</span><small>${t(k)}</small>${k==='tasks'&&me&&count?`<b class="hud-badge">${count}</b>`:''}</button>`).join('')}
   </div>`;
  }
@@ -118,7 +120,7 @@
  function mentorsPanel(){
   const me=data.me,areas=[...new Set(data.mentors.map(m=>m.area))],list=data.mentors.filter(m=>!area||m.area===area);
   if(!data.mentors.length)return `<p>${t('noMentors')}</p>`;
-  return `${areas.length>1?`<div class="hud-chips">${['',...areas].map(a=>`<button data-hud-area="${esc(a)}" aria-pressed="${a===area}">${esc(a||t('all'))}</button>`).join('')}</div>`:''}<ul class="hud-list hud-mentors">${list.map(m=>`<li><div class="hud-mentor-head">${window.BIRD_OFFICE_WALK?.[m.id]?`<span class="hud-mentor-sprite" style="background-image:url('assets/${esc(m.id)}-thumb.webp')" aria-hidden="true"></span>`:`<span class="hud-mentor-face ${m.gender==='f'?'is-f':''}">${esc(initials(m.name))}</span>`}<div><strong>${esc(m.name)}</strong><small class="hud-area">${esc(m.area)}</small></div></div>${m.bio?`<p>${esc(m.bio)}</p>`:''}<small>${m.nextFree?`${t('next')}: ${esc(when(m.nextFree))}`:t('noSlots')}</small><div class="hud-actions">${m.freeSlots?`<a class="hud-secondary" href="${me?'#/account/mentors/'+esc(m.id):'#/account/register'}">${t('book')}</a>`:''}${m.link?`<a class="hud-link" href="${esc(m.link)}" target="_blank" rel="noopener noreferrer">${t('linkedIn')} ↗</a>`:''}</div></li>`).join('')}</ul>`;
+  return `${areas.length>1?`<div class="hud-chips">${['',...areas].map(a=>`<button data-hud-area="${esc(a)}" aria-pressed="${a===area}">${esc(a||t('all'))}</button>`).join('')}</div>`:''}<ul class="hud-list hud-mentors">${list.map(m=>`<li><div class="hud-mentor-head">${window.BIRD_OFFICE_WALK?.[m.id]?sprite('assets/'+m.id+'-thumb.webp','hud-sprite-mentor'):`<span class="hud-mentor-face ${m.gender==='f'?'is-f':''}">${esc(initials(m.name))}</span>`}<div><strong>${esc(m.name)}</strong><small class="hud-area">${esc(m.area)}</small></div></div>${m.bio?`<p>${esc(m.bio)}</p>`:''}<small>${m.nextFree?`${t('next')}: ${esc(when(m.nextFree))}`:t('noSlots')}</small><div class="hud-actions">${m.freeSlots?`<a class="hud-secondary" href="${me?'#/account/mentors/'+esc(m.id):'#/account/register'}">${t('book')}</a>`:''}${m.link?`<a class="hud-link" href="${esc(m.link)}" target="_blank" rel="noopener noreferrer">${t('linkedIn')} ↗</a>`:''}</div></li>`).join('')}</ul>`;
  }
  function panel(){
   if(!open||!data)return '';

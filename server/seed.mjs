@@ -3,7 +3,7 @@ import {nowIso} from './db.mjs';
 import {curatedContent} from './projects.mjs';
 import {seedBadges} from './progress.mjs';
 
-const STAFF=[['staff-bird-1','Sara'],['staff-bird-2','Sven'],['staff-bird-3','Nika']];
+const STAFF=[['staff-bird-1','Sara'],['staff-bird-2','Sven'],['staff-bird-3','Nika'],['staff-bird-4','Jasmina']];
 // Mentor speed dating, 5 Nov (owner-provided list). Organisers set each mentor's area in Admin.
 const MENTORS=[
  ['mikael-hietala','Mikael Hietala','m','mhhietala/'],['miroslav-kovac','Miroslav Kovač','m','kovacmiroslav/'],['marko-brkljacic','Marko Brkljačić','m','markobrkljacic/'],
