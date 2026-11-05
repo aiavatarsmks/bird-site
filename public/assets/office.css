@@ -231,3 +231,4 @@ body.office-fullscreen .office-intro{display:none!important}
 .hud-btn{width:58px;min-height:58px}
 .hud-dock{gap:6px}
 @media(max-width:720px){.hud-btn{width:50px;min-height:50px}.hud-face{height:50px}.hud-dock{--face:50px;gap:5px}.hud-btn>span{font-size:17px}.hud-btn small{font-size:9px}.hud-panel{left:64px}}
+.hud-mentor-sprite{flex:none;width:48px;height:44px;background-size:contain;background-repeat:no-repeat;background-position:center;image-rendering:pixelated;border-radius:8px;background-color:#eef1e6}
