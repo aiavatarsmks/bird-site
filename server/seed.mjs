@@ -15,6 +15,7 @@ const MENTORS=[
 ];
 // Owner-provided dates. Pitch day (3 November) is not a lecture.
 const LECTURES=[
+ {id:'startup-stories-2',date:'2026-11-05',speaker:'Boris Sesar',title:{en:'Startup Stories #2: Boris Sesar',hr:'Startup Stories #2: Boris Sesar',ru:'Startup Stories #2: Boris Sesar'}},
  {id:'startup-pricing',date:'2026-10-29',speaker:'Ivan Bračić',title:{en:'Pricing for startups',hr:'Određivanje cijena za startupe',ru:'Ценообразование для стартапов'}},
  {id:'founder-led-sales',date:'2026-11-02',speaker:'',title:{en:'Founder-led sales',hr:'Prodaja koju vodi osnivač',ru:'Продажи силами основателя'}},
 ];
