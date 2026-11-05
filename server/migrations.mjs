@@ -157,4 +157,9 @@ CREATE TABLE IF NOT EXISTS cohort_quests(id TEXT PRIMARY KEY,title TEXT NOT NULL
 CREATE TABLE IF NOT EXISTS office_hours(id TEXT PRIMARY KEY,mentor_name TEXT NOT NULL,topic TEXT NOT NULL DEFAULT '',starts_at TEXT NOT NULL,duration_min INTEGER NOT NULL DEFAULT 30,location TEXT NOT NULL DEFAULT '',created_by TEXT NOT NULL,created TEXT NOT NULL,cancelled_at TEXT);
 CREATE TABLE IF NOT EXISTS office_hour_bookings(slot_id TEXT PRIMARY KEY REFERENCES office_hours(id),project_id TEXT NOT NULL REFERENCES projects(id),booked_by TEXT NOT NULL,question TEXT NOT NULL DEFAULT '',note TEXT NOT NULL DEFAULT '',created TEXT NOT NULL);
 `},
+ // The production check account created during the 5 Nov verification.
+ {id:8,name:'disable-deploy-check-account',sql:`
+UPDATE sessions SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE revoked_at IS NULL AND user_id IN (SELECT id FROM users WHERE login='bird-deploy-check' AND role='member');
+UPDATE users SET status='disabled',updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE login='bird-deploy-check' AND role='member';
+`},
 ];
