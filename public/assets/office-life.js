@@ -136,11 +136,11 @@ function create(scene,roster,options={}){
   if(a.id.startsWith('staff-')){
    const roaming=staffIds.filter(id=>id!==a.id&&(actors.get(id).activity!=='work'||actors.get(id).mode==='walking')).length;
    const kind=['work','coffee','work','water','work','walk','work','chat'][(a.index+a.round++)%8];
-   if(roaming<staffIds.length-2&&kind!=='work'&&walkers()<MAX_WALKERS-2&&!presence.swaps.length){
+   if(roaming<staffIds.length-2&&kind!=='work'){
     if(kind==='chat'){const hubs=[[620,920],[650,680],[700,550]].sort((b,c)=>dist(a.pos,b)-dist(a.pos,c));for(const hub of hubs)if(go(a,'staff-break',hub)){a.until=clock+25;return;}}
     else if(!atStation(kind,a)){const targets=[...choices[kind]].sort((b,c)=>dist(a.home,b)-dist(a.home,c));for(const target of targets)if(go(a,kind,target))return;}
    }
-   a.until=clock+35+a.index%25;return;
+   a.until=clock+18+a.index%14;return;
   }
   if(a.mentor){a.until=clock+20;return;}
   const schedule=exerciseIds.has(a.id)?['work','exercise','coffee','work','water','walk','food','chat','away']:lectureIds.includes(a.id)?['work','coffee','lecture','water','work','chat','food','away']:['work','coffee','water','work','chat','food','walk','away'];
