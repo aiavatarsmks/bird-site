@@ -110,6 +110,11 @@ export const EXAMPLE_TASKS=[
   t:T(['Ready for demo day','Deck, one-pager and a rehearsed pitch.','Organisers mark this after a rehearsal.','Confirmed by the organisers after a rehearsal.'],
    ['Spremni za demo dan','Prezentacija, jedna stranica i uvježban pitch.','Organizatori ovo označavaju nakon probe.','Potvrdili organizatori nakon probe.'],
    ['Готовы к демо-дню','Презентация, one-pager и отрепетированный питч.','Организаторы отмечают это после репетиции.','Подтверждено организаторами после репетиции.'])},
+ {key:'demo-day-kit',type:'checklist',scope:'team',xp:40,requiresReview:true,
+  checklist:[T('Pitch deck (10–12 slides)','Prezentacija (10–12 slajdova)','Питч-дек (10–12 слайдов)'),T('One-pager for investors','Jedna stranica za investitore','One-pager для инвесторов'),T('Slide with your key numbers','Slajd s ključnim brojevima','Слайд с ключевыми цифрами'),T('Two-minute pitch rehearsed with a timer','Pitch od dvije minute uvježban sa štopericom','Двухминутный питч отрепетирован с таймером'),T('Team photo','Fotografija tima','Фото команды')],
+  t:T(['Demo day kit','Everything you need on stage, ready a week early.','Upload the deck and one-pager to project files, tick what is ready and send for review. Organisers check it before the rehearsal.','All five items are ready and checked.'],
+   ['Paket za demo dan','Sve što trebate na pozornici, spremno tjedan ranije.','Učitajte prezentaciju i jednu stranicu u datoteke projekta, označite što je spremno i pošaljite na pregled. Organizatori to provjeravaju prije probe.','Svih pet stavki je spremno i provjereno.'],
+   ['Набор к демо-дню','Всё нужное для выступления, готово за неделю.','Загрузите презентацию и one-pager в файлы проекта, отметьте готовое и отправьте на проверку. Организаторы проверят до репетиции.','Все пять пунктов готовы и проверены.'])},
 ];
 function seedTasks(db,now){
  for(const task of EXAMPLE_TASKS){

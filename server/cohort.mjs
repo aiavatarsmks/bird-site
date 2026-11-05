@@ -64,10 +64,28 @@ export function deleteOutcome(ctx,projectId,id){
 }
 
 // Announcements ---------------------------------------------------------------------------
+const CHAT_HOOK=/^https:\/\/(hooks\.slack\.com\/services\/|(discord\.com|discordapp\.com)\/api\/webhooks\/)[A-Za-z0-9\/_-]{10,200}$/;
+export async function setChatHook(ctx){
+ const owner=requireAdmin(ctx),body=await readJson(ctx.request);
+ const url=text(body.url??'',{max:300},'url');if(url&&!CHAT_HOOK.test(url))fail(400,'INVALID_FIELDS',{field:'url'});
+ ctx.db.query("INSERT INTO settings(key,value,updated) VALUES('chat_webhook',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated=excluded.updated").run(url,nowIso());
+ audit(ctx.db,owner.id,'settings.chat_webhook','settings','chat_webhook',{set:!!url});
+ return json({ok:true,configured:!!url});
+}
+export function chatHookStatus(ctx){requireAdmin(ctx);return json({configured:!!ctx.db.query("SELECT value FROM settings WHERE key='chat_webhook' AND value<>''").get()});}
+/** Copies an announcement to the team chat. Failures never block the announcement. */
+async function postToChat(db,title,body,origin){
+ const url=db.query("SELECT value FROM settings WHERE key='chat_webhook' AND value<>''").get()?.value;if(!url||!CHAT_HOOK.test(url))return;
+ const text=`*${title}*\n${body}${origin?`\n${origin}/#/account`:''}`;
+ const payload=url.includes('discord')?{content:text.replace(/\*/g,'**').slice(0,1900)}:{text:text.slice(0,3500)};
+ try{await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(5000)});}catch{}
+}
 export async function createAnnouncement(ctx){
  const admin=requireAdmin(ctx),body=await readJson(ctx.request);
  const id=newId('ann');
- ctx.db.query('INSERT INTO announcements(id,title,body,pinned,author,created) VALUES(?,?,?,?,?,?)').run(id,text(body.title,{min:1,max:160},'title'),text(body.body,{min:1,max:4000,multiline:true},'body'),body.pinned?1:0,admin.id,nowIso());
+ const title=text(body.title,{min:1,max:160},'title'),content=text(body.body,{min:1,max:4000,multiline:true},'body');
+ ctx.db.query('INSERT INTO announcements(id,title,body,pinned,author,created) VALUES(?,?,?,?,?,?)').run(id,title,content,body.pinned?1:0,admin.id,nowIso());
+ if(body.toChat)postToChat(ctx.db,title,content,ctx.config.publicOrigin||new URL(ctx.request.url).origin);
  audit(ctx.db,admin.id,'announcement.create','announcement',id,{});
  return json({id},201);
 }
