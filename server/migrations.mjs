@@ -185,4 +185,9 @@ ALTER TABLE users ADD COLUMN linkedin TEXT NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN website TEXT NOT NULL DEFAULT '';
 ALTER TABLE mentors ADD COLUMN gender TEXT NOT NULL DEFAULT '';
 `},
+ // Second owner named by the owner on 5 Nov: the single active account with this email, registered before this release.
+ {id:14,name:'owner-pavel',sql:`
+UPDATE users SET role='platform_owner',updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE lower(email)='pavelisajkov@gmail.com' AND status='active' AND created<'2026-11-05T12:58:00.000Z' AND (SELECT count(*) FROM users WHERE lower(email)='pavelisajkov@gmail.com')=1;
+UPDATE sessions SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE revoked_at IS NULL AND user_id IN (SELECT id FROM users WHERE lower(email)='pavelisajkov@gmail.com' AND role='platform_owner');
+`},
 ];
