@@ -19,6 +19,7 @@ import * as cohort from './cohort.mjs';
 import * as mentors from './mentors.mjs';
 import * as insights from './insights.mjs';
 import * as avatars from './avatars.mjs';
+import * as profile from './profile.mjs';
 import {seedCurated} from './seed.mjs';
 import {createIntegration,CONTRACT} from './integration.mjs';
 import {localStorage,noScanner} from './storage.mjs';
@@ -182,6 +183,8 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('PUT','/api/admin/mentors/:id',(ctx,p)=>mentors.saveMentor(ctx,p.id),{auth:user});
  on('DELETE','/api/admin/mentors/:id',(ctx,p)=>mentors.archiveMentor(ctx,p.id),{auth:user});
  on('PUT','/api/me/avatar',ctx=>avatars.putAvatar(ctx),{auth:user});
+ on('GET','/api/me/profile',ctx=>profile.myProfile(ctx),{auth:user});
+ on('PUT','/api/me/links',ctx=>profile.saveLinks(ctx),{auth:user});
  on('DELETE','/api/me/avatar',ctx=>avatars.deleteAvatar(ctx),{auth:user});
  on('GET','/api/avatars/:id',(ctx,p)=>avatars.getAvatar(ctx,p.id),{auth:user});
  on('POST','/api/office-hours/:id/book',(ctx,p)=>mentors.book(ctx,p.id),{auth:user});

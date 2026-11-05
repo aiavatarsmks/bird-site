@@ -4,6 +4,15 @@ import {curatedContent} from './projects.mjs';
 import {seedBadges} from './progress.mjs';
 
 const STAFF=[['staff-bird-1','Sara'],['staff-bird-2','Sven'],['staff-bird-3','Nika']];
+// Mentor speed dating, 5 Nov (owner-provided list). Organisers set each mentor's area in Admin.
+const MENTORS=[
+ ['mikael-hietala','Mikael Hietala','m','mhhietala/'],['miroslav-kovac','Miroslav Kovač','m','kovacmiroslav/'],['marko-brkljacic','Marko Brkljačić','m','markobrkljacic/'],
+ ['damir-first','Damir Firšt','m','damir-first/'],['davor-anicic','Davor Aničić','m','davor-anicic/'],['marijana-sarolic-robic','Marijana Š. Robić','f','marijana-sarolic-robic-27363712/'],
+ ['lisa-lines','Lisa Lines','f','lisa-lines-8469b8115/'],['jana-klaric','Jana Klarić','f','jana-klari%C4%87/'],['kristijan-paksec','Kristijan Pakšec','m','kristijan-paksec/'],
+ ['josko-bobanovic','Joško Bobanović','m','josko/'],['vid-zavalic','Vid Zavalić','m','vzavalic/'],['christer-andersson','Christer Andersson','m','christerandersson/'],
+ ['nikola-tavic','Nikola Tavić','m','ntavic/'],['drazen-orescanin','Dražen Oreščanin','m','dorescanin/'],['branimir-buntak','Branimir Buntak','m','branimir23/'],
+ ['jasmina-kutlesa-matosevic','Jasmina Kutleša Matošević','f','jasmina-kutlesa-matosevic/'],
+];
 // Owner-provided dates. Pitch day (3 November) is not a lecture.
 const LECTURES=[
  {id:'startup-pricing',date:'2026-10-29',speaker:'Ivan Bračić',title:{en:'Pricing for startups',hr:'Određivanje cijena za startupe',ru:'Ценообразование для стартапов'}},
@@ -24,6 +33,8 @@ export function seedCurated(db,data,lectures=LECTURES){
   }
   for(const l of lectures)db.query('INSERT INTO lectures(id,date,speaker,title,created,updated) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING').run(l.id,l.date,l.speaker,JSON.stringify(l.title),now,now);
   db.query("INSERT INTO programs(id,name,created) VALUES('bird-2026',?,?) ON CONFLICT(id) DO NOTHING").run(JSON.stringify({en:'BIRD Incubator 2026',hr:'BIRD Inkubator 2026',ru:'Инкубатор BIRD 2026'}),now);
+  if(db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mentors'").get()&&db.query("SELECT 1 FROM pragma_table_info('mentors') WHERE name='gender'").get())
+   for(const [slug,name,gender,link] of MENTORS)db.query("INSERT INTO mentors(id,name,area,bio,link,gender,created_by,created,updated) VALUES(?,?,'Mentor speed dating','',?,?,'seed',?,?) ON CONFLICT(id) DO NOTHING").run('mentor-'+slug,name,'https://www.linkedin.com/in/'+link,gender,now,now);
   seedBadges(db);
   seedTasks(db,now);
   // A first shared goal for the cohort (organisers can close it and add others).

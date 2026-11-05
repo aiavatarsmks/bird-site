@@ -152,11 +152,11 @@ body.office-fullscreen .office-intro{display:none!important}
 .hud-btn small{font-size:11px;font-weight:600}
 .hud-btn[aria-pressed=true]{background:#263d34;color:#fcfaf3;border-color:#263d34}
 .hud-btn:focus-visible{outline:3px solid #d7b66f;outline-offset:2px}
-.hud-face{padding:0;overflow:hidden;border-radius:50%;height:64px}
+.hud-face{padding:0;overflow:hidden;border-radius:50%;height:58px}
 .hud-face img{width:100%;height:100%;object-fit:cover;display:block}
 .hud-face>span{font-size:20px;font-weight:700}
 .hud-badge{position:absolute;top:-6px;right:-6px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#b5482e;color:#fff;font-size:12px;line-height:22px;text-align:center}
-.hud-panel{position:absolute;left:88px;top:12px;width:min(360px,calc(100% - 100px));max-height:calc(100% - 24px);display:flex;flex-direction:column;background:#fcfaf3;color:#263d34;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.3);pointer-events:auto;overflow:hidden}
+.hud-panel{position:absolute;left:82px;top:12px;width:min(360px,calc(100% - 100px));max-height:calc(100% - 24px);display:flex;flex-direction:column;background:#fcfaf3;color:#263d34;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.3);pointer-events:auto;overflow:hidden}
 .hud-panel header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px;border-bottom:1px solid #e3e5da}
 .hud-panel h2{margin:0;font:600 18px/1.2 Georgia,serif}
 .hud-panel header button{width:44px;height:44px;border:0;background:none;font-size:26px;color:#263d34;cursor:pointer;border-radius:8px}
@@ -194,9 +194,40 @@ body.office-fullscreen .office-intro{display:none!important}
  .office-quest{left:auto;right:8px;transform:none;max-width:calc(100% - 80px)}
 }
 .hud-guest{background:#263d34;color:#fcfaf3;border-color:#263d34}.hud-guest[aria-pressed=true]{background:#b5482e;border-color:#b5482e}
-.hud-dock{--face:64px}
+.hud-dock{--face:58px}
 .hud-badge-face{position:absolute;left:calc(var(--face) - 16px);top:-6px;z-index:1}
 .hud-messages li{background:#fff6dc;border-color:#ead79b}
 .hud-messages p{margin:4px 0 0}
 @media(max-width:720px){.hud-dock{--face:54px}}
 .hud-profile strong{display:block;font-size:16px}.hud-profile small{display:block;color:#66745e;font-size:13px;margin-top:2px}
+.hud-sprite{display:inline-block;width:42px;height:39px;background-size:300% 100%;background-position:0 0;background-repeat:no-repeat;image-rendering:pixelated;flex:none}
+.hud-sprite-lg{width:88px;height:81px}
+.hud-profile{justify-content:space-between}
+.hud-profile-main{display:flex;gap:10px;align-items:center;flex:1}
+.hud-panel h3{margin:14px 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#66745e}
+.hud-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.hud-stats div{background:#fff;border:1px solid #e3e5da;border-radius:8px;padding:8px;text-align:center}
+.hud-stats b{display:block;font-size:20px}
+.hud-stats small{font-size:11px;color:#66745e}
+.hud-badges{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.hud-badges li{font-size:12px;padding:4px 9px;border-radius:12px;background:#efefe8;color:#8a9184}
+.hud-badges li.is-earned{background:#f1e7c9;color:#5b4a1d;font-weight:600}
+.hud-badges span{margin-right:4px}
+.hud-links{display:grid;gap:8px}
+.hud-links label{display:grid;gap:3px;font-size:12px;font-weight:600}
+.hud-links input{font:inherit;font-size:16px;min-height:42px;padding:6px 10px;border:1px solid #b9bcb1;border-radius:6px;width:100%;box-sizing:border-box}
+.hud-links button{justify-self:start;cursor:pointer}
+.hud-link{background:none;border:0;padding:6px 4px;color:#405b47;text-decoration:underline;font:inherit;font-size:13px;cursor:pointer;min-height:38px}
+.hud-teams li{padding:8px 10px}
+.hud-team{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:4px 0;font:inherit;text-align:left;cursor:pointer;color:inherit}
+.hud-team strong{flex:1}
+.hud-team-dot{width:10px;height:10px;border-radius:50%;flex:none}
+.hud-team-people{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.hud-person{display:flex;flex-direction:column;align-items:center;gap:1px;background:#f6f4ec;border:1px solid #e3e5da;border-radius:8px;padding:4px 6px;min-width:56px;cursor:pointer;font:inherit}
+.hud-person small{font-size:11px;margin:0!important;color:#263d34!important}
+.hud-lecture{display:flex;gap:10px;align-items:flex-start}
+.hud-date{flex:none;min-width:52px;padding:4px 6px;border-radius:6px;background:#263d34;color:#fcfaf3;font-size:12px;font-weight:700;text-align:center}
+.hud-mentor-face.is-f{background:#f1dcd2}
+.hud-btn{width:58px;min-height:58px}
+.hud-dock{gap:6px}
+@media(max-width:720px){.hud-btn{width:50px;min-height:50px}.hud-face{height:50px}.hud-dock{--face:50px;gap:5px}.hud-btn>span{font-size:17px}.hud-btn small{font-size:9px}.hud-panel{left:64px}}

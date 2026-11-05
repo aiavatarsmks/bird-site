@@ -65,6 +65,7 @@ function navigation(scene){
  }
  return{route,free,cells,canStep};
 }
+const STAFF_SHIFT=120;
 function create(scene,roster,options={}){
  const smokers=new Set(['person-pavel-isaykov','person-javier-garcia-zaballos']);
  const nav=navigation(scene),actors=new Map(),seats=[[225,263],[375,263],[225,500],[375,500],[997,943],[1143,943],[997,1135],[1143,1135],[998,1488],[1142,1488],[998,1670],[1142,1670],[1010,2050],[1170,2050],[1010,2320],[1170,2320]],windowSeats=[[225,1155],[225,1330]];
@@ -88,8 +89,10 @@ function create(scene,roster,options={}){
  // Start with varied, useful occupations already spread across the floor.
  const gymActor=actors.get('person-antun-matijasec');if(gymActor){gymActor.pos=[260,2240];gymActor.activity='exercise';gymActor.seated=false;gymActor.arrived=0;gymActor.until=22;gymActor.visited.add('exercise');}
  const outsideActor=actors.get('person-javier-garcia-zaballos');if(outsideActor){outsideActor.pos=[840,2520];outsideActor.activity='smoke';outsideActor.seated=false;outsideActor.arrived=0;outsideActor.until=24;outsideActor.visited.add('smoke');outsideActor.visited.add('away');}
- const staffIds=[...actors.keys()].filter(id=>id.startsWith('staff-'));
- const staffShift={active:staffIds[0],index:0,nextAt:60,departing:false};
+ // BIRD staff take turns at the desk: a new order on every visit, one shift change every two minutes.
+ const random=options.random||Math.random,staffIds=[...actors.keys()].filter(id=>id.startsWith('staff-'));
+ for(let i=staffIds.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[staffIds[i],staffIds[j]]=[staffIds[j],staffIds[i]];}
+ const staffShift={active:staffIds[0],index:0,nextAt:STAFF_SHIFT,departing:false};
  for(const id of staffIds.slice(1)){actors.get(id).hidden=true;actors.get(id).mode='offsite';}
  const visible=except=>[...actors.values()].filter(b=>b!==except&&!b.hidden);
  const walkers=()=>[...actors.values()].filter(b=>b.mode==='walking').length;
@@ -156,12 +159,12 @@ function create(scene,roster,options={}){
  const team=a=>groups.get(a.projectId)||[a.id];
  const teamPresent=a=>team(a).filter(id=>inOffice(actors.get(id))).length;
  function arrive(a){a.pos=[...LIFT];a.hidden=false;a.enteredAt=clock;a.wantsOut=false;note(a,'arrive');if(!go(a,'return',a.home)){a.mode='idle';a.activity='return';a.seated=false;a.until=clock+2;}}
- function startSwap(){
+ function startSwap(forced){
   const absent=[...presence.absentSince.entries()].sort((x,y)=>x[1]-y[1]).map(([id])=>id),reserved=new Set(presence.swaps.map(w=>w.in));
   const count=participants.filter(inOffice).length+presence.swaps.filter(w=>w.in&&!w.out).length;
   const pool=participants.filter(a=>a.mode==='offsite'&&!reserved.has(a.id)&&(clock-a.offSince>=30||absent.includes(a.projectId)));
   pool.sort((x,y)=>(absent.includes(x.projectId)?absent.indexOf(x.projectId):99)-(absent.includes(y.projectId)?absent.indexOf(y.projectId):99)||teamPresent(x)-teamPresent(y)||x.offSince-y.offSince||(x.index+presence.turn)%7-(y.index+presence.turn)%7);
-  const incoming=pool[0];
+  const incoming=forced||pool[0];
   const leaving=participants.filter(a=>inOffice(a)&&!a.hidden&&!a.pinned&&a.mode==='idle'&&!a.partner&&clock-a.enteredAt>40&&!presence.swaps.some(w=>w.out===a.id)&&(incoming&&a.projectId===incoming.projectId?true:teamPresent(a)>1||!presence.absentSince.size));
   leaving.sort((x,y)=>Number(!!y.wantsOut)-Number(!!x.wantsOut)||teamPresent(y)-teamPresent(x)||x.enteredAt-y.enteredAt||(x.index+presence.turn)%5-(y.index+presence.turn)%5);
   presence.turn++;
@@ -179,7 +182,13 @@ function create(scene,roster,options={}){
   }
   const waiting=[...presence.absentSince.entries()].filter(([pid,since])=>!presence.swaps.some(w=>w.in&&actors.get(w.in).projectId===pid));
   const overdue=waiting.find(([,since])=>clock-since>presence.maxTeamAbsence-25);
-  if(overdue){const a=participants.find(b=>b.projectId===overdue[0]&&b.mode==='offsite');if(a){arrive(a);presence.nextAt=Math.min(presence.nextAt,clock+4);}}
+  // An overdue team takes the next free place: it replaces a waiting arrival or starts a swap, so the count never goes over.
+  if(overdue){const a=participants.find(b=>b.projectId===overdue[0]&&b.mode==='offsite');if(a){
+   const pending=presence.swaps.find(w=>w.in&&actors.get(w.in).projectId!==overdue[0]);
+   if(participants.filter(inOffice).length<presence.target)arrive(a);
+   else if(pending)pending.in=a.id;
+   else if(!presence.swaps.some(w=>w.in)&&startSwap(a))presence.nextAt=clock+16;
+  }}
   const urgent=waiting.some(([,since])=>clock-since>35);
   if(presence.swaps.length<2&&(clock>=presence.nextAt||urgent&&presence.swaps.length<1||participants.filter(inOffice).length>presence.target&&!presence.swaps.length)){
    if(startSwap())presence.nextAt=clock+16+(presence.turn*7)%14;else presence.nextAt=clock+4;
@@ -206,7 +215,7 @@ function create(scene,roster,options={}){
      if(blocked){a.blocked=(a.blocked||0)+dt;if(a.blocked>2&&clock>(a.replanAt||0)){a.replanAt=clock+4;const detour=nav.route(a.pos,a.goal,['work','food','return','lecture','exercise','staff-in'].includes(a.activity),others.map(b=>b.pos));if(detour.length>1){a.path=detour.slice(1);a.blocked=0;}else if(a.blocked>12&&!['away','return','rotate-out','staff-out'].includes(a.activity)){if(!go(a,'return',a.home)){a.mode='idle';a.activity='walk';a.until=clock+5;} }}break;}
      a.blocked=0;a.moving=true;a.walkDistance=(a.walkDistance||0)+travel;a.walkBack=(next[0]+next[1])<(a.pos[0]+a.pos[1]);a.facingLeft=(next[0]-a.pos[0])-(next[1]-a.pos[1])<0;a.pos=next;left-=travel;if(travel===distance)a.path.shift();
     }
-    if(!a.path.length){const returning=a.activity==='return'||a.activity==='staff-in';if(a.activity==='staff-in')staffShift.nextAt=clock+60;if(returning)a.activity='work';a.mode='idle';a.arrived=clock;a.until=clock+(a.activity==='work'?26:a.activity==='lecture'?30:a.activity==='exercise'?18:a.activity==='chat'?16:a.activity==='smoke'?20:6)+(a.index%15);a.seated=['food','work','lecture'].includes(a.activity)&&scene.staticLayers.some(chair=>['chair','lecture'].includes(chair.kind)&&chair.anchor&&dist(a.pos,chair.anchor)<12);
+    if(!a.path.length){const returning=a.activity==='return'||a.activity==='staff-in';if(a.activity==='staff-in')staffShift.nextAt=clock+STAFF_SHIFT;if(returning)a.activity='work';a.mode='idle';a.arrived=clock;a.until=clock+(a.activity==='work'?26:a.activity==='lecture'?30:a.activity==='exercise'?18:a.activity==='chat'?16:a.activity==='smoke'?20:6)+(a.index%15);a.seated=['food','work','lecture'].includes(a.activity)&&scene.staticLayers.some(chair=>['chair','lecture'].includes(chair.kind)&&chair.anchor&&dist(a.pos,chair.anchor)<12);
      if(a.activity==='coffee'||a.activity==='water'){a.carry=a.activity;a.carryUntil=clock+35;}
      if(['away','rotate-out','staff-out'].includes(a.activity)){a.mode='departing';a.hidden=false;a.until=clock+1;}
      if(a.activity==='chat')a.celebrate=a.variant===0;

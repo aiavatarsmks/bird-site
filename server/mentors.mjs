@@ -69,7 +69,7 @@ export function listMentors(ctx){
  return json({items:rows.map(m=>{
   const next=ctx.db.query('SELECT h.starts_at FROM office_hours h LEFT JOIN office_hour_bookings b ON b.slot_id=h.id WHERE h.mentor_id=? AND h.cancelled_at IS NULL AND b.slot_id IS NULL AND h.starts_at>? ORDER BY h.starts_at LIMIT 1').get(m.id,now);
   const free=ctx.db.query('SELECT count(*) n FROM office_hours h LEFT JOIN office_hour_bookings b ON b.slot_id=h.id WHERE h.mentor_id=? AND h.cancelled_at IS NULL AND b.slot_id IS NULL AND h.starts_at>?').get(m.id,now).n;
-  return {id:m.id,name:m.name,area:m.area,bio:m.bio,link:m.link,nextFree:next?.starts_at||null,freeSlots:free};
+  return {id:m.id,name:m.name,area:m.area,bio:m.bio,link:m.link,gender:m.gender||'',nextFree:next?.starts_at||null,freeSlots:free};
  })});
 }
 export async function saveMentor(ctx,id){

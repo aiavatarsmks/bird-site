@@ -180,4 +180,9 @@ CREATE TABLE IF NOT EXISTS mentors(id TEXT PRIMARY KEY,name TEXT NOT NULL,area T
 ALTER TABLE office_hours ADD COLUMN mentor_id TEXT REFERENCES mentors(id);
 CREATE TABLE IF NOT EXISTS user_avatars(user_id TEXT PRIMARY KEY REFERENCES users(id),mime TEXT NOT NULL,bytes BLOB NOT NULL,updated TEXT NOT NULL);
 `},
+ {id:13,name:'profile-links-and-mentor-look',sql:`
+ALTER TABLE users ADD COLUMN linkedin TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN website TEXT NOT NULL DEFAULT '';
+ALTER TABLE mentors ADD COLUMN gender TEXT NOT NULL DEFAULT '';
+`},
 ];
