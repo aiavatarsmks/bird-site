@@ -343,7 +343,7 @@ async function onChange(e){
 window.BirdAccount={
  isRoute,
  title:()=>tr(parts()[0]==='admin'?'admin':'nav'),
- navLabel:()=>me?tr('nav'):tr('signIn'),
+ navLabel:language=>{if(language)lang=language;return me?tr('nav'):tr('signIn');},
  isSignedIn:()=>!!me,
  mount(el,language){
   root?.removeEventListener('submit',onSubmit);root?.removeEventListener('click',onClick);root?.removeEventListener('change',onChange);

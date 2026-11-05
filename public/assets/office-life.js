@@ -4,15 +4,36 @@ const STEP=20,dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 const DENSITY_RADIUS=175,AREA_LIMIT=3,MAX_WALKERS=5,PRESENT_TARGET=13,MAX_TEAM_ABSENCE=120;
 function fitsArea(point,others){if(others.filter(p=>dist(p,point)<DENSITY_RADIUS).length>=AREA_LIMIT)return false;return !others.some(center=>dist(point,center)<DENSITY_RADIUS&&others.filter(p=>dist(p,center)<DENSITY_RADIUS).length>=AREA_LIMIT);}
 const activities=['work','walk','chat','coffee','water','food','away','lecture','exercise'];
-const phrases={
- lecture:{en:['Taking notes','A little study time','Reviewing the lecture','One more idea','Working on a plan','Reading my notes','Thinking it through'],hr:['Pišem bilješke','Malo učenja','Ponavljam predavanje','Još jedna ideja','Radim na planu','Čitam bilješke','Razmišljam'],ru:['Делаю заметки','Немного учёбы','Повторю лекцию','Ещё одна идея','Работаю над планом','Читаю конспект','Обдумываю']},
- exercise:{en:['Stretch break','A few pull-ups','Moving a little','One more rep','Time to stretch','A quick workout','Then back to work'],hr:['Malo istezanja','Nekoliko zgibova','Malo kretanja','Još jedno ponavljanje','Vrijeme za istezanje','Kratki trening','Pa natrag na posao'],ru:['Размяться','Пара подтягиваний','Немного движения','Ещё один подход','Время разминки','Короткая тренировка','И обратно к работе']},
- smoke:{en:['Smoke break','A quick break','Stepping outside','Back in a minute','A little fresh air','Outside for a bit','See you in a minute'],hr:['Pauza za cigaretu','Kratka pauza','Idem van','Vraćam se brzo','Malo svježeg zraka','Nakratko van','Vidimo se uskoro'],ru:['Выйду покурить','Короткая пауза','На балкон','Скоро вернусь','Свежий воздух','Ненадолго на улицу','До скорого']},
- coffee:{en:['Coffee time','I want coffee','One espresso','Coffee break','Refill time','A little caffeine','Back in a minute'],hr:['Vrijeme za kavu','Želim kavu','Jedan espresso','Pauza za kavu','Još jednu','Malo kofeina','Vraćam se brzo'],ru:['Время кофе','Хочу кофе','Один эспрессо','Кофе-пауза','Ещё чашечку','Немного кофеина','Скоро вернусь']},
- water:{en:['Water break','Stay hydrated','Just some water','Refill time','A fresh glass','Cheers','Water first'],hr:['Pauza za vodu','Vrijeme za vodu','Samo voda','Napuniti čašu','Čaša vode','Živjeli','Prvo voda'],ru:['Попить воды','Время воды','Просто воды','Наполнить стакан','Стакан воды','За здоровье','Сначала вода']},
- food:{en:['Lunch time','Snack break','I am hungry','Something to eat','Kitchen break','Time for a bite','Be right back'],hr:['Vrijeme za ručak','Mali zalogaj','Gladan sam','Nešto za jelo','Pauza u kuhinji','Vrijeme za obrok','Vraćam se brzo'],ru:['Время обеда','Перекус','Хочу поесть','Что-нибудь съесть','Пауза на кухне','Пора перекусить','Скоро вернусь']},
- away:{en:['Be right back','A little fresh air','Quick break','Heading home','See you soon','Stretch my legs','Stepping outside'],hr:['Vraćam se brzo','Malo zraka','Kratka pauza','Idem kući','Vidimo se','Prošetati malo','Idem van'],ru:['Скоро вернусь','На свежий воздух','Короткая пауза','Пойду домой','До встречи','Размять ноги','Выйду ненадолго']}
+// Startup small talk, always in English. At most two speech bubbles in the whole office.
+const SPEECH_LIMIT=2,LINE_SECONDS=3.2;
+const SOLO={
+ coffee:['Coffee time!','One more espresso','Need caffeine','Coffee, then pitch deck'],
+ water:['Quick water break','Stay hydrated!','Just some water'],
+ food:['Lunch time!','Snack break','Anyone hungry?'],
+ smoke:['Going for a smoke','Smoke break','Fresh air, back soon'],
+ away:['Heading home','See you tomorrow!','Off to a meeting','Back in a bit','Customer call, bye!'],
+ arrive:['Hi everyone!','Morning, team!','I\'m back!','What did I miss?'],
+ exercise:['Stretch break!','Time for pull-ups','Five more reps'],
+ lecture:['Reviewing my notes','Study time','Pricing notes again'],
+ work:['Back to work','Deep work mode','Shipping it'],
 };
+const DIALOGUES=[
+ ['Hi! How\'s it going?','Busy week, but good!'],
+ ['How did your pitch go?','They asked about pricing.','Classic. Had an answer?','Working on it!'],
+ ['Coffee later?','Always.'],
+ ['Talked to users this week?','Five interviews!','Any surprises?','They want it simpler.'],
+ ['What\'s the MVP doing now?','Onboarding our first pilot.'],
+ ['Need help with the deck?','Yes! Slide 3 is a mess.'],
+ ['How many users so far?','Twelve. Real ones!','That\'s traction!'],
+ ['Pitch practice at five?','Deal. Two minutes max.'],
+ ['What\'s your burn rate?','Mostly coffee.','Same here.'],
+ ['Hey!','Hey! Good to see you.'],
+ ['Read the pricing notes?','Twice. So useful.'],
+ ['Any mentor feedback?','Focus on one segment.','Good advice.'],
+ ['When do we launch?','Friday. Promise.','Which Friday?'],
+ ['Who\'s your first customer?','A clinic in Zagreb.','Nice, local first!'],
+ ['Did you ship the update?','Last night. No bugs yet.'],
+];
 function navigation(scene){
  const desks=scene.staticLayers.filter(x=>x.kind==='desk-top').map(x=>x.footprint),walls=scene.staticLayers.filter(x=>x.kind==='wall'&&x.worldSegment).map(x=>x.worldSegment);
  const chairs=scene.staticLayers.filter(x=>x.kind==='chair').map(x=>x.footprint);
@@ -72,6 +93,27 @@ function create(scene,roster,options={}){
  for(const id of staffIds.slice(1)){actors.get(id).hidden=true;actors.get(id).mode='offsite';}
  const visible=except=>[...actors.values()].filter(b=>b!==except&&!b.hidden);
  const walkers=()=>[...actors.values()].filter(b=>b.mode==='walking').length;
+ const speech={lines:new Map(),events:[],dialogue:null,nextAt:6,turn:0,used:new Set()};
+ const say=(a,text)=>speech.lines.set(a.id,{text,until:clock+LINE_SECONDS});
+ const note=(a,kind)=>{if(SOLO[kind])speech.events.push({id:a.id,kind,at:clock});if(speech.events.length>20)speech.events.shift();};
+ function updateSpeech(){
+  for(const [id,l] of speech.lines)if(clock>l.until||actors.get(id).hidden)speech.lines.delete(id);
+  const d=speech.dialogue;
+  if(d){const a=actors.get(d.ids[d.line%2]),b=actors.get(d.ids[1-d.line%2]);
+   const together=a.activity==='chat'&&b.activity==='chat'&&a.mode==='idle'&&b.mode==='idle'&&dist(a.pos,b.pos)<130;
+   if(!together||d.line>=d.script.length)speech.dialogue=null;
+   else if(clock>=d.nextAt&&!speech.lines.has(b.id)&&speech.lines.size<SPEECH_LIMIT){say(a,d.script[d.line]);d.line++;d.nextAt=clock+LINE_SECONDS+.4;}
+  }
+  if(clock<speech.nextAt||speech.lines.size>=SPEECH_LIMIT)return;
+  speech.nextAt=clock+4+(speech.turn++*7)%6;
+  // A fresh pair at a chat spot may start a dialogue; other pairs talk silently.
+  if(!speech.dialogue&&speech.turn%2){
+   const pair=[...actors.values()].find(a=>a.activity==='chat'&&a.mode==='idle'&&!a.hidden&&a.partner&&actors.get(a.partner)?.mode==='idle'&&actors.get(a.partner).activity==='chat'&&dist(a.pos,actors.get(a.partner).pos)<130&&!speech.used.has(a.id+a.partner));
+   if(pair){speech.used.add(pair.id+pair.partner);speech.used.add(pair.partner+pair.id);const script=DIALOGUES[(speech.count=(speech.count||0)+1)*7%DIALOGUES.length];speech.dialogue={ids:[pair.id,pair.partner],script,line:0,nextAt:clock};return;}
+  }
+  const event=speech.events.filter(e=>clock-e.at<2.5&&!speech.lines.has(e.id)&&!actors.get(e.id).hidden).pop();
+  if(event){speech.events=speech.events.filter(e=>e!==event);const list=SOLO[event.kind];say(actors.get(event.id),list[(speech.turn+actors.get(event.id).index)%list.length]);}
+ }
  const choices={walk:[[620,920],[470,1190],[650,680],[700,340],[650,2140],[730,2320],[1080,2120]],coffee:[[780,740]],water:[[790,850]],food:[[1020,58]]};
  const atStation=(kind,except)=>visible(except).some(b=>b.activity===kind&&['walking','idle','departing'].includes(b.mode));
  function go(a,type,target){
@@ -79,6 +121,7 @@ function create(scene,roster,options={}){
   const others=visible(a);if(!fitsArea(target,others.map(b=>b.mode==='walking'?b.goal:b.pos)))return false;
   const path=nav.route(a.pos,target,['work','food','return','lecture','exercise','staff-in'].includes(type),others.map(b=>b.pos));if(path.length<2)return false;
   if(['work','food','return','lecture','exercise','staff-in'].includes(type)||type==='smoke')a.carry=null;if(type==='return')a.rotationOut=false;
+  note(a,type==='staff-out'||type==='rotate-out'?'away':type);
   a.activity=type;a.visited.add(type==='smoke'?'away':type);if(type==='smoke')a.visited.add('smoke');a.goal=[...target];a.path=path.slice(1);a.mode='walking';a.seated=false;a.hidden=false;a.variant=(a.variant+1)%7;a.started=clock;return true;
  }
  function plan(a){
@@ -112,7 +155,7 @@ function create(scene,roster,options={}){
  const inOffice=a=>a.mode!=='offsite';
  const team=a=>groups.get(a.projectId)||[a.id];
  const teamPresent=a=>team(a).filter(id=>inOffice(actors.get(id))).length;
- function arrive(a){a.pos=[...LIFT];a.hidden=false;a.enteredAt=clock;a.wantsOut=false;if(!go(a,'return',a.home)){a.mode='idle';a.activity='return';a.seated=false;a.until=clock+2;}}
+ function arrive(a){a.pos=[...LIFT];a.hidden=false;a.enteredAt=clock;a.wantsOut=false;note(a,'arrive');if(!go(a,'return',a.home)){a.mode='idle';a.activity='return';a.seated=false;a.until=clock+2;}}
  function startSwap(){
   const absent=[...presence.absentSince.entries()].sort((x,y)=>x[1]-y[1]).map(([id])=>id),reserved=new Set(presence.swaps.map(w=>w.in));
   const count=participants.filter(inOffice).length+presence.swaps.filter(w=>w.in&&!w.out).length;
@@ -172,9 +215,10 @@ function create(scene,roster,options={}){
    else if(clock>a.until){a.partner=null;a.targetSeat=null;if(a.activity!=='work'){if(!go(a,'return',a.home))a.until=clock+5;}else plan(a);}
   }
   updatePresence();
+  updateSpeech();
  }
- function words(a,lang){if(a.hidden)return '';const partner=actors.get(a.partner);if(a.activity==='chat'&&a.mode==='idle'&&partner?.mode==='idle'&&partner.activity==='chat'&&dist(a.pos,partner.pos)<100)return Math.floor(clock/2+(a.id<a.partner?0:1))%2?'…':'';const list=phrases[a.activity==='rotate-out'?'away':a.activity]?.[lang]||phrases[a.activity]?.en;return list&&clock-(a.mode==='walking'?a.started:a.arrived)<3.8?list[a.variant]:'';}
- return{actors,nav,step,words,get time(){return clock},activities,plan,presence,staffShift,limits:{radius:DENSITY_RADIUS,area:AREA_LIMIT,walkers:MAX_WALKERS},fitsArea};
+ function words(a){return a.hidden?'':speech.lines.get(a.id)?.text||'';}
+ return{actors,nav,step,words,get time(){return clock},activities,plan,presence,speech,staffShift,limits:{radius:DENSITY_RADIUS,area:AREA_LIMIT,walkers:MAX_WALKERS},fitsArea};
 }
 window.BirdOfficeLife={create,navigation,activities};
 })();

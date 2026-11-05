@@ -21,7 +21,7 @@ function renderExercise(ex){const key=answerKey(ex.id),value=read(key);return `<
 function renderSection(s,i){return `<section class="section" id="${s.id}"><span class="eyebrow">0${i+1} / ${esc(t(s.nav))}</span><h2>${esc(t(s.title))}</h2><p class="lede">${esc(t(s.intro))}</p>${s.metrics?`<div class="sprint-metrics">${[20,10,5,1].map((n,j)=>`<div class="metric"><b>${n}</b><small>${esc(t(s.metrics)[j])}</small></div>`).join('')}</div>`:''}${s.blocks.map(renderBlock).join('')}${s.flow?`<div class="flow">${t(s.flow).map((x,j)=>`${j?'<i aria-hidden="true">→</i>':''}<span>${esc(x)}</span>`).join('')}</div>`:''}${s.exercises?s.exercises.map(renderExercise).join(''):''}${s.template?`<div class="template"><pre>${esc(t(s.template))}</pre><button class="copy" data-copy="${s.id}">${ui('copy')}</button><span class="status" data-copy-status="${s.id}" aria-live="polite"></span></div>`:''}</section>`;}
 const isOffice=()=>location.hash.replace(/^#\/?/,'').split('/')[0]==='office';
 const isAccount=()=>!!window.BirdAccount?.isRoute();
-const accountLink=()=>`<a class="nav-account" href="#/account" ${isAccount()?'aria-current="page"':''}>${esc(window.BirdAccount?.navLabel()||'Account')}</a>`;
+const accountLink=()=>`<a class="nav-account" href="#/account" ${isAccount()?'aria-current="page"':''}>${esc(window.BirdAccount?.navLabel(lang)||'Account')}</a>`;
 const officeNav=()=>({en:'Office',hr:'Ured',ru:'Офис'}[lang]);
 const isCity=()=>!!window.BirdCity?.isRoute();
 let cityLeft=false;
