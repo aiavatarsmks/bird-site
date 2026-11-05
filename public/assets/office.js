@@ -84,7 +84,7 @@ function labelTransform(el){const scale=camera?.scale||1,a=el.dataset.anchorPers
 function anchorTeamLabel(el,personId){if(!el)return;if(personId)el.dataset.anchorPerson=personId;else{delete el.dataset.anchorPerson;el.dataset.labelX=el.dataset.zoneX;el.dataset.labelY=el.dataset.zoneY;}el.setAttribute('transform',labelTransform(el));}
 function scene(){
  layout=artLayout();const native=BirdOfficeScene,people=[],labels=[],nameLabels=[];
- if(!life&&store.real&&window.BirdOfficeLife){const roster=layout.zones.flatMap(z=>z.project.members.map((m,i)=>({id:m.id,home:z.seats[i],projectId:z.project.id})));for(let i=0;i<3;i++)roster.push({id:'staff-bird-'+(i+1),home:native.staffZone.seats[i]});life=BirdOfficeLife.create(native,roster);}
+ if(!life&&store.real&&window.BirdOfficeLife){const roster=layout.zones.flatMap(z=>z.project.members.map((m,i)=>({id:m.id,home:z.seats[i],projectId:z.project.id})));for(let i=0;i<3;i++)roster.push({id:'staff-bird-'+(i+1),home:native.staffZone.seats[i]});life=BirdOfficeLife.create(native,roster,{mentors:Object.keys(window.BIRD_OFFICE_WALK||{}).filter(k=>k.startsWith('mentor-')).map(id=>({id}))});loadMentorNames();}
  const underlay=layout.zones.map(zone=>{
   const p=zone.project,chosen=selection?.projectId===p.id;
   const seats=zone.seats||p.members.map((m,i)=>[zone.wx+70+(i%4)*100,zone.wy+220+Math.floor(i/4)*110]);
@@ -165,6 +165,8 @@ async function decorateTeamLabels(){
   const extra=` · ${t.teamXp}${t.streak>1?' 🔥'+t.streak:''}`;textNode.textContent+=extra;
   const w=Number(label.dataset.labelW)+extra.length*7.6;label.dataset.labelW=String(Math.round(w));label.querySelector('rect')?.setAttribute('width',String(Math.round(w)));}
 }
+const mentorNames={};let mentorNamesLoaded=false;
+function loadMentorNames(){if(mentorNamesLoaded||typeof fetch!=='function')return;mentorNamesLoaded=true;fetch('/api/mentors',{credentials:'same-origin'}).then(r=>r.json()).then(d=>{for(const m of d.items||[])mentorNames[m.id]=m.name;}).catch(()=>{});}
 function startOfficeLife(){
  cancelAnimationFrame(lifeFrame);if(!life||!root)return;decorateTeamLabels();
  const svg=root.querySelector('.office-scene'),ns='http://www.w3.org/2000/svg';
@@ -172,7 +174,7 @@ function startOfficeLife(){
  const staticNodes=[...svg.querySelectorAll(':scope > .iso-layer')].filter(el=>el.dataset.sceneKind!=='person');
  // Keep decoded sprite nodes mounted. Replacing SVG images during every step
  // caused a blank paint and restarted the idle frame opacity animations.
- for(const n of nodes){
+ function setupViews(n){
   const activity=window.BIRD_OFFICE_ACTIVITIES?.[n.id],chair=window.BIRD_OFFICE_SEATED?.[n.id];
   const views=[['base',n.body.querySelector('.frame-0')?.outerHTML||n.base]];
   if(activity)for(let i=0;i<3;i++)views.push([String(i),`<svg class="pixel-frame life-pose" x="-69.82" y="-132" width="139.64" height="128" viewBox="${i*384} 0 384 352"><image href="${activity.asset}" width="1152" height="352"/></svg>`]);
@@ -183,6 +185,23 @@ function startOfficeLife(){
   for(const kind of ['lecture','exercise']){const asset=routine?.[kind];if(!asset)continue;for(const i of [1,2]){const h=asset.renderHeight,w=h*384/352;views.push([kind+'-'+i,`<svg class="pixel-frame life-pose life-${kind}-pose" x="${-w/2}" y="${-h*332/352}" width="${w}" height="${h}" viewBox="${i*384} 0 384 352"><image href="${asset.asset}" width="1152" height="352"/></svg>`]);}}
   n.body.innerHTML='<g class="life-facing">'+views.map(([key,html])=>`<g data-life-pose="${key}" style="visibility:${key==='base'?'visible':'hidden'}">${html}</g>`).join('')+'</g>';
   n.poses=[...n.body.querySelectorAll('[data-life-pose]')];n.walkSvg=n.body.querySelector('.life-walk-pose');n.lastPose='base';
+ }
+ nodes.forEach(setupViews);
+ // A visiting mentor is added to the scene only for the visit, so the page never loads all mentor images.
+ let mentorNode=null;
+ function syncMentor(){
+  const id=life.mentorVisit?.active||null;if((mentorNode?.id||null)===id)return;
+  if(mentorNode){mentorNode.layer.remove();mentorNode.label?.remove();nodes.splice(nodes.indexOf(mentorNode),1);mentorNode=null;}
+  if(!id)return;
+  const member={id,name:mentorNames[id]||id.slice(7).split('-').map(w=>w[0].toUpperCase()+w.slice(1)).join(' '),role:'Mentor',portraitAsset:'assets/'+id+'.webp',avatarAppearance:'illustrative',sprite:{width:1152,height:352,frames:[[0,0,384,352],[384,0,384,352],[768,0,384,352]]}};
+  const layer=document.createElementNS(ns,'g');layer.setAttribute('class','iso-layer');layer.dataset.sceneKind='person';layer.dataset.layerId='person-'+id;layer.setAttribute('pointer-events','auto');
+  layer.innerHTML=`<g>${spriteAvatar(member,{name:'Mentor'},0,false,false).replace('data-person=','data-mentor=')}</g>`;
+  const label=document.createElementNS(ns,'text');label.setAttribute('class','scene-person-label person-name office-mentor-name');label.setAttribute('text-anchor','middle');label.textContent=member.name;
+  svg.append(layer);svg.append(label);
+  const el=layer.querySelector('[data-mentor]'),body=el.querySelector('.pixel-body'),overlay=document.createElementNS(ns,'g');overlay.setAttribute('class','life-overlay');overlay.setAttribute('aria-hidden','true');el.append(overlay);
+  el.addEventListener('click',e=>{e.stopPropagation();window.BirdOfficeHud?.open?.('mentors');});
+  mentorNode={id,el,body,base:body.innerHTML,outer:layer.firstElementChild,layer,label,overlay,lastPose:'',lastBubble:''};
+  setupViews(mentorNode);nodes.push(mentorNode);
  }
  let last=performance.now(),paint=0,fpsStart=last,fpsFrames=0;
  function update(now){if(!root||!svg.isConnected)return;fpsFrames++;if(now-fpsStart>=1000){svg.dataset.renderFps=String(Math.round(fpsFrames*1000/(now-fpsStart)));fpsStart=now;fpsFrames=0;}const dt=Math.min(.15,(now-last)/1000);last=now;
@@ -196,7 +215,7 @@ function startOfficeLife(){
    const source=a.walkBack?walk.backFacing:walk.frontFacing,flip=a.facingLeft!==source.endsWith('w');n.el.classList.toggle('is-facing-left',flip);
    if(n.carryNode){const hand=walk.handPositions?.[index]||[121,102],x=(hand[0]-walk.cell/2)*walk.renderHeight/walk.cell,y=hand[1]*walk.renderHeight/walk.cell-128;n.carryNode.setAttribute('transform',`translate(${flip?-x:x} ${y})`);}
   }
-  if(now-paint>65){paint=now;const actorPositions=[],occupiedChairs=new Set();
+  if(now-paint>65){paint=now;syncMentor();const actorPositions=[],occupiedChairs=new Set();
    for(const n of nodes){const a=life.actors.get(n.id);if(!a)continue;
     a.pinned=!a.hidden&&(n.el.matches(':hover'));
     const[x,y]=BirdOfficeScene.project(...a.pos);

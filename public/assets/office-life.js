@@ -66,6 +66,9 @@ function navigation(scene){
  return{route,free,cells,canStep};
 }
 const STAFF_SHIFT=120;
+// Mentors are visitors: one at a time, roughly every ten minutes, a short stay near the teams.
+const MENTOR_EVERY=600,MENTOR_STAY=150,MENTOR_SPOTS=[[620,920],[470,1190],[650,680]];
+const MENTOR_LINES=['Hi team! How is the pitch going?','Who wants quick feedback?','Talk to five customers this week!','Great progress, folks!','Book my office hours if you need help.','What is your biggest blocker?'];
 function create(scene,roster,options={}){
  const smokers=new Set(['person-pavel-isaykov','person-javier-garcia-zaballos']);
  const nav=navigation(scene),actors=new Map(),seats=[[225,263],[375,263],[225,500],[375,500],[997,943],[1143,943],[997,1135],[1143,1135],[998,1488],[1142,1488],[998,1670],[1142,1670],[1010,2050],[1170,2050],[1010,2320],[1170,2320]],windowSeats=[[225,1155],[225,1330]];
@@ -94,6 +97,9 @@ function create(scene,roster,options={}){
  for(let i=staffIds.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[staffIds[i],staffIds[j]]=[staffIds[j],staffIds[i]];}
  const staffShift={active:staffIds[0],index:0,nextAt:STAFF_SHIFT,departing:false};
  for(const id of staffIds.slice(1)){actors.get(id).hidden=true;actors.get(id).mode='offsite';}
+ const mentorIds=(options.mentors||[]).map(m=>m.id).filter(id=>!actors.has(id));
+ for(const id of mentorIds)actors.set(id,{id,mentor:true,index:serial++,home:[...LIFT],pos:[...LIFT],mode:'offsite',activity:'mentor',until:Infinity,path:[],round:0,variant:0,visited:new Set(),seated:false,hidden:true,carry:null});
+ const mentorVisit={active:null,last:null,nextAt:options.firstMentorAt??150,stayUntil:0,line:0,lineAt:0};
  const visible=except=>[...actors.values()].filter(b=>b!==except&&!b.hidden);
  const walkers=()=>[...actors.values()].filter(b=>b.mode==='walking').length;
  const speech={lines:new Map(),events:[],dialogue:null,nextAt:6,turn:0,used:new Set()};
@@ -130,6 +136,7 @@ function create(scene,roster,options={}){
  function plan(a){
   if(walkers()>=MAX_WALKERS-1){a.until=clock+7+a.index%5;return;}
   if(a.id.startsWith('staff-')){a.until=clock+60;return;}
+  if(a.mentor){a.until=clock+20;return;}
   const schedule=exerciseIds.has(a.id)?['work','exercise','coffee','work','water','walk','food','chat','away']:lectureIds.includes(a.id)?['work','coffee','lecture','water','work','chat','food','away']:['work','coffee','water','work','chat','food','walk','away'];
   const next=schedule[(a.index+a.round++)%schedule.length],kind=smokers.has(a.id)&&!a.visited.has('smoke')?'away':exerciseIds.has(a.id)&&!a.visited.has('exercise')?'exercise':next;
   if(kind==='exercise'&&!atStation('exercise',a)&&go(a,'exercise',[260,2240]))return;
@@ -194,6 +201,23 @@ function create(scene,roster,options={}){
    if(startSwap())presence.nextAt=clock+16+(presence.turn*7)%14;else presence.nextAt=clock+4;
   }
  }
+ function updateMentor(){
+  const id=mentorVisit.active,a=id&&actors.get(id);
+  if(!a){
+   if(!mentorIds.length||clock<mentorVisit.nextAt)return;
+   const pool=mentorIds.filter(x=>x!==mentorVisit.last),pick=actors.get(pool[Math.floor(random()*pool.length)]);
+   pick.pos=[...LIFT];pick.hidden=false;pick.mode='idle';pick.rotationOut=false;
+   if(go(pick,'mentor-visit',MENTOR_SPOTS[Math.floor(random()*MENTOR_SPOTS.length)])){mentorVisit.active=pick.id;mentorVisit.stayUntil=Infinity;mentorVisit.lineAt=clock+3;}
+   else{pick.hidden=true;pick.mode='offsite';mentorVisit.nextAt=clock+5;}
+   return;
+  }
+  if(a.mode==='offsite'){mentorVisit.last=a.id;mentorVisit.active=null;mentorVisit.nextAt=clock+MENTOR_EVERY;return;}
+  if(a.activity==='mentor-visit'&&a.mode==='idle'){
+   if(mentorVisit.stayUntil===Infinity)mentorVisit.stayUntil=clock+MENTOR_STAY;
+   if(clock>=mentorVisit.lineAt&&speech.lines.size<SPEECH_LIMIT){say(a,MENTOR_LINES[mentorVisit.line++%MENTOR_LINES.length]);mentorVisit.lineAt=clock+18;}
+   if(clock>=mentorVisit.stayUntil&&go(a,'staff-out',LIFT))a.rotationOut=true;
+  }
+ }
  function step(dt){clock+=dt;
   const staff=actors.get(staffShift.active);
   if(staff&&staffShift.departing&&staff.mode==='offsite'){
@@ -212,7 +236,7 @@ function create(scene,roster,options={}){
     a.moving=false;let left=dt*(54+(a.index%4)*3);
     while(left>0&&a.path.length){const target=a.path[0],distance=dist(a.pos,target);if(distance<.1){a.path.shift();continue;}const travel=Math.min(left,distance),next=[a.pos[0]+(target[0]-a.pos[0])*travel/distance,a.pos[1]+(target[1]-a.pos[1])*travel/distance],others=visible(a);
      const blocked=!nav.canStep(a.pos,next,(['work','food','return','lecture','exercise','staff-in'].includes(a.activity))&&a.path.length===1)||!fitsArea(next,others.map(b=>b.pos))||others.some(b=>dist(next,b.pos)<45&&dist(next,b.pos)<dist(a.pos,b.pos));
-     if(blocked){a.blocked=(a.blocked||0)+dt;if(a.blocked>2&&clock>(a.replanAt||0)){a.replanAt=clock+4;const detour=nav.route(a.pos,a.goal,['work','food','return','lecture','exercise','staff-in'].includes(a.activity),others.map(b=>b.pos));if(detour.length>1){a.path=detour.slice(1);a.blocked=0;}else if(a.blocked>12&&!['away','return','rotate-out','staff-out'].includes(a.activity)){if(!go(a,'return',a.home)){a.mode='idle';a.activity='walk';a.until=clock+5;} }}break;}
+     if(blocked){a.blocked=(a.blocked||0)+dt;if(a.blocked>2&&clock>(a.replanAt||0)){a.replanAt=clock+4;const detour=nav.route(a.pos,a.goal,['work','food','return','lecture','exercise','staff-in'].includes(a.activity),others.map(b=>b.pos));if(detour.length>1){a.path=detour.slice(1);a.blocked=0;}else if(a.blocked>12&&!['away','return','rotate-out','staff-out','mentor-visit'].includes(a.activity)){if(!go(a,'return',a.home)){a.mode='idle';a.activity='walk';a.until=clock+5;} }}break;}
      a.blocked=0;a.moving=true;a.walkDistance=(a.walkDistance||0)+travel;a.walkBack=(next[0]+next[1])<(a.pos[0]+a.pos[1]);a.facingLeft=(next[0]-a.pos[0])-(next[1]-a.pos[1])<0;a.pos=next;left-=travel;if(travel===distance)a.path.shift();
     }
     if(!a.path.length){const returning=a.activity==='return'||a.activity==='staff-in';if(a.activity==='staff-in')staffShift.nextAt=clock+STAFF_SHIFT;if(returning)a.activity='work';a.mode='idle';a.arrived=clock;a.until=clock+(a.activity==='work'?26:a.activity==='lecture'?30:a.activity==='exercise'?18:a.activity==='chat'?16:a.activity==='smoke'?20:6)+(a.index%15);a.seated=['food','work','lecture'].includes(a.activity)&&scene.staticLayers.some(chair=>['chair','lecture'].includes(chair.kind)&&chair.anchor&&dist(a.pos,chair.anchor)<12);
@@ -221,13 +245,13 @@ function create(scene,roster,options={}){
      if(a.activity==='chat')a.celebrate=a.variant===0;
     }
    }else if(a.activity==='chat'&&a.partner&&actors.get(a.partner)?.mode==='walking'&&clock<a.started+70){a.until=clock+12;}
-   else if(clock>a.until){a.partner=null;a.targetSeat=null;if(a.activity!=='work'){if(!go(a,'return',a.home))a.until=clock+5;}else plan(a);}
+   else if(clock>a.until){if(a.mentor){a.until=clock+20;continue;}a.partner=null;a.targetSeat=null;if(a.activity!=='work'){if(!go(a,'return',a.home))a.until=clock+5;}else plan(a);}
   }
-  updatePresence();
+  updatePresence();updateMentor();
   updateSpeech();
  }
  function words(a){return a.hidden?'':speech.lines.get(a.id)?.text||'';}
- return{actors,nav,step,words,get time(){return clock},activities,plan,presence,speech,staffShift,limits:{radius:DENSITY_RADIUS,area:AREA_LIMIT,walkers:MAX_WALKERS},fitsArea};
+ return{actors,nav,step,words,get time(){return clock},activities,plan,presence,speech,staffShift,mentorVisit,limits:{radius:DENSITY_RADIUS,area:AREA_LIMIT,walkers:MAX_WALKERS},fitsArea};
 }
 window.BirdOfficeLife={create,navigation,activities};
 })();

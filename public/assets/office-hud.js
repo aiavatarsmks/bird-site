@@ -170,5 +170,5 @@
   paint();
   load().then(paint);
  }
- window.BirdOfficeHud={mount,refresh:()=>load(true).then(paint)};
+ window.BirdOfficeHud={mount,refresh:()=>load(true).then(paint),open:async name=>{open=name;paint();await load();paint();}};
 })();
