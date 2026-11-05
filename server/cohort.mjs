@@ -19,7 +19,8 @@ export function streak(db,projectId){
 }
 
 export async function saveCheckin(ctx,projectId){
- const user=requireUser(ctx);requireProject(ctx.db,user,projectId,'team');
+ const user=requireUser(ctx);const {project}=requireProject(ctx.db,user,projectId,'team');
+ if(project.status==='archived')fail(409,'INVALID_STATE');
  const body=await readJson(ctx.request);
  const week=isoWeek(),now=nowIso();
  const c={metric_name:text(body.metricName??'',{max:80},'metricName'),metric_value:text(body.metricValue??'',{max:80},'metricValue'),goal:text(body.goal??'',{min:1,max:500,multiline:true},'goal'),blocker:text(body.blocker??'',{max:500,multiline:true},'blocker'),needs_help:body.needsHelp?1:0};
@@ -72,6 +73,7 @@ export async function createAnnouncement(ctx){
 }
 export function archiveAnnouncement(ctx,id){const admin=requireAdmin(ctx);ctx.db.query('UPDATE announcements SET archived_at=? WHERE id=?').run(nowIso(),id);audit(ctx.db,admin.id,'announcement.archive','announcement',id,{});return json({ok:true});}
 export function listAnnouncements(ctx){
+ requireUser(ctx);
  const {limit}=page(ctx.url,20);
  const rows=ctx.db.query('SELECT a.*,u.display_name author_name FROM announcements a JOIN users u ON u.id=a.author WHERE a.archived_at IS NULL ORDER BY a.pinned DESC,a.created DESC LIMIT ?').all(limit);
  const read=ctx.user?new Set(ctx.db.query('SELECT announcement_id FROM announcement_reads WHERE user_id=?').all(ctx.user.id).map(r=>r.announcement_id)):new Set();
@@ -87,7 +89,7 @@ export function readAnnouncements(ctx){
 /** Team ranking: only team totals and weekly gain; personal tasks and private metrics stay out. */
 export function teamRanking(ctx){
  const week=isoWeek(),since=new Date(Date.now()-7*86400000).toISOString();
- const rows=ctx.db.query("SELECT p.id,json_extract(coalesce(p.published,p.draft),'$.name') name FROM projects p WHERE p.status='published' OR EXISTS(SELECT 1 FROM memberships m WHERE m.project_id=p.id AND m.revoked_at IS NULL)").all();
+ const rows=ctx.db.query("SELECT p.id,json_extract(p.published,'$.name') name FROM projects p WHERE p.status='published' AND p.published IS NOT NULL").all();
  const items=rows.filter(r=>r.id).map(p=>{
   const members=ctx.db.query("SELECT user_id FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").all(p.id).map(m=>m.user_id);
   const team=projectXp(ctx.db,p.id),weekGain=ctx.db.query("SELECT coalesce(sum(amount),0) n FROM xp_ledger WHERE beneficiary_type='project' AND beneficiary_id=? AND created>=?").get(p.id,since).n;

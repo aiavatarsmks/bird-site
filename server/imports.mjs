@@ -126,7 +126,8 @@ export async function hook(ctx){
    // A form answer is the participant's own report, not organiser verification.
    applied=ctx.db.query("INSERT INTO attendance(user_id,lecture_id,kind,note,created,updated) VALUES(?,?,'self_reported',?,?,?) ON CONFLICT(user_id,lecture_id) DO NOTHING").run(r.user.id,r.lecture.id,r.note,now,now).changes>0;
    if(applied)ctx.hooks?.onEvent?.(ctx,{type:'attendance',userId:r.user.id,lectureId:r.lecture.id});
-  }else applied=markDone(ctx.db,{task,userId:r.user.id,projectId:r.projectId,note:r.note,actor:h.created_by,source:'form'});
+  // Form answers match accounts by an unverified email: they wait for an organiser's review.
+  }else applied=markDone(ctx.db,{task,userId:r.user.id,projectId:r.projectId,note:r.note,actor:h.created_by,source:'form',review:true});
  }
  ctx.db.query('UPDATE form_hooks SET last_used=? WHERE id=?').run(nowIso(),h.id);
  return json({status:r.status,applied});

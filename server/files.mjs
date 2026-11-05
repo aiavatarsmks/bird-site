@@ -111,7 +111,9 @@ export function upload(ctx){
    if(kind!==expected)fail(400,'UNSUPPORTED_FILE',{reason:'signature'});
    const claimed=(ctx.request.headers.get('content-type')||'').split(';')[0].trim().toLowerCase();
    if(claimed&&claimed!=='application/octet-stream'&&claimed!==type.mime)fail(400,'UNSUPPORTED_FILE',{reason:'mime'});
-   if(ext==='pdf'&&/\/(JavaScript|JS|Launch|EmbeddedFile)\b/.test(new TextDecoder('latin1').decode(bytes.subarray(0,Math.min(bytes.length,4*1024*1024)))))fail(400,'UNSUPPORTED_FILE',{reason:'active-content'});
+   // Best effort: names may hide letters as #xx escapes. Compressed streams are not inflated, so the download
+   // headers (attachment + sandbox CSP) remain the real protection.
+   if(ext==='pdf'&&/\/(JavaScript|JS|Launch|EmbeddedFile|OpenAction|AA)\b/.test(new TextDecoder('latin1').decode(bytes.subarray(0,Math.min(bytes.length,8*1024*1024))).replace(/#([0-9a-f]{2})/gi,(_,h)=>String.fromCharCode(parseInt(h,16)))))fail(400,'UNSUPPORTED_FILE',{reason:'active-content'});
    if(ext==='pptx')inspectPptx(bytes,ctx.config.limits);
    const key=ctx.storage.newKey(),id=newId('file'),now=nowIso(),hash=createHash('sha256').update(bytes).digest('hex');
    await ctx.storage.put(key,bytes);

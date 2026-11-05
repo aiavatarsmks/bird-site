@@ -1,4 +1,8 @@
-/** Numbered, additive migrations. Never edit an applied migration: add a new one. */
+/**
+ * Numbered, additive migrations. Never edit an applied migration: add a new one.
+ * The checksum covers the SQL text, or the source of up() for JS migrations,
+ * so even a comment inside an applied up() makes the server refuse to start.
+ */
 export const MIGRATIONS=[
  {id:1,name:'core-platform',sql:`
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL,updated TEXT NOT NULL);

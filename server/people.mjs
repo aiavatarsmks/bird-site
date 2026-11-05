@@ -118,7 +118,8 @@ export async function acceptInvite(ctx){
   if(!r.changes)fail(400,'INVITE_INVALID');
   if(invite.kind==='project'){
    const project=ctx.db.query("SELECT id FROM projects WHERE id=? AND status<>'archived'").get(invite.project_id);if(!project)fail(400,'INVITE_INVALID');
-   ctx.db.query('INSERT INTO memberships(project_id,user_id,role,created) VALUES(?,?,?,?) ON CONFLICT(project_id,user_id) DO UPDATE SET role=excluded.role,revoked_at=NULL').run(invite.project_id,user.id,invite.role,now);
+   // An invitation never lowers an existing role (an owner stays owner).
+   ctx.db.query("INSERT INTO memberships(project_id,user_id,role,created) VALUES(?,?,?,?) ON CONFLICT(project_id,user_id) DO UPDATE SET role=CASE WHEN memberships.revoked_at IS NOT NULL THEN excluded.role WHEN memberships.role='owner' THEN 'owner' WHEN memberships.role='editor' AND excluded.role IN ('member','reviewer') THEN 'editor' ELSE excluded.role END,revoked_at=NULL").run(invite.project_id,user.id,invite.role,now);
    audit(ctx.db,user.id,'membership.join','project',invite.project_id,{role:invite.role,invite:invite.id});
   }else if(invite.kind==='person'){linkPerson(ctx.db,user,invite.person_id,invite.created_by);}
   else if(invite.kind==='program_admin'){if(user.role==='member'){ctx.db.query("UPDATE users SET role='program_admin',updated=? WHERE id=?").run(now,user.id);privilege=true;}audit(ctx.db,invite.created_by,'role.grant','user',user.id,{role:'program_admin'});}
