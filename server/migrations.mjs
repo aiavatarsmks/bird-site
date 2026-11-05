@@ -190,4 +190,13 @@ ALTER TABLE mentors ADD COLUMN gender TEXT NOT NULL DEFAULT '';
 UPDATE users SET role='platform_owner',updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE lower(email)='pavelisajkov@gmail.com' AND status='active' AND created<'2026-11-05T12:58:00.000Z' AND (SELECT count(*) FROM users WHERE lower(email)='pavelisajkov@gmail.com')=1;
 UPDATE sessions SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE revoked_at IS NULL AND user_id IN (SELECT id FROM users WHERE lower(email)='pavelisajkov@gmail.com' AND role='platform_owner');
 `},
+ // Areas confirmed from the 26/27 programme brochure and public mentor posts; organiser edits are kept.
+ {id:15,name:'mentor-areas',sql:`
+UPDATE mentors SET area='Go-to-market',bio=CASE WHEN bio='' THEN 'Positioning & Distribution workshop' ELSE bio END,updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='mentor-damir-first' AND area='Mentor speed dating';
+UPDATE mentors SET area='AI & Tech',bio=CASE WHEN bio='' THEN 'AI Defensibility & What to Own workshop' ELSE bio END,updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='mentor-davor-anicic' AND area='Mentor speed dating';
+UPDATE mentors SET area='Pitch',bio=CASE WHEN bio='' THEN 'The Deck: hands-on clinic on your pitch deck' ELSE bio END,updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='mentor-lisa-lines' AND area='Mentor speed dating';
+UPDATE mentors SET area='Legal & IP',bio=CASE WHEN bio='' THEN 'Intellectual property, digital regulation, legal side of scaling' ELSE bio END,updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='mentor-jana-klaric' AND area='Mentor speed dating';
+UPDATE mentors SET area='Legal & IP',bio=CASE WHEN bio='' THEN 'Startup law and AI regulation' ELSE bio END,updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='mentor-marijana-sarolic-robic' AND area='Mentor speed dating';
+UPDATE mentors SET area='General' WHERE id LIKE 'mentor-%' AND area='Mentor speed dating';
+`},
 ];

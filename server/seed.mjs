@@ -18,6 +18,8 @@ const LECTURES=[
  {id:'startup-pricing',date:'2026-10-29',speaker:'Ivan Bračić',title:{en:'Pricing for startups',hr:'Određivanje cijena za startupe',ru:'Ценообразование для стартапов'}},
  {id:'founder-led-sales',date:'2026-11-02',speaker:'',title:{en:'Founder-led sales',hr:'Prodaja koju vodi osnivač',ru:'Продажи силами основателя'}},
 ];
+// Confirmed from the 26/27 programme brochure and public mentor posts (migration 15 sets the same on existing data).
+const MENTOR_AREAS={'damir-first':['Go-to-market','Positioning & Distribution workshop'],'davor-anicic':['AI & Tech','AI Defensibility & What to Own workshop'],'lisa-lines':['Pitch','The Deck: hands-on clinic on your pitch deck'],'jana-klaric':['Legal & IP','Intellectual property, digital regulation, legal side of scaling'],'marijana-sarolic-robic':['Legal & IP','Startup law and AI regulation']};
 
 export function seedCurated(db,data,lectures=LECTURES){
  const now=nowIso();
@@ -34,7 +36,7 @@ export function seedCurated(db,data,lectures=LECTURES){
   for(const l of lectures)db.query('INSERT INTO lectures(id,date,speaker,title,created,updated) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING').run(l.id,l.date,l.speaker,JSON.stringify(l.title),now,now);
   db.query("INSERT INTO programs(id,name,created) VALUES('bird-2026',?,?) ON CONFLICT(id) DO NOTHING").run(JSON.stringify({en:'BIRD Incubator 2026',hr:'BIRD Inkubator 2026',ru:'Инкубатор BIRD 2026'}),now);
   if(db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mentors'").get()&&db.query("SELECT 1 FROM pragma_table_info('mentors') WHERE name='gender'").get())
-   for(const [slug,name,gender,link] of MENTORS)db.query("INSERT INTO mentors(id,name,area,bio,link,gender,created_by,created,updated) VALUES(?,?,'Mentor speed dating','',?,?,'seed',?,?) ON CONFLICT(id) DO NOTHING").run('mentor-'+slug,name,'https://www.linkedin.com/in/'+link,gender,now,now);
+   for(const [slug,name,gender,link] of MENTORS){const [area,bio]=MENTOR_AREAS[slug]||['General',''];db.query("INSERT INTO mentors(id,name,area,bio,link,gender,created_by,created,updated) VALUES(?,?,?,?,?,?,'seed',?,?) ON CONFLICT(id) DO NOTHING").run('mentor-'+slug,name,area,bio,'https://www.linkedin.com/in/'+link,gender,now,now);}
   seedBadges(db);
   seedTasks(db,now);
   // A first shared goal for the cohort (organisers can close it and add others).
