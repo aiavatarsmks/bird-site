@@ -1,5 +1,5 @@
 /** Admin: overview of projects (status, points, what is left), users and roles, audit, settings. */
-import {fail,json,readJson,oneOf,page} from './http.mjs';
+import {fail,json,readJson,oneOf,page,text} from './http.mjs';
 import {nowIso} from './db.mjs';
 import {audit,requireAdmin,requireOwner,PERMISSION_MATRIX} from './permissions.mjs';
 import {publicUser} from './auth.mjs';
@@ -25,17 +25,32 @@ export function projectsOverview(ctx){
    teamXp:projectXp(ctx.db,p.id),personalXp:personal,totalXp:projectXp(ctx.db,p.id)+personal,
    attendance:{selfReported:attendance.find(a=>a.kind==='self_reported')?.n||0,verified:attendance.find(a=>a.kind==='verified_by_admin')?.n||0,lecturesHeld:lectures},
    tasks:{total:assignments.length,done:assignments.filter(a=>a.sub==='accepted').length,waitingReview:assignments.filter(a=>a.sub==='submitted').length,open:open.length},
-   risk:riskSignals(ctx.db,p.id,ids),streak:streak(ctx.db,p.id),
+   risk:riskSignals(ctx.db,p.id,ids),streak:streak(ctx.db,p.id),lastSeen:ids.map(id=>lastSeen(ctx.db,id)).filter(Boolean).sort().at(-1)||null,
    todo:open.slice(0,6).map(a=>({assignmentId:a.id,title:JSON.parse(a.translations),xp:a.xp,dueAt:a.due_at,status:a.sub})),
   };
  });
  return json({items,generated:nowIso()});
 }
 
+/** Latest activity of any of the person's sessions (updated at most every 5 minutes). */
+export const lastSeen=(db,userId)=>db.query('SELECT max(last_seen) t FROM sessions WHERE user_id=?').get(userId)?.t||null;
+
+/** Organiser reminder: an in-account message to chosen people or a whole team. */
+export async function nudge(ctx){
+ const admin=requireAdmin(ctx),body=await readJson(ctx.request);
+ const message=text(body.message,{min:1,max:300,multiline:true},'message');
+ const ids=new Set(Array.isArray(body.userIds)?body.userIds.slice(0,300).map(String):[]);
+ if(body.projectId)for(const m of ctx.db.query("SELECT user_id FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").all(String(body.projectId)))ids.add(m.user_id);
+ let sent=0;
+ ctx.db.transaction(()=>{for(const id of ids){if(!ctx.db.query("SELECT 1 FROM users WHERE id=? AND status='active'").get(id))continue;notify(ctx.db,id,'nudge',{message,from:admin.display_name});sent++;}})();
+ audit(ctx.db,admin.id,'nudge.send','users',body.projectId?String(body.projectId):'selected',{sent});
+ return json({sent});
+}
+
 export function listUsers(ctx){
  requireAdmin(ctx);const {limit,offset}=page(ctx.url,100);const q=(ctx.url.searchParams.get('q')||'').slice(0,60).toLowerCase();
  const rows=ctx.db.query("SELECT * FROM users WHERE (?1='' OR lower(login) LIKE ?2 OR lower(display_name) LIKE ?2) ORDER BY created DESC LIMIT ?3 OFFSET ?4").all(q,'%'+q+'%',limit+1,offset);
- return json({items:rows.slice(0,limit).map(u=>({...publicUser(u),email:undefined,status:u.status,created:u.created,xp:userXp(ctx.db,u.id),lectures:ctx.db.query('SELECT count(*) n FROM attendance WHERE user_id=?').get(u.id).n,tasksDone:ctx.db.query("SELECT count(*) n FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.user_id=? AND s.status='accepted'").get(u.id).n,projects:ctx.db.query("SELECT json_extract(p.draft,'$.name') name FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL").all(u.id).map(r=>r.name)})),hasMore:rows.length>limit});
+ return json({items:rows.slice(0,limit).map(u=>({...publicUser(u),email:undefined,status:u.status,created:u.created,lastSeen:lastSeen(ctx.db,u.id),xp:userXp(ctx.db,u.id),lectures:ctx.db.query('SELECT count(*) n FROM attendance WHERE user_id=?').get(u.id).n,tasksDone:ctx.db.query("SELECT count(*) n FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.user_id=? AND s.status='accepted'").get(u.id).n,projects:ctx.db.query("SELECT json_extract(p.draft,'$.name') name FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL").all(u.id).map(r=>r.name)})),hasMore:rows.length>limit});
 }
 /** Only the platform owner changes program roles. The changed user's sessions are revoked. */
 export async function setRole(ctx,userId){

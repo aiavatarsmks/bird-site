@@ -194,3 +194,9 @@ body.office-fullscreen .office-intro{display:none!important}
  .office-quest{left:auto;right:8px;transform:none;max-width:calc(100% - 80px)}
 }
 .hud-guest{background:#263d34;color:#fcfaf3;border-color:#263d34}.hud-guest[aria-pressed=true]{background:#b5482e;border-color:#b5482e}
+.hud-dock{--face:64px}
+.hud-badge-face{position:absolute;left:calc(var(--face) - 16px);top:-6px;z-index:1}
+.hud-messages li{background:#fff6dc;border-color:#ead79b}
+.hud-messages p{margin:4px 0 0}
+@media(max-width:720px){.hud-dock{--face:54px}}
+.hud-profile strong{display:block;font-size:16px}.hud-profile small{display:block;color:#66745e;font-size:13px;margin-top:2px}

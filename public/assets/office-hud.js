@@ -8,6 +8,7 @@
   tasks:{en:'Tasks',hr:'Zadaci',ru:'Задания'},
   mentors:{en:'Mentors',hr:'Mentori',ru:'Менторы'},
   close:{en:'Close',hr:'Zatvori',ru:'Закрыть'},
+  messages:{en:'Messages from the organisers',hr:'Poruke organizatora',ru:'Сообщения от организаторов'},
   signIn:{en:'Sign in',hr:'Prijava',ru:'Войти'},
   register:{en:'Create account',hr:'Izradi račun',ru:'Создать аккаунт'},
   guestNote:{en:'Sign in to see your tasks, points and to book mentors.',hr:'Prijavite se za zadatke, bodove i termine s mentorima.',ru:'Войдите, чтобы видеть свои задания, баллы и записываться к менторам.'},
@@ -42,13 +43,14 @@
   if(data&&!force&&Date.now()-loadedAt<20000)return data;
   if(loading)return loading;
   loading=(async()=>{
-   const me=(await get('/api/auth/me').catch(()=>({user:null}))).user;
-   const [tasks,progress,mentors]=await Promise.all([
+   const auth=await get('/api/auth/me').catch(()=>({user:null})),me=auth.user;
+   const [tasks,progress,mentors,notes]=await Promise.all([
     me?get('/api/tasks').catch(()=>({items:[]})):{items:[]},
     me?get('/api/progress').catch(()=>null):null,
     get('/api/mentors').catch(()=>({items:[]})),
+    me?get('/api/notifications?limit=10').catch(()=>({items:[]})):{items:[]},
    ]);
-   data={me,tasks:tasks.items.filter(x=>OPEN.has(x.status)&&x.task?.status==='published'),xp:progress?.xp??null,mentors:mentors.items};
+   data={me,csrf:auth.csrf||'',messages:notes.items.filter(n=>n.kind==='nudge'&&!n.read),tasks:tasks.items.filter(x=>OPEN.has(x.status)&&x.task?.status==='published'),xp:progress?.xp??null,mentors:mentors.items};
    loadedAt=Date.now();loading=null;return data;
   })();
   return loading;
@@ -59,7 +61,7 @@
  function dock(){
   const me=data?.me,count=data?.tasks.length||0;
   return `<div class="hud-dock" role="toolbar" aria-label="BIRD">
-   ${me?`<button class="hud-btn hud-face" data-hud="profile" aria-pressed="${open==='profile'}" aria-label="${t('profile')}">${face(me,44)}</button>`:`<button class="hud-btn hud-guest" data-hud="profile" aria-pressed="${open==='profile'}"><span aria-hidden="true">👤</span><small>${t('signIn')}</small></button>`}
+   ${me?`<button class="hud-btn hud-face" data-hud="profile" aria-pressed="${open==='profile'}" aria-label="${t('profile')}">${face(me,44)}</button>${data.messages.length?`<b class="hud-badge hud-badge-face" aria-label="${t('messages')}">${data.messages.length}</b>`:''}`:`<button class="hud-btn hud-guest" data-hud="profile" aria-pressed="${open==='profile'}"><span aria-hidden="true">👤</span><small>${t('signIn')}</small></button>`}
    <button class="hud-btn" data-hud="tasks" aria-pressed="${open==='tasks'}"><span aria-hidden="true">✓</span><small>${t('tasks')}</small>${me&&count?`<b class="hud-badge">${count}</b>`:''}</button>
    <button class="hud-btn" data-hud="mentors" aria-pressed="${open==='mentors'}"><span aria-hidden="true">✦</span><small>${t('mentors')}</small></button>
   </div>`;
@@ -69,7 +71,7 @@
   if(!open||!data)return '';
   const me=data.me;let body='';
   if(open==='profile'){
-   body=me?`<div class="hud-profile"><label class="hud-photo">${face(me,72)}<input type="file" accept="image/*" data-hud-photo hidden><span>${t(me.hasAvatar?'photo':'addPhoto')}</span></label><div><strong>${esc(me.displayName)}</strong>${data.xp!==null?`<small>${data.xp} ${t('points')}</small>`:''}</div></div><p class="hud-muted">${t('photoNote')}</p>${error?`<p class="hud-error" role="alert">${esc(error)}</p>`:''}<div class="hud-actions"><a class="hud-primary" href="#/account">${t('cabinet')}</a>${['program_admin','platform_owner'].includes(me.role)?`<a class="hud-secondary" href="#/admin">${t('admin')}</a>`:''}</div>`:guest();
+   body=me?`<div class="hud-profile"><label class="hud-photo">${face(me,72)}<input type="file" accept="image/*" data-hud-photo hidden><span>${t(me.hasAvatar?'photo':'addPhoto')}</span></label><div><strong>${esc(me.displayName)}</strong>${data.xp!==null?`<small>${data.xp} ${t('points')}</small>`:''}</div></div>${data.messages.length?`<ul class="hud-list hud-messages">${data.messages.map(n=>`<li><strong>${esc(n.payload.from)}</strong><p>${esc(n.payload.message)}</p></li>`).join('')}</ul>`:''}<p class="hud-muted">${t('photoNote')}</p>${error?`<p class="hud-error" role="alert">${esc(error)}</p>`:''}<div class="hud-actions"><a class="hud-primary" href="#/account">${t('cabinet')}</a>${['program_admin','platform_owner'].includes(me.role)?`<a class="hud-secondary" href="#/admin">${t('admin')}</a>`:''}</div>`:guest();
   }else if(open==='tasks'){
    body=me?(data.tasks.length?`<ul class="hud-list">${data.tasks.slice(0,8).map(x=>`<li><a href="#/account/task/${esc(x.id)}"><strong>${esc(title(x.task.translations))}</strong><small>${x.task.xp} ${t('points')} · ${t('st_'+x.status)}</small></a></li>`).join('')}</ul>`:`<p>${t('noTasks')}</p>`)+`<div class="hud-actions"><a class="hud-primary" href="#/account/tasks">${t('allTasks')}</a></div>`:guest();
   }else if(open==='mentors'){
@@ -89,7 +91,7 @@
   // Keep taps on the dock away from the map's pan and zoom handlers.
   for(const type of ['pointerdown','wheel','dblclick','touchstart'])el.addEventListener(type,e=>e.stopPropagation(),{passive:true});
   el.addEventListener('click',async e=>{
-   const b=e.target.closest('[data-hud]');if(b){open=open===b.dataset.hud?null:b.dataset.hud;error='';paint();if(open)await load(true).then(paint);return;}
+   const b=e.target.closest('[data-hud]');if(b){open=open===b.dataset.hud?null:b.dataset.hud;error='';paint();if(open){await load(true);paint();if(open==='profile'&&data.messages.length)fetch('/api/notifications/read',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','x-csrf-token':data.csrf},body:'{}'}).catch(()=>{});}return;}
    if(e.target.closest('[data-hud-close]')){open=null;paint();return;}
    const a=e.target.closest('[data-hud-area]');if(a){area=a.dataset.hudArea;paint();return;}
    if(e.target.closest('a[href^="#"]')){open=null;}

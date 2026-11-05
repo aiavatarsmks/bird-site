@@ -124,3 +124,6 @@ pre.acc-pre{font:inherit;background:#f7f5ef;padding:10px;border-radius:6px;margi
 .acc-mentor.is-selected{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
 .acc-mentor .acc-chip{justify-self:start}
 .acc-mentor span{font-size:14px}
+.acc-idle{color:#a33a22!important}
+.acc-nudge-team summary{cursor:pointer;font-weight:600;min-height:32px}
+.acc-nudge-team form{margin-top:12px}

@@ -61,6 +61,8 @@ export function buildDigest(db){
   waitingReview:db.query("SELECT count(*) n FROM submissions WHERE status='submitted'").get().n,
   unverifiedAttendance:db.query("SELECT count(*) n FROM attendance WHERE kind='self_reported'").get().n,
   newAccounts:db.query('SELECT count(*) n FROM users WHERE created>=?').get(since).n,
+  // Participants with no visit in 7 days (organisers are left out).
+  inactive:db.query("SELECT u.display_name n FROM users u WHERE u.status='active' AND u.role='member' AND coalesce((SELECT max(last_seen) FROM sessions s WHERE s.user_id=u.id),u.created)<? ORDER BY u.display_name").all(since).map(r=>r.n),
   lastLecture:lastLecture&&{date:lastLecture.date,title:lastLecture.title,answers:lastLecture.answers,average:lastLecture.average},
  };
 }
@@ -72,6 +74,7 @@ export function digestText(d){
   `No check-in yet: ${list(d.noCheckin)}`,
   `At risk: ${list(d.atRisk.map(t=>t.name))}`,
   `Asked for help: ${list(d.needsHelp)}`,
+  `No visit in 7 days: ${list(d.inactive.slice(0,15))}${d.inactive.length>15?` +${d.inactive.length-15}`:''}`,
   `Waiting for review: ${d.waitingReview} · Attendance to verify: ${d.unverifiedAttendance} · New accounts: ${d.newAccounts}`,
   d.lastLecture?`Last lecture ${d.lastLecture.date}: ${d.lastLecture.answers} answers${d.lastLecture.average!==null?`, average ${d.lastLecture.average}/10`:''}`:'',
  ].filter(Boolean).join('\n');

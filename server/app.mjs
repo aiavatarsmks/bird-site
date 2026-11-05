@@ -134,6 +134,7 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  // Admin
  on('GET','/api/admin/overview',ctx=>admin.projectsOverview(ctx),{auth:user});
  on('GET','/api/admin/users',ctx=>admin.listUsers(ctx),{auth:user});
+ on('POST','/api/admin/nudge',ctx=>admin.nudge(ctx),{auth:user});
  on('PUT','/api/admin/users/:id/role',(ctx,p)=>admin.setRole(ctx,p.id),{auth:user});
  on('PUT','/api/admin/users/:id/status',(ctx,p)=>admin.setUserStatus(ctx,p.id),{auth:user});
  on('GET','/api/admin/claims',ctx=>people.adminClaims(ctx),{auth:user});
