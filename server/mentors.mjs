@@ -12,7 +12,7 @@ export function listSlots(ctx){
  const since=new Date(Date.now()-14*86400000).toISOString();
  const rows=ctx.db.query(`SELECT h.*,b.project_id,b.booked_by,b.question,b.note,json_extract(p.draft,'$.name') project_name FROM office_hours h LEFT JOIN office_hour_bookings b ON b.slot_id=h.id LEFT JOIN projects p ON p.id=b.project_id WHERE h.cancelled_at IS NULL AND h.starts_at>=? ORDER BY h.starts_at LIMIT 200`).all(since);
  return json({items:rows.map(r=>{const mine=r.project_id&&teamRole(ctx.db,r.project_id,user.id);
-  return {id:r.id,mentorName:r.mentor_name,topic:r.topic,startsAt:r.starts_at,durationMin:r.duration_min,location:r.location,booked:!!r.project_id,mine:!!mine,
+  return {id:r.id,mentorId:r.mentor_id||null,mentorName:r.mentor_name,topic:r.topic,startsAt:r.starts_at,durationMin:r.duration_min,location:r.location,booked:!!r.project_id,mine:!!mine,
    ...(mine||admin?{projectId:r.project_id,projectName:r.project_name,question:r.question,note:r.note}:{})};})});
 }
 export async function createSlot(ctx){
@@ -21,7 +21,10 @@ export async function createSlot(ctx){
  const location=text(body.location??'',{max:200},'location');
  if(/^https?:/i.test(location))httpUrl(location,'location');
  const id=newId('slot');
- ctx.db.query('INSERT INTO office_hours(id,mentor_name,topic,starts_at,duration_min,location,created_by,created) VALUES(?,?,?,?,?,?,?,?)').run(id,text(body.mentorName,{min:1,max:100},'mentorName'),text(body.topic??'',{max:200},'topic'),new Date(starts).toISOString(),int(body.durationMin??30,{min:10,max:240},'durationMin'),location,admin.id,nowIso());
+ // A slot either belongs to a mentor profile or names a guest mentor.
+ const mentor=body.mentorId?ctx.db.query('SELECT * FROM mentors WHERE id=? AND archived_at IS NULL').get(String(body.mentorId)):null;
+ if(body.mentorId&&!mentor)fail(400,'INVALID_FIELDS',{field:'mentorId'});
+ ctx.db.query('INSERT INTO office_hours(id,mentor_id,mentor_name,topic,starts_at,duration_min,location,created_by,created) VALUES(?,?,?,?,?,?,?,?,?)').run(id,mentor?.id||null,mentor?mentor.name:text(body.mentorName,{min:1,max:100},'mentorName'),text(body.topic??'',{max:200},'topic'),new Date(starts).toISOString(),int(body.durationMin??30,{min:10,max:240},'durationMin'),location,admin.id,nowIso());
  audit(ctx.db,admin.id,'officehours.create','office_hours',id,{});
  return json({id},201);
 }
@@ -58,3 +61,28 @@ export async function addNote(ctx,id){
  ctx.db.query('UPDATE office_hour_bookings SET note=? WHERE slot_id=?').run(text(body.note,{max:2000,multiline:true},'note'),id);
  return json({ok:true});
 }
+
+// Mentor profiles: who helps with what. Public so guests in the office see them too.
+export function listMentors(ctx){
+ const now=nowIso();
+ const rows=ctx.db.query('SELECT * FROM mentors WHERE archived_at IS NULL ORDER BY area,name').all();
+ return json({items:rows.map(m=>{
+  const next=ctx.db.query('SELECT h.starts_at FROM office_hours h LEFT JOIN office_hour_bookings b ON b.slot_id=h.id WHERE h.mentor_id=? AND h.cancelled_at IS NULL AND b.slot_id IS NULL AND h.starts_at>? ORDER BY h.starts_at LIMIT 1').get(m.id,now);
+  const free=ctx.db.query('SELECT count(*) n FROM office_hours h LEFT JOIN office_hour_bookings b ON b.slot_id=h.id WHERE h.mentor_id=? AND h.cancelled_at IS NULL AND b.slot_id IS NULL AND h.starts_at>?').get(m.id,now).n;
+  return {id:m.id,name:m.name,area:m.area,bio:m.bio,link:m.link,nextFree:next?.starts_at||null,freeSlots:free};
+ })});
+}
+export async function saveMentor(ctx,id){
+ const admin=requireAdmin(ctx),body=await readJson(ctx.request);
+ const name=text(body.name,{min:1,max:100},'name'),area=text(body.area,{min:1,max:60},'area');
+ const bio=text(body.bio??'',{max:600,multiline:true},'bio'),link=body.link?httpUrl(text(body.link,{max:300},'link'),'link'):'';
+ const now=nowIso();
+ if(id){
+  const r=ctx.db.query('UPDATE mentors SET name=?,area=?,bio=?,link=?,updated=? WHERE id=? AND archived_at IS NULL').run(name,area,bio,link,now,id);
+  if(!r.changes)fail(404,'NOT_FOUND');
+  ctx.db.query('UPDATE office_hours SET mentor_name=? WHERE mentor_id=?').run(name,id);
+ }else{id=newId('mentor');ctx.db.query('INSERT INTO mentors(id,name,area,bio,link,created_by,created,updated) VALUES(?,?,?,?,?,?,?,?)').run(id,name,area,bio,link,admin.id,now,now);}
+ audit(ctx.db,admin.id,'mentor.save','mentor',id,{});
+ return json({id},201);
+}
+export function archiveMentor(ctx,id){const admin=requireAdmin(ctx);ctx.db.query('UPDATE mentors SET archived_at=? WHERE id=?').run(nowIso(),id);audit(ctx.db,admin.id,'mentor.archive','mentor',id,{});return json({ok:true});}

@@ -175,4 +175,9 @@ UPDATE invites SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE kind='p
  {id:11,name:'lecture-feedback',sql:`
 CREATE TABLE IF NOT EXISTS lecture_feedback(user_id TEXT NOT NULL REFERENCES users(id),lecture_id TEXT NOT NULL REFERENCES lectures(id),score INTEGER NOT NULL CHECK(score BETWEEN 1 AND 10),comment TEXT NOT NULL DEFAULT '',created TEXT NOT NULL,updated TEXT NOT NULL,PRIMARY KEY(user_id,lecture_id));
 `},
+ {id:12,name:'mentor-profiles-and-avatars',sql:`
+CREATE TABLE IF NOT EXISTS mentors(id TEXT PRIMARY KEY,name TEXT NOT NULL,area TEXT NOT NULL,bio TEXT NOT NULL DEFAULT '',link TEXT NOT NULL DEFAULT '',created_by TEXT NOT NULL,created TEXT NOT NULL,updated TEXT NOT NULL,archived_at TEXT);
+ALTER TABLE office_hours ADD COLUMN mentor_id TEXT REFERENCES mentors(id);
+CREATE TABLE IF NOT EXISTS user_avatars(user_id TEXT PRIMARY KEY REFERENCES users(id),mime TEXT NOT NULL,bytes BLOB NOT NULL,updated TEXT NOT NULL);
+`},
 ];
