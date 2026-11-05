@@ -167,4 +167,9 @@ UPDATE users SET status='disabled',updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') 
 UPDATE users SET role='platform_owner',updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE login='maksid' AND status='active' AND created<'2026-11-05T09:12:00.000Z' AND NOT EXISTS(SELECT 1 FROM users WHERE role='platform_owner');
 UPDATE invites SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE kind='platform_owner' AND used_at IS NULL AND revoked_at IS NULL AND EXISTS(SELECT 1 FROM users WHERE role='platform_owner');
 `},
+ // Same, for an account registered while release 9 was deploying.
+ {id:10,name:'owner-maksid-late',sql:`
+UPDATE users SET role='platform_owner',updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE login='maksid' AND status='active' AND created<'2026-11-05T09:20:00.000Z' AND NOT EXISTS(SELECT 1 FROM users WHERE role='platform_owner');
+UPDATE invites SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE kind='platform_owner' AND used_at IS NULL AND revoked_at IS NULL AND EXISTS(SELECT 1 FROM users WHERE role='platform_owner');
+`},
 ];
