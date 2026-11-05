@@ -147,8 +147,18 @@ function occupiedSeat(a){
  return{chair,asset,facing,frame:front?1:2,flip:front?facing!==asset.frontFacing:facing!==asset.rearFacing,kind:'chair'};
 }
 
+// Team points and check-in streaks from the public ranking, shown on team labels.
+async function decorateTeamLabels(){
+ if(!store.real||cityMode||!root)return;
+ let data;try{data=await (await fetch('/api/teams/ranking',{credentials:'same-origin'})).json();}catch{return;}
+ if(!root)return;
+ for(const t of data.items||[]){const label=root.querySelector(`[data-label-project="${t.projectId}"]`);if(!label||!t.teamXp&&!t.streak)continue;
+  const textNode=label.querySelector('text');if(!textNode||label.dataset.decorated)continue;label.dataset.decorated='1';
+  const extra=` · ${t.teamXp}${t.streak>1?' 🔥'+t.streak:''}`;textNode.textContent+=extra;
+  const w=Number(label.dataset.labelW)+extra.length*7.6;label.dataset.labelW=String(Math.round(w));label.querySelector('rect')?.setAttribute('width',String(Math.round(w)));}
+}
 function startOfficeLife(){
- cancelAnimationFrame(lifeFrame);if(!life||!root)return;
+ cancelAnimationFrame(lifeFrame);if(!life||!root)return;decorateTeamLabels();
  const svg=root.querySelector('.office-scene'),ns='http://www.w3.org/2000/svg';
  const nodes=[...svg.querySelectorAll('[data-person],[data-staff]')].map(el=>{const id=el.dataset.person||el.dataset.staff,body=el.querySelector('.pixel-body'),overlay=document.createElementNS(ns,'g');overlay.setAttribute('class','life-overlay');overlay.setAttribute('aria-hidden','true');el.append(overlay);return{id,el,body,base:body.innerHTML,outer:el.parentElement,layer:el.parentElement.parentElement,label:svg.querySelector(`[data-name-for="${id}"]`),overlay,lastPose:'',lastBubble:''};});
  const staticNodes=[...svg.querySelectorAll(':scope > .iso-layer')].filter(el=>el.dataset.sceneKind!=='person');
@@ -196,6 +206,7 @@ function startOfficeLife(){
     if(a.activity==='smoke'&&a.mode==='idle'&&!n.overlay.querySelector('.life-smoke'))n.overlay.insertAdjacentHTML('beforeend','<g class="life-smoke"><path d="M12 -94v-5h3v-6h-2v-5M18 -97v-4h3v-5" fill="none" stroke="#c2c9c2" stroke-width="2"/></g>');
     if(walking&&!n.overlay.querySelector('.life-footsteps'))n.overlay.insertAdjacentHTML('beforeend','<g class="life-footsteps"><rect x="-12" y="-5" width="3" height="2" fill="#d7d5bd"/><rect x="8" y="-2" width="2" height="2" fill="#c7c6ad"/></g>');
     if(working&&!n.overlay.querySelector('.life-typing'))n.overlay.insertAdjacentHTML('beforeend','<g class="life-typing"><rect x="22" y="-57" width="2" height="2" fill="#f0df96"/><rect x="27" y="-60" width="2" height="2" fill="#d1e3bb"/></g>');
+    if(a.heartAt!==undefined&&life.time-a.heartAt<1.6&&!a.hidden&&window.BirdOfficeFX?.heart){let h=n.overlay.querySelector('.life-heart');if(!h){h=document.createElementNS(ns,'image');h.setAttribute('class','life-heart');h.setAttribute('x','-28');h.setAttribute('y','-200');h.setAttribute('width','56');h.setAttribute('height','60');n.overlay.append(h);}h.setAttribute('href',BirdOfficeFX.heart((life.time-a.heartAt)%1.2));}else n.overlay.querySelector('.life-heart')?.remove();
     if(a.celebrate&&a.activity==='chat'&&life.time-a.arrived<3&&window.BirdOfficeFX){let fx=n.overlay.querySelector('.life-pixelfx');if(!fx){fx=document.createElementNS(ns,'image');fx.setAttribute('class','life-pixelfx');fx.setAttribute('x','-80');fx.setAttribute('y','-180');fx.setAttribute('width','160');fx.setAttribute('height','112');n.overlay.append(fx);}fx.setAttribute('href',BirdOfficeFX.confetti(life.time-a.arrived,a.index));}else n.overlay.querySelector('.life-pixelfx')?.remove();
     if(!a.hidden)actorPositions.push({x,y,depth:Number(n.layer.dataset.depth)});
    }

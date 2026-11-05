@@ -101,7 +101,7 @@ function create(scene,roster,options={}){
   const d=speech.dialogue;
   if(d){const a=actors.get(d.ids[d.line%2]),b=actors.get(d.ids[1-d.line%2]);
    const together=a.activity==='chat'&&b.activity==='chat'&&a.mode==='idle'&&b.mode==='idle'&&dist(a.pos,b.pos)<130;
-   if(!together||d.line>=d.script.length)speech.dialogue=null;
+   if(!together||d.line>=d.script.length){if(together&&d.line>=d.script.length&&clock>=d.nextAt-.4){a.heartAt=b.heartAt=clock;}speech.dialogue=null;}
    else if(clock>=d.nextAt&&!speech.lines.has(b.id)&&speech.lines.size<SPEECH_LIMIT){say(a,d.script[d.line]);d.line++;d.nextAt=clock+LINE_SECONDS+.4;}
   }
   if(clock<speech.nextAt||speech.lines.size>=SPEECH_LIMIT)return;

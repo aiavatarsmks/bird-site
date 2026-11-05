@@ -282,9 +282,23 @@ async function render(){
  }catch(e){html=me?shell('overview',`<p class="acc-flash is-error" role="alert">${errText(e)}</p>`):authView('login');}
  if(token!==renderToken||!root)return;
  root.innerHTML=html;updateNav();
+ if(me&&['account'].includes(p[0])&&(!p[1]||p[1]==='progress'))celebrateBadges();
  const status=root.querySelector('.acc-flash');if(status)status.focus?.();
 }
 function setFlash(html,error=false){flash={html,error};}
+// New badge: a short pixel achievement toast (static frame with reduced motion).
+async function celebrateBadges(){
+ if(!me||!window.BirdOfficeFX?.achievement)return;
+ let p;try{p=await api('GET','/api/progress');}catch{return;}
+ const key='bird-seen-badges:'+me.id;let seen=null;try{seen=JSON.parse(localStorage.getItem(key)||'null');}catch{}
+ const ids=p.badges.map(b=>b.id);try{localStorage.setItem(key,JSON.stringify(ids));}catch{}
+ if(!seen)return;
+ const fresh=p.badges.find(b=>!seen.includes(b.id));if(!fresh)return;
+ const img=document.createElement('img');img.className='acc-achievement';img.alt=tr('n_badge')+': '+pick(fresh.title);img.setAttribute('role','status');document.body.append(img);
+ const title=(fresh.title.en||'').toUpperCase().slice(0,22),still=matchMedia('(prefers-reduced-motion: reduce)').matches,start=performance.now();
+ const frame=now=>{const t=still?1.2:(now-start)/1000;img.src=BirdOfficeFX.achievement(Math.min(t,2.39),'ACHIEVEMENT',title);if(!still&&t<2.4)requestAnimationFrame(frame);else setTimeout(()=>img.remove(),still?2500:200);};
+ requestAnimationFrame(frame);
+}
 async function run(fn){try{await fn();}catch(e){if(e.code==='CONFLICT'&&e.detail?.yours){cache.conflict={id:parts()[2],yours:e.detail.yours};render();return;}setFlash(errText(e),true);render();}}
 
 async function onSubmit(e){

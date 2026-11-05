@@ -101,3 +101,4 @@ pre.acc-pre{font:inherit;background:#f7f5ef;padding:10px;border-radius:6px;margi
 .acc-help{color:#9a3412!important;font-weight:600}
 .acc-script{font:12px/1.5 ui-monospace,Menlo,monospace;background:#1f2622;color:#e6efe2;padding:12px;border-radius:8px;overflow:auto;white-space:pre}
 .acc-catalog li{align-items:flex-start}
+.acc-achievement{position:fixed;z-index:3000;left:50%;top:84px;transform:translateX(-50%);width:min(440px,92vw);image-rendering:pixelated;pointer-events:none}
