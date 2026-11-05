@@ -1,0 +1,358 @@
+/* Accounts, project cabinet, tasks and admin. Plain HTML forms; the server checks every permission. */
+(()=>{'use strict';
+const T=window.BIRD_ACCOUNT_TEXT;
+let lang='en',root=null,me,csrf='',flash=null,cache={},renderToken=0;
+const tr=k=>T[k]?.[lang]??T[k]?.en??k;
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const loc={en:'en-GB',hr:'hr-HR',ru:'ru-RU'};
+const date=(iso,time=false)=>iso?new Intl.DateTimeFormat(loc[lang],{day:'numeric',month:'short',year:'numeric',...(time?{hour:'2-digit',minute:'2-digit'}:{}),timeZone:'Europe/Zagreb'}).format(new Date(iso.length===10?iso+'T12:00:00Z':iso)):'';
+const size=n=>n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
+const pick=o=>o?.[lang]||o?.en||'';
+// Authored task text falls back to English with a visible language marker.
+const authored=(t,field)=>{const own=t?.[lang]?.[field];if(own)return esc(own);const en=t?.en?.[field];return en?`<span lang="en">${esc(en)}</span>${lang!=='en'?' <small class="acc-lang">EN</small>':''}`:'';};
+const idem=()=>crypto.randomUUID().replace(/-/g,'');
+const isAdmin=()=>me&&['program_admin','platform_owner'].includes(me.role);
+
+class ApiError extends Error{constructor(code,detail,status){super(code);this.code=code;this.detail=detail;this.status=status;}}
+async function api(method,path,body,{key,headers={},raw}={}){
+ const h={...headers};if(method!=='GET'&&csrf)h['X-CSRF-Token']=csrf;if(key)h['Idempotency-Key']=key;
+ let payload;if(raw){payload=raw;}else if(body!==undefined){h['Content-Type']='application/json';payload=JSON.stringify(body);}
+ let res;try{res=await fetch(path,{method,headers:h,body:payload,credentials:'same-origin'});}catch{throw new ApiError('NETWORK');}
+ const data=(res.headers.get('content-type')||'').includes('json')?await res.json():null;
+ if(data?.csrf)csrf=data.csrf;
+ if(!res.ok){if(res.status===401&&me){me=null;}throw new ApiError(data?.error?.code||'SERVER_ERROR',data?.error?.detail,res.status);}
+ return data;
+}
+const errText=e=>tr('e_'+(e?.code||'SERVER_ERROR'))+(e?.detail?.field?` (${esc(e.detail.field)})`:'');
+async function loadMe(){try{const r=await api('GET','/api/auth/me');me=r.user;csrf=r.csrf||'';cache.unread=r.unread||0;}catch{me=null;}updateNav();}
+function updateNav(){document.querySelectorAll('.nav-account').forEach(a=>{a.textContent=me?tr('nav'):tr('signIn');});}
+
+function parts(){return location.hash.replace(/^#\/?/,'').split('/').filter(Boolean);}
+function isRoute(){return ['account','admin'].includes(parts()[0]);}
+const go=h=>{if(location.hash===h)render();else location.hash=h;};
+
+// Layout -------------------------------------------------------------------------
+function shell(active,body){
+ const tabs=[['#/account',tr('overview'),'overview'],['#/account/tasks',tr('tasks'),'tasks'],['#/account/progress',tr('progress'),'progress'],['#/account/character',tr('character'),'character'],['#/account/settings',tr('settings'),'settings'],...(isAdmin()?[['#/admin',tr('admin'),'admin']]:[])];
+ return `<div class="acc"><div class="acc-head"><div><span class="eyebrow">${esc(tr('urole_'+me.role))}</span><h1>${esc(me.displayName)}</h1></div><a class="acc-office" href="#/office">${tr('office')} ↗</a></div><nav class="acc-tabs" aria-label="${tr('nav')}">${tabs.map(([h,l,k])=>`<a href="${h}" ${k===active?'aria-current="page"':''}>${esc(l)}${k==='overview'&&cache.unread?` <b class="acc-dot">${cache.unread}</b>`:''}</a>`).join('')}</nav>${flashHtml()}<div class="acc-body">${body}</div><p class="acc-small">${tr('unofficial')}</p></div>`;
+}
+function flashHtml(){if(!flash)return '';const f=flash;flash=null;return `<p class="acc-flash ${f.error?'is-error':''}" role="${f.error?'alert':'status'}">${f.html}</p>`;}
+const field=(name,label,{type='text',value='',hint='',required=false,attrs=''}={})=>`<label class="acc-field"><span>${esc(label)}</span>${type==='textarea'?`<textarea name="${name}" ${required?'required':''} ${attrs}>${esc(value)}</textarea>`:`<input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${attrs}>`}${hint?`<small>${esc(hint)}</small>`:''}</label>`;
+const select=(name,label,options,value)=>`<label class="acc-field"><span>${esc(label)}</span><select name="${name}">${options.map(([v,l])=>`<option value="${esc(v)}" ${String(v)===String(value)?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
+const statusChip=s=>`<span class="acc-chip is-${esc(s)}">${esc(tr('st_'+s))}</span>`;
+const empty=()=>`<p class="acc-muted">${tr('none')}</p>`;
+
+// Signed-out ------------------------------------------------------------------------
+function authView(mode){
+ const tabs=`<div class="acc-switch">${[['login',tr('signIn')],['register',tr('createAccount')],['recover',tr('recover')]].map(([m,l])=>`<a href="#/account/${m==='login'?'':m}" ${m===mode?'aria-current="page"':''}>${esc(l)}</a>`).join('')}</div>`;
+ const form=mode==='register'?`<form data-form="register">${field('login',tr('login'),{required:true,hint:tr('loginHint'),attrs:'autocomplete="username" maxlength="60" autocapitalize="none"'})}${field('password',tr('password'),{type:'password',required:true,hint:tr('passwordHint'),attrs:'autocomplete="new-password" minlength="10" maxlength="200"'})}${field('displayName',tr('displayName'),{required:true,attrs:'maxlength="80"'})}${field('email',tr('email'),{type:'email',hint:tr('emailNote'),attrs:'autocomplete="email" maxlength="200"'})}${field('invite',tr('inviteCodeOptional'),{attrs:'maxlength="100" autocomplete="off"'})}<button class="acc-primary">${tr('createAccount')}</button></form>`
+ :mode==='recover'?`<form data-form="recover"><p class="acc-muted">${tr('noEmail')}</p>${field('login',tr('login'),{required:true,attrs:'autocomplete="username" autocapitalize="none"'})}${field('code',tr('recoveryCode'),{required:true,attrs:'autocomplete="off"'})}${field('newPassword',tr('newPassword'),{type:'password',required:true,hint:tr('passwordHint'),attrs:'autocomplete="new-password" minlength="10"'})}<button class="acc-primary">${tr('recover')}</button></form>`
+ :`<form data-form="login">${field('login',tr('login'),{required:true,attrs:'autocomplete="username" autocapitalize="none"'})}${field('password',tr('password'),{type:'password',required:true,attrs:'autocomplete="current-password"'})}<button class="acc-primary">${tr('signIn')}</button></form>`;
+ return `<div class="acc acc-auth"><h1>${tr(mode==='register'?'createAccount':mode==='recover'?'recover':'signIn')}</h1>${tabs}${flashHtml()}${form}<p class="acc-small">${tr('unofficial')}</p></div>`;
+}
+function codesView(codes,next){return `<div class="acc acc-auth"><h1>${tr('codesTitle')}</h1><p>${tr('codesText')}</p><ol class="acc-codes">${codes.map(c=>`<li><code>${esc(c)}</code></li>`).join('')}</ol><button class="acc-primary" data-act="codes-done" data-next="${esc(next)}">${tr('codesDone')}</button></div>`;}
+
+// Account pages --------------------------------------------------------------------------
+async function overviewView(){
+ const [projects,tasks,notes,claims,help]=await Promise.all([api('GET','/api/projects?mine=1'),api('GET','/api/tasks'),api('GET','/api/notifications?limit=8'),api('GET','/api/people/claims'),api('GET','/api/help/confirmations')]);
+ const character=await api('GET','/api/me/character');
+ const open=tasks.items.filter(t=>['not_started','draft','changes_requested'].includes(t.status)&&t.task.status==='published');
+ const claimBlock=character.person?.confirmed?'':await claimForm(claims.items);
+ return shell('overview',`<div class="acc-grid">
+ <section class="acc-card"><div class="acc-card-head"><h2>${tr('myProjects')}</h2><a class="acc-secondary" href="#/account/new-project">+ ${tr('newProject')}</a></div>${projects.items.length?`<ul class="acc-list">${projects.items.map(p=>`<li><a href="#/account/project/${esc(p.id)}"><strong>${esc(p.name)}</strong><small>${esc(tr('role_'+p.role))} · ${esc(tr('st_'+p.status))}</small></a></li>`).join('')}</ul>`:empty()}</section>
+ <section class="acc-card"><div class="acc-card-head"><h2>${tr('tasks')}</h2><a href="#/account/tasks">${tr('open')} →</a></div>${open.length?`<ul class="acc-list">${open.slice(0,6).map(taskRow).join('')}</ul>`:empty()}</section>
+ ${help.items.length?`<section class="acc-card"><h2>${tr('helpRequests')}</h2><ul class="acc-list">${help.items.map(h=>`<li><div><strong>${esc(h.helperName)}</strong><small>${esc(h.note)}</small></div><span class="acc-actions"><button data-act="help" data-id="${esc(h.id)}" data-decision="confirmed" class="acc-secondary">${tr('confirmHelp')}</button><button data-act="help" data-id="${esc(h.id)}" data-decision="declined">${tr('decline')}</button></span></li>`).join('')}</ul></section>`:''}
+ <section class="acc-card"><div class="acc-card-head"><h2>${tr('notifications')}</h2>${notes.unread?`<button data-act="read">${tr('markRead')}</button>`:''}</div>${notes.items.length?`<ul class="acc-list">${notes.items.map(n=>`<li class="${n.read?'':'is-unread'}"><span>${esc(tr('n_'+n.kind.replace('.','_')))}</span><small>${date(n.created,true)}</small></li>`).join('')}</ul>`:empty()}</section>
+ <section class="acc-card"><h2>${tr('acceptInvite')}</h2><form data-form="invite" class="acc-inline">${field('code',tr('inviteCode'),{required:true,attrs:'autocomplete="off" maxlength="100"'})}<button class="acc-secondary">${tr('acceptInvite')}</button></form></section>
+ ${claimBlock}</div>`);
+}
+async function claimForm(claims){
+ const people=(await api('GET','/api/people?limit=100')).items.filter(p=>p.kind==='participant');
+ const pending=claims.filter(c=>c.status==='pending');
+ return `<section class="acc-card"><h2>${tr('claimTitle')}</h2><p class="acc-muted">${tr('claimText')}</p>${pending.length?`<ul class="acc-list">${pending.map(c=>`<li><span>${esc(c.personName)}</span>${statusChip('pending')}</li>`).join('')}</ul>`:`<form data-form="claim">${select('personId',tr('character'),people.map(p=>[p.id,p.displayName]),'')}${field('message',tr('claimMessage'),{type:'textarea',attrs:'maxlength="500" rows="2"'})}<button class="acc-secondary">${tr('claimSend')}</button></form>`}</section>`;
+}
+const taskRow=t=>`<li><a href="#/account/task/${esc(t.id)}"><strong>${authored(t.task.translations,'title')}</strong><small>${esc(tr(t.task.scope==='team'?'team':'personal'))}${t.projectName?' · '+esc(t.projectName):''}${t.period?' · '+tr('week')+' '+esc(t.period.split('-W')[1]):''} · ${t.task.xp} ${tr('xp')}${t.task.dueAt?' · '+tr('due')+' '+date(t.task.dueAt):''}</small></a>${statusChip(t.status)}</li>`;
+
+async function tasksView(){
+ const tasks=await api('GET','/api/tasks');
+ const groups=[['changes_requested'],['not_started','draft'],['submitted'],['accepted','rejected']];
+ return shell('tasks',`<p class="acc-note">${tr('voluntary')}</p>${groups.map(g=>{const items=tasks.items.filter(t=>g.includes(t.status));return items.length?`<section class="acc-card"><h2>${esc(tr('st_'+g[0]))}</h2><ul class="acc-list">${items.map(taskRow).join('')}</ul></section>`:'';}).join('')||empty()}`);
+}
+
+async function taskView(id){
+ const {assignment:a}=await api('GET','/api/tasks/'+encodeURIComponent(id));
+ const t=a.task,content=a.draft||{},locked=!['not_started','draft','changes_requested'].includes(a.status)&&!(t.repeatRule==='weekly_reward'&&a.status==='accepted')||t.status!=='published';
+ let input='';
+ if(t.type==='checklist')input=t.checklist.map((c,i)=>`<label class="acc-check"><input type="checkbox" name="checked" value="${i}" ${content.checked?.[i]?'checked':''}> ${esc(pick(c))}</label>`).join('')+field('note',tr('note'),{type:'textarea',value:content.note,attrs:'rows="2" maxlength="2000"'});
+ else if(t.type==='counter')input=`<div class="acc-counter"><button type="button" data-act="count" data-d="-1" aria-label="−1">−</button><output name="countOut">${content.count||0}</output> / ${t.counterTarget}<button type="button" data-act="count" data-d="1" aria-label="+1">+</button><input type="hidden" name="count" value="${content.count||0}"></div>`+field('note',tr('note'),{type:'textarea',value:content.note,attrs:'rows="4" maxlength="2000"'});
+ else if(t.type==='text'||t.type==='team_result'){
+  if(t.key==='project-update')input=`<p><a href="#/account/project/${esc(a.projectId)}/updates">${tr('postUpdate')} →</a></p>`;
+  else{input=field('text',tr('answer'),{type:'textarea',value:content.text,attrs:'rows="7" maxlength="5000"'});
+   if(t.key==='help-team'){const list=(await api('GET','/api/projects?limit=50')).items.filter(p=>p.id!==a.projectId);input+=select('recipientProjectId',tr('recipient'),[['',''],...list.map(p=>[p.id,p.name])],content.recipientProjectId);}}
+ }
+ else if(t.type==='link')input=field('url',tr('link'),{type:'url',value:content.url,attrs:'maxlength="500"'})+field('note',tr('note'),{type:'textarea',value:content.note,attrs:'rows="2"'});
+ else if(t.type==='attachment'){const files=a.projectId?(await api('GET',`/api/projects/${encodeURIComponent(a.projectId)}/files`)).items.filter(f=>f.purpose!=='reference'):[];input=(files.length?select('fileId',tr('chooseFile'),[['',''],...files.map(f=>[f.id,f.filename])],content.fileId):`<p class="acc-muted">${tr('none')}</p>`)+(a.projectId?`<p><a href="#/account/project/${esc(a.projectId)}/files">${tr('upload')} →</a></p>`:'')+field('note',tr('note'),{type:'textarea',value:content.note,attrs:'rows="2"'});}
+ else if(t.type==='attendance'){const lectures=(await api('GET','/api/lectures'));input=`<fieldset class="acc-field"><legend>${tr('chooseLectures')}</legend>${lectures.items.filter(l=>l.date<=lectures.today).map(l=>`<label class="acc-check"><input type="checkbox" name="lectureIds" value="${esc(l.id)}" ${l.attendance?'checked disabled':''}> ${esc(pick(l.title))} · ${date(l.date)} ${l.attendance?`<small>(${tr(l.attendance.kind==='verified_by_admin'?'verified':'selfReported')})</small>`:''}</label>`).join('')}</fieldset><p class="acc-note">${tr('selfReport')}</p>`;}
+ const reviews=a.reviews?.length?`<section class="acc-card"><h2>${tr('reviewsTitle')}</h2><ul class="acc-list">${a.reviews.map(r=>`<li><div>${statusChip(r.decision)} <small>${esc(r.reviewer)} · ${date(r.created,true)}</small><p>${esc(r.comment)}</p></div></li>`).join('')}</ul></section>`:'';
+ const revs=a.revisions?.length?`<details class="acc-card"><summary>${tr('revisions')} (${a.revisions.length})</summary><ul class="acc-list">${a.revisions.map(r=>`<li><div><strong>#${r.revision}</strong> <small>${esc(r.author)} · ${date(r.created,true)}</small><pre class="acc-pre">${esc(r.content.text||r.content.note||'')}</pre></div></li>`).join('')}</ul></details>`:'';
+ return shell('tasks',`<a class="acc-back" href="#/account/tasks">← ${tr('tasks')}</a><article class="acc-card acc-task"><div class="acc-card-head"><h2>${authored(t.translations,'title')}</h2>${statusChip(a.status)}</div><p class="acc-meta">${esc(tr(t.scope==='team'?'team':'personal'))}${a.projectName?' · '+esc(a.projectName):''} · ${t.xp} ${tr('xp')}${t.dueAt?' · '+tr('due')+' '+date(t.dueAt,true):''}${t.requiresReview?' · '+tr('requiresReview'):''}</p>${t.translations.en.goal?`<h3>${tr('goal')}</h3><p>${authored(t.translations,'goal')}</p>`:''}<h3>${tr('instructions')}</h3><p class="acc-pre">${authored(t.translations,'instructions')}</p>${t.translations.en.criteria?`<h3>${tr('criteria')}</h3><p>${authored(t.translations,'criteria')}</p>`:''}<p class="acc-note">${tr('voluntary')}</p>
+ ${a.helpConfirmation?`<p>${statusChip(a.helpConfirmation.status==='confirmed'?'accepted':a.helpConfirmation.status==='declined'?'changes_requested':'pending')}</p>`:''}
+ ${locked||t.key==='project-update'?(t.key==='project-update'?input:''):`<form data-form="answer" data-id="${esc(a.id)}" data-type="${esc(t.type)}">${input}<div class="acc-actions"><button type="button" data-act="answer-draft" class="acc-secondary">${tr('saveDraft')}</button><button class="acc-primary" data-key="${idem()}">${tr(t.requiresReview?'submitReview':'submit')}</button></div></form>`}</article>${reviews}${revs}`);
+}
+function answerContent(form,type){
+ const f=new FormData(form),c={note:f.get('note')||''};
+ if(type==='checklist')c.checked=[...form.querySelectorAll('[name=checked]')].map(x=>x.checked);
+ if(type==='counter')c.count=Number(f.get('count')||0);
+ if(type==='text'||type==='team_result'){c.text=f.get('text')||'';if(f.get('recipientProjectId'))c.recipientProjectId=f.get('recipientProjectId');}
+ if(type==='link')c.url=f.get('url')||'';
+ if(type==='attachment')c.fileId=f.get('fileId')||'';
+ if(type==='attendance')c.lectureIds=f.getAll('lectureIds');
+ return c;
+}
+
+async function progressView(){
+ const p=await api('GET','/api/progress');
+ const owned=new Set(p.badges.map(b=>b.id));
+ return shell('progress',`<div class="acc-grid"><section class="acc-card acc-score"><h2>${tr('myPoints')}</h2><b>${p.xp}</b><ul class="acc-list">${p.history.map(h=>`<li><span>${h.amount>0?'+':''}${h.amount}</span><small>${esc(h.reason)} · ${date(h.created)}</small></li>`).join('')}</ul></section>
+ ${p.teams.map(t=>`<section class="acc-card acc-score"><h2>${tr('teamPoints')} · ${esc(t.name)}</h2><b>${t.xp}</b><ul class="acc-list">${t.history.map(h=>`<li><span>${h.amount>0?'+':''}${h.amount}</span><small>${esc(h.reason)} · ${date(h.created)}</small></li>`).join('')}</ul></section>`).join('')}
+ <section class="acc-card"><h2>${tr('badges')}</h2><ul class="acc-badges">${p.available.map(b=>`<li class="${owned.has(b.id)?'is-owned':''}"><span aria-hidden="true">${owned.has(b.id)?'★':'☆'}</span>${esc(pick(b.title))}</li>`).join('')}</ul></section></div>`);
+}
+
+async function characterView(){
+ const c=await api('GET','/api/me/character'),p=c.person;
+ return shell('character',`<section class="acc-card"><h2>${tr('character')}</h2><p>${statusChip(p.confirmed?'approved':'pending')} ${tr(p.confirmed?'confirmed':'visitor')}</p>
+ <form data-form="character">${p.confirmed?`<p><strong>${esc(p.displayName)}</strong></p>${field('publicRole',tr('publicRole'),{value:p.publicRole,attrs:'maxlength="80"'})}<p class="acc-note">${tr('appearanceNote')}</p>${field('appearanceRequest',tr('appearanceRequest'),{type:'textarea',attrs:'rows="2" maxlength="500"'})}`:`${field('displayName',tr('displayName'),{value:p.displayName,required:true,attrs:'maxlength="80"'})}${select('appearance',tr('appearance'),['','woman','man'].map(v=>[v,tr('app_'+v)]),p.appearance||'')}`}<button class="acc-primary">${tr('save')}</button></form>
+ <h3>${tr('reference')}</h3><form data-form="reference"><input type="file" name="file" accept="image/png,image/jpeg,image/webp"><button class="acc-secondary">${tr('upload')}</button></form>${c.references.length?`<ul class="acc-list">${c.references.map(r=>`<li><span>${esc(r.filename)}</span><small>${date(r.created)}</small></li>`).join('')}</ul>`:''}
+ ${p.confirmed?`<p><a href="#/office/${esc(window.BirdProjects?.person(p.id)?.projectIds?.[0]||'')}/${esc(p.id)}" data-act="office-me">${tr('showInOffice')} →</a></p>`:''}</section>`);
+}
+
+async function settingsView(){
+ const s=await api('GET','/api/auth/sessions');
+ return shell('settings',`<div class="acc-grid"><section class="acc-card"><h2>${tr('settings')}</h2><form data-form="profile">${field('displayName',tr('displayName'),{value:me.displayName,required:true,attrs:'maxlength="80"'})}${field('email',tr('email'),{type:'email',value:me.email,hint:tr('emailNote')})}${select('language',tr('language'),[['en','English'],['hr','Hrvatski'],['ru','Русский']],me.language)}<label class="acc-check"><input type="checkbox" name="leaderboardOptIn" ${me.leaderboardOptIn?'checked':''}> ${tr('leaderboard')}</label><small class="acc-muted">${tr('leaderboardNote')}</small><button class="acc-primary">${tr('save')}</button></form></section>
+ <section class="acc-card"><h2>${tr('sessions')}</h2><ul class="acc-list">${s.items.map(x=>`<li><div><strong>${esc(x.device)}</strong>${x.current?` <small>(${tr('thisDevice')})</small>`:''}<small>${date(x.lastSeen,true)}</small></div><button data-act="session" data-id="${esc(x.id)}">${tr('revoke')}</button></li>`).join('')}</ul><div class="acc-actions"><button data-act="logout">${tr('signOut')}</button><button data-act="logout-all">${tr('signOutAll')}</button></div></section>
+ <section class="acc-card"><h2>${tr('password')}</h2><form data-form="password">${field('currentPassword',tr('currentPassword'),{type:'password',required:true,attrs:'autocomplete="current-password"'})}${field('newPassword',tr('newPassword'),{type:'password',required:true,hint:tr('passwordHint'),attrs:'autocomplete="new-password" minlength="10"'})}<button class="acc-secondary">${tr('save')}</button></form>
+ <h3>${tr('newCodes')}</h3><form data-form="codes">${field('currentPassword',tr('currentPassword'),{type:'password',required:true,attrs:'autocomplete="current-password"'})}<button class="acc-secondary">${tr('newCodes')}</button></form></section></div>`);
+}
+
+// Project cabinet ------------------------------------------------------------------------
+const FIELDS=['name','short','problem','users','solution','value','ask','nextSteps','details'];
+function projectForm(c,version,id){
+ return `<form data-form="project" data-id="${esc(id||'')}" data-version="${esc(version||'')}"><p class="acc-note">${tr('optional')}</p>${FIELDS.map(k=>field(k,tr('f_'+k),{type:k==='name'?'text':'textarea',value:c?.[k]||'',required:k==='name',attrs:k==='name'?'maxlength="100"':`rows="${k==='short'?2:4}" maxlength="${k==='details'?8000:3000}"`})).join('')}${select('stage',tr('f_stage'),['idea','research','prototype','pilot','launched'].map(s=>[s,tr('stage_'+s)]),c?.stage||'idea')}<fieldset class="acc-field"><legend>${tr('f_links')}</legend>${[0,1,2].map(i=>`<div class="acc-inline"><input name="linkLabel" aria-label="${tr('f_links')} ${i+1}" value="${esc(c?.links?.[i]?.label||'')}" maxlength="80"><input name="linkUrl" type="url" aria-label="URL ${i+1}" value="${esc(c?.links?.[i]?.url||'')}" maxlength="500"></div>`).join('')}</fieldset><div class="acc-actions"><button class="acc-primary">${tr(id?'saveDraft':'newProject')}</button>${id?`<button type="button" data-act="preview" class="acc-secondary">${tr('preview')}</button>`:''}</div></form>`;
+}
+function readProjectForm(form){const f=new FormData(form),c={};for(const k of FIELDS)c[k]=f.get(k)||'';c.stage=f.get('stage');const labels=f.getAll('linkLabel'),urls=f.getAll('linkUrl');c.links=urls.map((u,i)=>({label:labels[i]||'',url:u})).filter(l=>l.url);return c;}
+function previewHtml(c){return `<article class="acc-preview"><span class="eyebrow">${esc(tr('stage_'+c.stage))}</span><h2>${esc(c.name)}</h2><p class="acc-lede">${esc(c.short)}</p>${FIELDS.slice(2).filter(k=>c[k]).map(k=>`<h3>${tr('f_'+k)}</h3><p class="acc-pre">${esc(c[k])}</p>`).join('')}${c.links?.length?`<ul>${c.links.map(l=>`<li><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer nofollow">${esc(l.label||l.url)}</a></li>`).join('')}</ul>`:''}</article>`;}
+
+const DRAFT_KEY=id=>'bird-project-draft:'+id;
+async function projectView(id,tab='edit'){
+ const {project:p}=await api('GET','/api/projects/'+encodeURIComponent(id));
+ const tabs=[['edit',tr('description')],['files',tr('files')],['team',tr('members')],['updates',tr('updates')],['journal',tr('journal')],['history',tr('history')]];
+ const progress=await api('GET','/api/progress');const xp=progress.teams.find(t=>t.projectId===id)?.xp??0;
+ let body='';
+ if(tab==='edit'){
+  let local=null;try{local=JSON.parse(sessionStorage.getItem(DRAFT_KEY(id))||'null');}catch{}
+  const conflict=cache.conflict?.id===id?cache.conflict:null;cache.conflict=null;
+  body=(conflict?`<div class="acc-flash is-error" role="alert">${tr('conflict')}<details open><summary>${tr('yourText')}</summary>${previewHtml(conflict.yours)}</details></div>`:'')+(p.access.edit?projectForm(local&&local.version===p.draftVersion?local.content:p.draft,p.draftVersion,id)+`<div class="acc-card"><p class="acc-note">${tr('publishNote')}</p><button data-act="publish" data-id="${esc(id)}" data-version="${p.draftVersion}" class="acc-primary">${tr('publish')}</button>${p.access.manage?`<button data-act="${p.status==='archived'?'unarchive':'archive'}" data-id="${esc(id)}">${tr(p.status==='archived'?'unarchive':'archive')}</button>`:''}</div>`:previewHtml(p.draft||p.published));
+ }else if(tab==='files'){
+  const f=await api('GET',`/api/projects/${encodeURIComponent(id)}/files`);
+  body=`${p.access.edit?`<form data-form="upload" data-id="${esc(id)}" class="acc-card"><p class="acc-note">${tr('uploadHint')}</p><input type="file" name="file" accept=".pdf,.pptx,.png,.jpg,.jpeg,.webp" required><button class="acc-primary">${tr('upload')}</button></form>`:''}<p class="acc-muted">${tr('used')}: ${size(f.usedBytes)} / ${size(f.limitBytes)}</p>${f.items.length?`<ul class="acc-list">${f.items.map(x=>`<li><div><a href="/api/files/${esc(x.id)}" download>${esc(x.filename)}</a><small>${size(x.size)} · ${date(x.created)} · ${tr('notScanned')}</small></div>${p.access.edit?`<span class="acc-actions"><select data-act="visibility" data-id="${esc(x.id)}" aria-label="${tr('status')}">${['private','team','reviewer','public'].map(v=>`<option value="${v}" ${x.visibility===v?'selected':''}>${tr('vis_'+v)}</option>`).join('')}</select><button data-act="file-delete" data-id="${esc(x.id)}">${tr('remove')}</button></span>`:`<small>${tr('vis_'+x.visibility)}</small>`}</li>`).join('')}</ul>`:empty()}`;
+ }else if(tab==='team'){
+  const invites=p.access.manage?await api('GET','/api/invites?projectId='+encodeURIComponent(id)):{items:[]};
+  body=`<ul class="acc-list">${(p.members||[]).map(m=>`<li><div><strong>${esc(m.displayName)}</strong><small>${esc(tr('role_'+m.role))}</small></div>${p.access.manage&&m.userId!==me.id?`<span class="acc-actions"><select data-act="member-role" data-project="${esc(id)}" data-user="${esc(m.userId)}" aria-label="${tr('roleChange')}">${['owner','editor','member'].map(r=>`<option value="${r}" ${m.role===r?'selected':''}>${tr('role_'+r)}</option>`).join('')}</select><button data-act="member-remove" data-project="${esc(id)}" data-user="${esc(m.userId)}">${tr('remove')}</button></span>`:''}</li>`).join('')}</ul>
+  ${p.access.manage?`<form data-form="project-invite" data-id="${esc(id)}" class="acc-card">${select('role',tr('roleChange'),[['editor',tr('role_editor')],['member',tr('role_member')]],'editor')}<button class="acc-secondary">${tr('invite')}</button></form>${cache.newInvite?`<p class="acc-flash" role="status">${tr('inviteShow')}<br><code class="acc-code">${esc(cache.newInvite)}</code></p>`:''}<ul class="acc-list">${invites.items.filter(i=>!i.used&&!i.revoked).map(i=>`<li><span>${tr('role_'+i.role)} · ${date(i.expires)}</span><button data-act="invite-revoke" data-id="${esc(i.id)}">${tr('revoke')}</button></li>`).join('')}</ul>`:''}`;
+  cache.newInvite=null;
+ }else if(tab==='updates'){
+  const u=await api('GET',`/api/projects/${encodeURIComponent(id)}/updates`);const helpList=await api('GET','/api/help');
+  body=`${p.access.edit?`<form data-form="update" data-id="${esc(id)}" class="acc-card">${field('body',tr('postUpdate'),{type:'textarea',required:true,attrs:'rows="3" maxlength="3000"'})}${select('visibility',tr('status'),[['public',tr('vis_public')],['team',tr('vis_team')]],'public')}<button class="acc-primary" data-key="${idem()}">${tr('postUpdate')}</button></form>`:''}${u.items.length?`<ul class="acc-list">${u.items.map(x=>`<li><div><p class="acc-pre">${esc(x.body)}</p><small>${esc(x.author)} · ${date(x.created,true)} · ${tr('vis_'+x.visibility)}</small></div></li>`).join('')}</ul>`:empty()}
+  <section class="acc-card"><h2>${tr('help')}</h2>${p.access.edit?`<form data-form="help" data-id="${esc(id)}" class="acc-inline">${select('kind',tr('type'),[['offer',tr('offer')],['ask',tr('ask')]],'offer')}${field('body',tr('note'),{attrs:'maxlength="500" required'})}<button class="acc-secondary">${tr('save')}</button></form>`:''}<ul class="acc-list">${helpList.items.filter(h=>h.projectId===id).map(h=>`<li><span><strong>${tr(h.kind)}</strong> ${esc(h.body)}</span>${p.access.edit?`<button data-act="help-close" data-id="${esc(h.id)}">${tr('close')}</button>`:''}</li>`).join('')}</ul></section>`;
+ }else if(tab==='journal'){
+  const j=await api('GET',`/api/projects/${encodeURIComponent(id)}/journal`);
+  body=`<section class="acc-card"><h2>${tr('milestone')}</h2>${p.access.edit?`<form data-form="milestone" data-id="${esc(id)}" class="acc-inline">${field('title',tr('title'),{required:true,attrs:'maxlength="200"'})}${field('due',tr('due'),{type:'date'})}<button class="acc-secondary">${tr('save')}</button></form>`:''}<ul class="acc-list">${j.milestones.map(m=>`<li><span>${esc(m.title)}${m.due?' · '+date(m.due):''}</span>${m.doneAt?statusChip('accepted'):p.access.edit?`<button data-act="milestone-done" data-project="${esc(id)}" data-id="${esc(m.id)}">${tr('done')}</button>`:''}</li>`).join('')}</ul></section>
+  <section class="acc-card"><h2>${tr('metric')}</h2>${p.access.edit?`<form data-form="metric" data-id="${esc(id)}" class="acc-inline">${field('name',tr('metricName'),{required:true,attrs:'maxlength="80"'})}${field('value',tr('metricValue'),{required:true,attrs:'maxlength="80"'})}${field('measuredOn',tr('lectureDate'),{type:'date',value:new Date().toISOString().slice(0,10)})}${select('visibility',tr('status'),[['team',tr('vis_team')],['public',tr('vis_public')]],'team')}<button class="acc-secondary">${tr('save')}</button></form>`:''}<ul class="acc-list">${j.metrics.map(m=>`<li><span><strong>${esc(m.name)}</strong> ${esc(m.value)}</span><small>${date(m.measuredOn)} · ${esc(m.author)} · ${tr('vis_'+m.visibility)}</small></li>`).join('')}</ul></section>`;
+ }else if(tab==='history'){
+  const r=p.access.edit?await api('GET',`/api/projects/${encodeURIComponent(id)}/revisions`):{items:[]};
+  body=r.items.length?`<ul class="acc-list">${r.items.map(x=>`<li><div><strong>v${x.version}</strong> ${statusChip(x.kind==='published'?'published':x.kind==='conflict'?'changes_requested':'draft')}<small>${esc(x.author)} · ${date(x.created,true)}</small><details><summary>${tr('preview')}</summary>${previewHtml(x.content)}</details></div><button data-act="restore" data-project="${esc(id)}" data-id="${x.id}">${tr('restore')}</button></li>`).join('')}</ul>`:empty();
+ }
+ return shell('overview',`<a class="acc-back" href="#/account">← ${tr('myProjects')}</a><div class="acc-card-head"><h2 class="acc-project-title">${esc((p.draft||p.published).name)}</h2><span>${statusChip(p.status)} <b class="acc-xp">${xp} ${tr('xp')}</b></span></div><nav class="acc-tabs acc-subtabs">${tabs.map(([k,l])=>`<a href="#/account/project/${esc(id)}/${k}" ${k===tab?'aria-current="page"':''}>${esc(l)}</a>`).join('')}</nav>${body}`);
+}
+
+// Admin ------------------------------------------------------------------------------
+function adminShell(active,body){
+ const tabs=[['overview',tr('overview')],['reviews',tr('reviews')],['tasks',tr('tasks')],['claims',tr('claims')],['users',tr('users')],['lectures',tr('lectures')],['audit',tr('audit')]];
+ return shell('admin',`<nav class="acc-tabs acc-subtabs">${tabs.map(([k,l])=>`<a href="#/admin/${k}" ${k===active?'aria-current="page"':''}>${esc(l)}</a>`).join('')}</nav>${body}`);
+}
+async function adminView(tab='overview',id){
+ if(tab==='overview'){
+  const o=await api('GET','/api/admin/overview');
+  return adminShell(tab,`<div class="acc-table-wrap"><table class="acc-table"><thead><tr><th>${tr('project')}</th><th>${tr('status')}</th><th>${tr('points')}</th><th>${tr('attendance')}</th><th>${tr('tasks')}</th><th>${tr('toDo')}</th></tr></thead><tbody>${o.items.map(p=>`<tr><td><strong>${esc(p.name)}</strong><small>${esc(p.members.join(', '))}</small></td><td>${statusChip(p.status)}<small>${esc(tr('stage_'+p.stage))}</small></td><td><b>${p.totalXp}</b><small>${tr('team')} ${p.teamXp} · ${tr('personal')} ${p.personalXp}</small></td><td>${p.attendance.verified} ✓ · ${p.attendance.selfReported}<small>${tr('verified')} · ${tr('selfReportedShort')}</small></td><td>${p.tasks.done}/${p.tasks.total}${p.tasks.waitingReview?`<small>${p.tasks.waitingReview} ${tr('waiting')}</small>`:''}</td><td>${p.todo.length?`<ul class="acc-todo">${p.todo.map(t=>`<li>${esc(pick(t.title).title)}</li>`).join('')}</ul>`:'—'}</td></tr>`).join('')}</tbody></table></div>`);
+ }
+ if(tab==='reviews'){
+  const q=await api('GET','/api/reviews');
+  const details=await Promise.all(q.items.map(i=>api('GET','/api/tasks/'+i.id).then(r=>r.assignment)));
+  return adminShell(tab,q.items.length?details.map((a,i)=>{const r=a.revisions[0]?.content||{};return `<section class="acc-card"><div class="acc-card-head"><h2>${authored(a.task.translations,'title')}</h2><small>${esc(a.projectName||q.items[i].userName||'')} · v${a.revision}</small></div><p class="acc-muted">${tr('criteria')}: ${authored(a.task.translations,'criteria')}</p><pre class="acc-pre">${esc(r.text||r.note||'')}</pre>${r.count!==undefined?`<p>${tr('count')}: ${r.count}</p>`:''}${r.fileId?`<p><a href="/api/files/${esc(r.fileId)}" download>${tr('download')}</a></p>`:''}${r.url?`<p><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer nofollow">${esc(r.url)}</a></p>`:''}<form data-form="review" data-id="${esc(q.items[i].submissionId)}" data-revision="${a.revision}">${field('comment',tr('comment'),{type:'textarea',attrs:'rows="2" maxlength="3000"'})}<div class="acc-actions"><button name="decision" value="accepted" class="acc-primary">${tr('accept')}</button><button name="decision" value="changes_requested" class="acc-secondary">${tr('requestChanges')}</button><button name="decision" value="rejected">${tr('reject')}</button></div></form></section>`;}).join(''):empty());
+ }
+ if(tab==='tasks'){
+  const list=await api('GET','/api/admin/tasks');
+  return adminShell(tab,`<a class="acc-secondary" href="#/admin/task/new">+ ${tr('newTask')}</a><ul class="acc-list">${list.items.map(t=>`<li><a href="#/admin/task/${esc(t.id)}"><strong>${authored(t.translations,'title')}</strong><small>${esc(tr('type_'+t.type))} · ${esc(tr(t.scope==='team'?'team':'personal'))} · ${t.xp} ${tr('xp')} · ${t.assigned} ${tr('assigned')}${t.waiting?` · ${t.waiting} ${tr('waiting')}`:''}</small></a>${statusChip(t.status)}</li>`).join('')}</ul>`);
+ }
+ if(tab==='task'){
+  const t=id==='new'?null:(await api('GET','/api/admin/tasks')).items.find(x=>x.id===id);
+  const tl=t?.translations||{};
+  const form=`<form data-form="task" data-id="${esc(t?.id||'')}" data-version="${t?.version||''}" class="acc-card">${select('type',tr('type'),['checklist','counter','text','link','attachment','attendance','team_result'].map(v=>[v,tr('type_'+v)]),t?.type||'text')}${select('scope',tr('scope'),[['personal',tr('personal')],['team',tr('team')]],t?.scope||'personal')}${field('xp',tr('points'),{type:'number',value:t?.xp??10,attrs:'min="0" max="1000"'})}${field('counterTarget',tr('target'),{type:'number',value:t?.counterTarget||1,attrs:'min="1" max="100"'})}${select('repeatRule',tr('repeat'),['once','weekly_reward','per_week'].map(v=>[v,tr('rep_'+v)]),t?.repeatRule||'once')}<label class="acc-check"><input type="checkbox" name="requiresReview" ${t?.requiresReview?'checked':''}> ${tr('requiresReview')}</label>${field('dueAt',tr('due'),{type:'datetime-local',value:t?.dueAt?new Date(t.dueAt).toISOString().slice(0,16):''})}
+  ${['en','hr','ru'].map(l=>`<fieldset class="acc-field"><legend>${l.toUpperCase()}</legend>${field('title_'+l,tr('title'),{value:tl[l]?.title,required:l==='en',attrs:'maxlength="160"'})}${field('goal_'+l,tr('goal'),{type:'textarea',value:tl[l]?.goal,attrs:'rows="2"'})}${field('instructions_'+l,tr('instructions'),{type:'textarea',value:tl[l]?.instructions,required:l==='en',attrs:'rows="4"'})}${field('criteria_'+l,tr('criteria'),{type:'textarea',value:tl[l]?.criteria,attrs:'rows="2"'})}</fieldset>`).join('')}
+  ${field('checklist',tr('checklistItems'),{type:'textarea',value:(t?.checklist||[]).map(c=>c.en).join('\n'),attrs:'rows="3"'})}<button class="acc-primary">${tr('save')}</button></form>`;
+  const status=t?`<section class="acc-card"><p>${statusChip(t.status)}</p><div class="acc-actions">${t.status==='draft'?`<button data-act="task-status" data-id="${esc(t.id)}" data-status="published" class="acc-primary">${tr('publish')}</button>`:''}${t.status==='published'?`<button data-act="task-status" data-id="${esc(t.id)}" data-status="closed">${tr('close')}</button><button data-act="task-preview" data-id="${esc(t.id)}" class="acc-secondary">${tr('assignPreview')}</button>`:''}${t.status==='closed'?`<button data-act="task-status" data-id="${esc(t.id)}" data-status="archived">${tr('archive').split(' ')[0]}</button>`:''}${t.status==='archived'?`<button data-act="task-status" data-id="${esc(t.id)}" data-status="draft">${tr('makeDraft')}</button>`:''}</div>${cache.preview?.id===t.id?`<p>${tr('total')}: ${cache.preview.total} · ${tr('newCount')}: ${cache.preview.new}</p><ul class="acc-list">${cache.preview.items.slice(0,30).map(x=>`<li><span>${esc(x.name)}</span>${x.alreadyAssigned?statusChip('accepted'):''}</li>`).join('')}</ul><button data-act="task-assign" data-id="${esc(t.id)}" data-key="${idem()}" class="acc-primary">${tr('assign')} (${cache.preview.new})</button>`:''}</section>`:'';
+  return adminShell('tasks',`<a class="acc-back" href="#/admin/tasks">← ${tr('tasks')}</a>${status}${form}`);
+ }
+ if(tab==='claims'){
+  const c=await api('GET','/api/admin/claims');
+  const people=(await api('GET','/api/people?limit=100')).items.filter(p=>p.kind==='participant');
+  return adminShell(tab,`${c.items.length?`<ul class="acc-list">${c.items.map(x=>`<li><div><strong>${esc(x.userName)}</strong> (${esc(x.login)}) → <strong>${esc(x.personName)}</strong><small>${esc(x.message)} · ${date(x.created,true)}</small></div><span class="acc-actions"><button data-act="claim" data-id="${esc(x.id)}" data-decision="approved" class="acc-secondary">${tr('approve')}</button><button data-act="claim" data-id="${esc(x.id)}" data-decision="rejected">${tr('reject')}</button></span></li>`).join('')}</ul>`:empty()}
+  <form data-form="person-invite" class="acc-card"><h2>${tr('personInvite')}</h2>${select('personId',tr('character'),people.map(p=>[p.id,p.displayName]),'')}<button class="acc-secondary">${tr('invite')}</button></form>${cache.newInvite?`<p class="acc-flash" role="status">${tr('inviteShow')}<br><code class="acc-code">${esc(cache.newInvite)}</code></p>`:''}`);
+ }
+ if(tab==='users'){
+  const u=await api('GET','/api/admin/users');const s=await api('GET','/api/admin/settings');const inv=cache.newInvite;cache.newInvite=null;
+  return adminShell(tab,`<div class="acc-table-wrap"><table class="acc-table"><thead><tr><th>${tr('displayName')}</th><th>${tr('status')}</th><th>${tr('points')}</th><th></th></tr></thead><tbody>${u.items.map(x=>`<tr><td><strong>${esc(x.displayName)}</strong><small>${esc(x.login)} · ${date(x.created)}</small></td><td>${esc(tr('urole_'+x.role))}<small>${x.status==='active'?'':tr('disable')}</small></td><td>${x.xp}</td><td>${me.role==='platform_owner'&&x.role!=='platform_owner'?`<select data-act="user-role" data-id="${esc(x.id)}" aria-label="${tr('roleChange')}">${['member','program_admin'].map(r=>`<option value="${r}" ${x.role===r?'selected':''}>${tr('urole_'+r)}</option>`).join('')}</select>`:''}${x.role!=='platform_owner'?`<button data-act="user-status" data-id="${esc(x.id)}" data-status="${x.status==='active'?'disabled':'active'}">${tr(x.status==='active'?'disable':'enable')}</button>`:''}</td></tr>`).join('')}</tbody></table></div>
+  ${me.role==='platform_owner'?`<section class="acc-card"><button data-act="admin-invite" class="acc-secondary">${tr('adminInvite')}</button>${inv?`<p class="acc-flash" role="status">${tr('inviteShow')}<br><code class="acc-code">${esc(inv)}</code></p>`:''}</section>`:''}
+  <section class="acc-card"><h2>${tr('limits')}</h2><p>PDF/PPTX ${s.limits.documentMB} MB · ${tr('upload')} ${s.limits.imageMB} MB · ${tr('project')} ${s.limits.projectMB} MB · ${tr('total')} ${s.limits.uploadsMB} MB</p><p>${tr('mail')}: ${s.mail==='disabled'?tr('mailOff'):esc(s.mail)}</p></section>`);
+ }
+ if(tab==='lectures'){
+  const l=await api('GET','/api/admin/lectures'),a=await api('GET','/api/admin/attendance');
+  return adminShell(tab,`<ul class="acc-list">${l.items.map(x=>`<li><span><strong>${esc(pick(x.title))}</strong> · ${date(x.date)}${x.speaker?' · '+esc(x.speaker):''}</span>${statusChip(x.status)}</li>`).join('')}</ul>
+  <form data-form="lecture" class="acc-card"><h2>${tr('addLecture')}</h2>${field('date',tr('lectureDate'),{type:'date',required:true})}${field('speaker',tr('speaker'),{attrs:'maxlength="120"'})}${['en','hr','ru'].map(x=>field('title_'+x,tr('title')+' '+x.toUpperCase(),{required:x==='en',attrs:'maxlength="200"'})).join('')}<button class="acc-secondary">${tr('save')}</button></form>
+  <h2>${tr('attendance')}</h2>${a.items.length?`<ul class="acc-list">${a.items.map(x=>`<li><div><strong>${esc(x.userName)}</strong><small>${esc(pick(l.items.find(y=>y.id===x.lectureId)?.title))} · ${tr(x.kind==='verified_by_admin'?'verified':'selfReported')}</small></div>${x.kind==='self_reported'?`<button data-act="verify" data-user="${esc(x.userId)}" data-lecture="${esc(x.lectureId)}" class="acc-secondary">${tr('verify')}</button>`:''}</li>`).join('')}</ul>`:empty()}`);
+ }
+ if(tab==='audit'){
+  const a=await api('GET','/api/admin/audit');
+  return adminShell(tab,`<ul class="acc-list acc-audit">${a.items.map(x=>`<li><code>${esc(x.action)}</code><span>${esc(x.actor)} · ${esc(x.targetType)}:${esc(x.targetId)}</span><small>${date(x.created,true)}</small></li>`).join('')}</ul>`);
+ }
+ return adminShell('overview',empty());
+}
+
+// Render and events ---------------------------------------------------------------------
+async function render(){
+ if(!root||!isRoute())return;
+ const token=++renderToken;const p=parts();
+ if(me===undefined)await loadMe();
+ let html;
+ try{
+  if(!me){html=cache.codes?codesView(cache.codes.codes,cache.codes.next):authView(['register','recover'].includes(p[1])?p[1]:'login');}
+  else if(cache.codes){html=codesView(cache.codes.codes,cache.codes.next);}
+  else if(p[0]==='admin'){html=isAdmin()?await adminView(p[1]||'overview',p[2]):shell('overview',`<p class="acc-flash is-error">${tr('e_FORBIDDEN')}</p>`);}
+  else if(!p[1])html=await overviewView();
+  else if(p[1]==='tasks')html=await tasksView();
+  else if(p[1]==='task')html=await taskView(p[2]);
+  else if(p[1]==='progress')html=await progressView();
+  else if(p[1]==='character')html=await characterView();
+  else if(p[1]==='settings')html=await settingsView();
+  else if(p[1]==='new-project')html=shell('overview',`<a class="acc-back" href="#/account">← ${tr('myProjects')}</a><h2>${tr('newProject')}</h2>${projectForm(null)}`);
+  else if(p[1]==='project')html=await projectView(p[2],p[3]||'edit');
+  else if(['register','recover'].includes(p[1]))html=await overviewView();
+  else html=await overviewView();
+ }catch(e){html=me?shell('overview',`<p class="acc-flash is-error" role="alert">${errText(e)}</p>`):authView('login');}
+ if(token!==renderToken||!root)return;
+ root.innerHTML=html;updateNav();
+ const status=root.querySelector('.acc-flash');if(status)status.focus?.();
+}
+function setFlash(html,error=false){flash={html,error};}
+async function run(fn){try{await fn();}catch(e){if(e.code==='CONFLICT'&&e.detail?.yours){cache.conflict={id:parts()[2],yours:e.detail.yours};render();return;}setFlash(errText(e),true);render();}}
+
+async function onSubmit(e){
+ const form=e.target.closest('form[data-form]');if(!form||!root.contains(form))return;
+ e.preventDefault();const f=new FormData(form),kind=form.dataset.form,btn=e.submitter;
+ if(form.dataset.busy)return;form.dataset.busy='1';[...form.querySelectorAll('button')].forEach(b=>b.disabled=true);
+ await run(async()=>{
+  if(kind==='login'){await api('POST','/api/auth/login',{login:f.get('login'),password:f.get('password')});await loadMe();go('#/account');return;}
+  if(kind==='register'){const r=await api('POST','/api/auth/register',{login:f.get('login'),password:f.get('password'),displayName:f.get('displayName'),email:f.get('email'),language:lang});me=r.user;if(f.get('invite')){try{await api('POST','/api/invites/accept',{code:f.get('invite')});await loadMe();}catch(err){setFlash(errText(err),true);}}cache.codes={codes:r.recoveryCodes,next:'#/account'};render();return;}
+  if(kind==='recover'){await api('POST','/api/auth/recover',{login:f.get('login'),code:f.get('code'),newPassword:f.get('newPassword')});await loadMe();setFlash(tr('saved'));go('#/account/settings');return;}
+  if(kind==='invite'){const r=await api('POST','/api/invites/accept',{code:f.get('code')});await loadMe();setFlash(tr('saved'));go(r.projectId?'#/account/project/'+r.projectId:'#/account');return;}
+  if(kind==='claim'){await api('POST','/api/people/claims',{personId:f.get('personId'),message:f.get('message')});setFlash(tr('st_pending'));render();return;}
+  if(kind==='project'){const content=readProjectForm(form);
+   if(!form.dataset.id){const r=await api('POST','/api/projects',content,{key:form.dataset.key||(form.dataset.key=idem())});go('#/account/project/'+r.project.id);return;}
+   try{sessionStorage.setItem(DRAFT_KEY(form.dataset.id),JSON.stringify({version:Number(form.dataset.version),content}));}catch{}
+   await api('PUT',`/api/projects/${encodeURIComponent(form.dataset.id)}/draft`,{content},{headers:{'If-Match':`"${form.dataset.version}"`}});
+   try{sessionStorage.removeItem(DRAFT_KEY(form.dataset.id));}catch{}
+   setFlash(tr('saved'));render();return;}
+  if(kind==='upload'||kind==='reference'){const file=f.get('file');if(!file?.size)return;
+   const purpose=kind==='reference'?'reference':file.type.startsWith('image/')?'image':'document';
+   const url=`/api/files?purpose=${purpose}${kind==='upload'?'&projectId='+encodeURIComponent(form.dataset.id):''}`;
+   await api('POST',url,undefined,{raw:file,key:idem(),headers:{'X-Filename':encodeURIComponent(file.name),'Content-Type':file.type||'application/octet-stream'}});setFlash(tr('saved'));render();return;}
+  if(kind==='project-invite'){const r=await api('POST','/api/invites',{kind:'project',projectId:form.dataset.id,role:f.get('role')});cache.newInvite=r.code;render();return;}
+  if(kind==='person-invite'){const r=await api('POST','/api/invites',{kind:'person',personId:f.get('personId')});cache.newInvite=r.code;render();return;}
+  if(kind==='update'){await api('POST',`/api/projects/${encodeURIComponent(form.dataset.id)}/updates`,{body:f.get('body'),visibility:f.get('visibility')},{key:btn?.dataset.key});setFlash(tr('saved'));render();return;}
+  if(kind==='help'){await api('POST',`/api/projects/${encodeURIComponent(form.dataset.id)}/help`,{kind:f.get('kind'),body:f.get('body')});render();return;}
+  if(kind==='milestone'){await api('POST',`/api/projects/${encodeURIComponent(form.dataset.id)}/milestones`,{title:f.get('title'),due:f.get('due')||null});render();return;}
+  if(kind==='metric'){await api('POST',`/api/projects/${encodeURIComponent(form.dataset.id)}/metrics`,{name:f.get('name'),value:f.get('value'),measuredOn:f.get('measuredOn'),visibility:f.get('visibility')});render();return;}
+  if(kind==='answer'){await api('POST',`/api/tasks/${encodeURIComponent(form.dataset.id)}/submit`,{content:answerContent(form,form.dataset.type)},{key:btn?.dataset.key});setFlash(tr('saved'));render();return;}
+  if(kind==='character'){const body=Object.fromEntries([...f.entries()]);await api('PUT','/api/me/character',body);setFlash(tr('saved'));render();return;}
+  if(kind==='profile'){const r=await api('PUT','/api/me/profile',{displayName:f.get('displayName'),email:f.get('email'),language:f.get('language'),leaderboardOptIn:f.get('leaderboardOptIn')==='on'});me=r.user;setFlash(tr('saved'));render();return;}
+  if(kind==='password'){await api('POST','/api/auth/password',{currentPassword:f.get('currentPassword'),newPassword:f.get('newPassword')});setFlash(tr('saved'));render();return;}
+  if(kind==='codes'){const r=await api('POST','/api/auth/recovery-codes',{currentPassword:f.get('currentPassword')});cache.codes={codes:r.recoveryCodes,next:'#/account/settings'};render();return;}
+  if(kind==='review'){await api('POST','/api/reviews/'+encodeURIComponent(form.dataset.id),{decision:btn?.value,comment:f.get('comment'),revision:Number(form.dataset.revision)});setFlash(tr('saved'));render();return;}
+  if(kind==='task'){
+   const body={type:f.get('type'),scope:f.get('scope'),xp:Number(f.get('xp')),counterTarget:Number(f.get('counterTarget')),repeatRule:f.get('repeatRule'),requiresReview:f.get('requiresReview')==='on',dueAt:f.get('dueAt')?new Date(f.get('dueAt')).toISOString():null,translations:Object.fromEntries(['en','hr','ru'].map(l=>[l,{title:f.get('title_'+l),goal:f.get('goal_'+l),instructions:f.get('instructions_'+l),criteria:f.get('criteria_'+l)}])),checklist:String(f.get('checklist')||'').split('\n').map(s=>s.trim()).filter(Boolean).map(en=>({en,hr:'',ru:''})),version:Number(form.dataset.version)};
+   const r=form.dataset.id?await api('PUT','/api/admin/tasks/'+encodeURIComponent(form.dataset.id),body):await api('POST','/api/admin/tasks',body);
+   setFlash(tr('saved'));go('#/admin/task/'+r.task.id);return;}
+  if(kind==='lecture'){await api('POST','/api/admin/lectures',{date:f.get('date'),speaker:f.get('speaker'),title:{en:f.get('title_en'),hr:f.get('title_hr'),ru:f.get('title_ru')}});render();return;}
+ });
+ delete form.dataset.busy;[...form.querySelectorAll('button')].forEach(b=>b.disabled=false);
+}
+
+async function onClick(e){
+ const el=e.target.closest('[data-act]');if(!el||!root.contains(el)||el.tagName==='SELECT')return;
+ const d=el.dataset,act=d.act;
+ if(act==='count'){const form=el.closest('form'),input=form.elements.count,max=Number(form.closest('.acc-task')?.querySelector('.acc-counter')?.textContent.match(/\/\s*(\d+)/)?.[1]||100);input.value=Math.max(0,Math.min(max,Number(input.value)+Number(d.d)));form.elements.countOut.value=input.value;return;}
+ if(act==='office-me')return;
+ if(act==='codes-done'){cache.codes=null;go(d.next||'#/account');return;}
+ e.preventDefault();
+ if(el.dataset.busy)return;el.dataset.busy='1';el.disabled=true;
+ await run(async()=>{
+  if(act==='answer-draft'){const form=el.closest('form');await api('PUT',`/api/tasks/${encodeURIComponent(form.dataset.id)}/draft`,{content:answerContent(form,form.dataset.type)});setFlash(tr('saved'));render();}
+  else if(act==='preview'){const form=el.closest('form');const c=readProjectForm(form);let box=root.querySelector('.acc-preview-box');if(!box){box=document.createElement('div');box.className='acc-preview-box acc-card';form.after(box);}box.innerHTML=previewHtml(c);box.scrollIntoView({block:'nearest'});}
+  else if(act==='publish'){await api('POST',`/api/projects/${encodeURIComponent(d.id)}/publish`,{version:Number(d.version)});setFlash(tr('st_published'));render();}
+  else if(act==='archive'||act==='unarchive'){await api('POST',`/api/projects/${encodeURIComponent(d.id)}/${act}`,{});render();}
+  else if(act==='restore'){await api('POST',`/api/projects/${encodeURIComponent(d.project)}/revisions/${d.id}/restore`,{});go(`#/account/project/${d.project}/edit`);}
+  else if(act==='file-delete'){await api('DELETE','/api/files/'+encodeURIComponent(d.id));render();}
+  else if(act==='member-remove'){await api('PUT',`/api/projects/${encodeURIComponent(d.project)}/members/${encodeURIComponent(d.user)}`,{remove:true});render();}
+  else if(act==='invite-revoke'){await api('DELETE','/api/invites/'+encodeURIComponent(d.id));render();}
+  else if(act==='help'){await api('POST','/api/help/confirmations/'+encodeURIComponent(d.id),{decision:d.decision});render();}
+  else if(act==='help-close'){await api('DELETE','/api/help/'+encodeURIComponent(d.id));render();}
+  else if(act==='milestone-done'){await api('POST',`/api/projects/${encodeURIComponent(d.project)}/milestones/${encodeURIComponent(d.id)}/done`,{});render();}
+  else if(act==='read'){await api('POST','/api/notifications/read',{});cache.unread=0;render();}
+  else if(act==='session'){await api('DELETE','/api/auth/sessions/'+encodeURIComponent(d.id));await loadMe();render();}
+  else if(act==='logout'||act==='logout-all'){await api('POST','/api/auth/'+act,{});me=null;csrf='';go('#/account');}
+  else if(act==='claim'){await api('POST','/api/admin/claims/'+encodeURIComponent(d.id),{decision:d.decision});render();}
+  else if(act==='task-status'){await api('POST',`/api/admin/tasks/${encodeURIComponent(d.id)}/status`,{status:d.status});render();}
+  else if(act==='task-preview'){cache.preview={id:d.id,...await api('GET',`/api/admin/tasks/${encodeURIComponent(d.id)}/preview`)};render();}
+  else if(act==='task-assign'){const r=await api('POST',`/api/admin/tasks/${encodeURIComponent(d.id)}/assign`,{period:cache.preview?.period},{key:d.key});cache.preview=null;setFlash(`${tr('assign')}: ${r.created}`);render();}
+  else if(act==='verify'){await api('POST','/api/admin/attendance',{userId:d.user,lectureId:d.lecture});render();}
+  else if(act==='user-status'){await api('PUT',`/api/admin/users/${encodeURIComponent(d.id)}/status`,{status:d.status});render();}
+  else if(act==='admin-invite'){const r=await api('POST','/api/invites',{kind:'program_admin'});cache.newInvite=r.code;render();}
+ });
+ delete el.dataset.busy;el.disabled=false;
+}
+async function onChange(e){
+ const el=e.target.closest('select[data-act]');if(!el||!root.contains(el))return;
+ await run(async()=>{
+  if(el.dataset.act==='visibility')await api('PATCH','/api/files/'+encodeURIComponent(el.dataset.id),{visibility:el.value});
+  if(el.dataset.act==='member-role')await api('PUT',`/api/projects/${encodeURIComponent(el.dataset.project)}/members/${encodeURIComponent(el.dataset.user)}`,{role:el.value});
+  if(el.dataset.act==='user-role')await api('PUT',`/api/admin/users/${encodeURIComponent(el.dataset.id)}/role`,{role:el.value});
+  setFlash(tr('saved'));render();
+ });
+}
+
+window.BirdAccount={
+ isRoute,
+ title:()=>tr(parts()[0]==='admin'?'admin':'nav'),
+ navLabel:()=>me?tr('nav'):tr('signIn'),
+ isSignedIn:()=>!!me,
+ mount(el,language){
+  root?.removeEventListener('submit',onSubmit);root?.removeEventListener('click',onClick);root?.removeEventListener('change',onChange);
+  root=el;lang=language;if(cache.codes&&!location.hash.startsWith('#/account'))cache.codes=null;
+  root.addEventListener('submit',onSubmit);root.addEventListener('click',onClick);root.addEventListener('change',onChange);
+  root.innerHTML=`<p class="acc-muted">${tr('loading')}</p>`;render();
+ },
+ async refresh(){await loadMe();},
+ codesShown(){cache.codes=null;},
+};
+loadMe();
+})();

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>City visit harness · BIRD</title>
+<style>
+:root{--paper:#f7f5f0;--ink:#242a26;--line:#dcded4;--ok:#24502c;--bad:#7d2a12}
+body{margin:0;font:15px/1.5 Inter,-apple-system,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink)}
+header{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+header h1{font-size:17px;margin:0 12px 0 0}
+button{font:inherit;min-height:40px;padding:6px 12px;border:1px solid var(--ink);background:#fff;border-radius:6px;cursor:pointer}
+main{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:12px;padding:12px 16px}
+iframe{width:100%;height:70vh;border:1px solid var(--line);border-radius:8px;background:#fff}
+ol{margin:0;padding-left:20px;font-size:13px;max-height:70vh;overflow:auto}
+.pass{color:var(--ok)}.fail{color:var(--bad);font-weight:600}
+@media(max-width:800px){main{grid-template-columns:1fr}iframe{height:60vh}}
+</style></head>
+<body>
+<header><h1>City visit harness</h1><button id="run">Run all checks</button><button id="enter">Enter (valid)</button><button id="exit">Accept exit</button><span id="summary"></span></header>
+<main><iframe id="office" title="BIRD office visit"></iframe><section><h2>Messages and checks</h2><ol id="log"></ol></section></main>
+<script>
+'use strict';
+// Parent stand-in for Zagreb. It talks only to its own BIRD origin; nothing leaves this page.
+const frame=document.getElementById('office'),log=document.getElementById('log');
+const BIRD=location.origin;let nonce='',visitId='',inbox=[],results=[];
+const rnd=()=>crypto.randomUUID().replace(/-/g,'');
+function line(text,cls=''){const li=document.createElement('li');li.textContent=text;if(cls)li.className=cls;log.append(li);li.scrollIntoView({block:'nearest'});}
+window.addEventListener('message',e=>{
+ if(e.source!==frame.contentWindow||e.origin!==BIRD){line('ignored message from '+e.origin);return;}
+ inbox.push(e.data);line('← '+JSON.stringify(e.data));
+});
+const post=m=>{line('→ '+JSON.stringify(m));frame.contentWindow.postMessage(m,BIRD);};
+const wait=(pred,ms=6000)=>new Promise(res=>{const t0=Date.now();(function poll(){const hit=inbox.find(pred);if(hit)return res(hit);if(Date.now()-t0>ms)return res(null);setTimeout(poll,50);})();});
+function load(withNonce=true){inbox=[];nonce=withNonce?rnd():'';visitId='visit-'+rnd().slice(0,12);frame.src=BIRD+'/?frame='+rnd().slice(0,8)+'#/office/city'+(nonce?'/'+nonce:'');return new Promise(r=>frame.onload=()=>r());}
+const enterMsg=(o={})=>({type:'city.office.enter',version:1,visitId,nonce,language:'hr',visitor:{displayName:'Guest',appearance:'woman'},...o});
+function check(name,ok,extra=''){results.push(ok);line((ok?'PASS ':'FAIL ')+name+(extra?' · '+extra:''),ok?'pass':'fail');}
+async function runAll(){
+ results=[];log.textContent='';
+ await load(false);
+ check('no ready without a visit nonce',!(await wait(m=>m.type==='bird.office.ready',2500)));
+ await load(true);
+ const ready=await wait(m=>m.type==='bird.office.ready');check('ready after load',!!ready&&ready.nonce===nonce&&ready.version===1);
+ inbox=[];post({...enterMsg(),language:'xx',extra:'<script>'});check('malformed payload rejected',(await wait(m=>m.type==='office.error'))?.code==='MALFORMED');
+ inbox=[];post(enterMsg({version:9}));check('other version rejected',(await wait(m=>m.type==='office.error'))?.code==='VERSION_MISMATCH');
+ inbox=[];post(enterMsg({nonce:'wrong-nonce-0000000000'}));check('wrong nonce rejected',(await wait(m=>m.type==='office.error'))?.code==='BAD_NONCE');
+ inbox=[];post(enterMsg());const entered=await wait(m=>m.type==='bird.office.entered');check('enter accepted',!!entered&&entered.visitId===visitId);
+ check('language applied',frame.contentDocument.documentElement.lang==='hr');
+ inbox=[];post(enterMsg());check('duplicate enter is idempotent',!!(await wait(m=>m.type==='bird.office.entered')));
+ inbox=[];post({type:'city.office.unknown',version:1,visitId,nonce});check('unknown type answered with error',(await wait(m=>m.type==='office.error'))?.code==='UNKNOWN_TYPE');
+ inbox=[];frame.contentWindow.BirdCity.openProject('project-unmi');const open=await wait(m=>m.type==='bird.office.project.open');check('project.open carries only a known id',open?.projectId==='project-unmi'&&!('url' in open));
+ inbox=[];frame.contentDocument.querySelector('[data-city-exit]').click();check('exit request sent',!!(await wait(m=>m.type==='bird.office.exit.request')));
+ post({type:'city.office.exit.accepted',version:1,visitId,nonce});await new Promise(r=>setTimeout(r,400));
+ check('office stopped after exit',!!frame.contentDocument.querySelector('.city-left')&&!frame.contentDocument.querySelector('.office-scene'));
+ document.getElementById('summary').textContent=`${results.filter(Boolean).length}/${results.length} passed`;
+ document.body.dataset.result=results.every(Boolean)?'pass':'fail';
+}
+document.getElementById('run').onclick=runAll;
+document.getElementById('enter').onclick=async()=>{if(!nonce)await load(true);await wait(m=>m.type==='bird.office.ready');post(enterMsg());};
+document.getElementById('exit').onclick=()=>post({type:'city.office.exit.accepted',version:1,visitId,nonce});
+load(true);
+</script>
+</body></html>

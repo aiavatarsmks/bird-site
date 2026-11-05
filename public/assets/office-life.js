@@ -1,7 +1,7 @@
 /* Ambient office routines. Local visual simulation, never attendance tracking. */
 (()=>{'use strict';
 const STEP=20,dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
-const DENSITY_RADIUS=175,AREA_LIMIT=3,MAX_WALKERS=5;
+const DENSITY_RADIUS=175,AREA_LIMIT=3,MAX_WALKERS=5,PRESENT_TARGET=13,MAX_TEAM_ABSENCE=120;
 function fitsArea(point,others){if(others.filter(p=>dist(p,point)<DENSITY_RADIUS).length>=AREA_LIMIT)return false;return !others.some(center=>dist(point,center)<DENSITY_RADIUS&&others.filter(p=>dist(p,center)<DENSITY_RADIUS).length>=AREA_LIMIT);}
 const activities=['work','walk','chat','coffee','water','food','away','lecture','exercise'];
 const phrases={
@@ -44,7 +44,7 @@ function navigation(scene){
  }
  return{route,free,cells,canStep};
 }
-function create(scene,roster){
+function create(scene,roster,options={}){
  const smokers=new Set(['person-pavel-isaykov','person-javier-garcia-zaballos']);
  const nav=navigation(scene),actors=new Map(),seats=[[225,263],[375,263],[225,500],[375,500],[997,943],[1143,943],[997,1135],[1143,1135],[998,1488],[1142,1488],[998,1670],[1142,1670],[1010,2050],[1170,2050],[1010,2320],[1170,2320]],windowSeats=[[225,1155],[225,1330]];
  const lectureIds=['person-karlo-ciciliani','person-antonio-kocijan','person-marko-milardic','person-nada','person-christopher-sawyer-bateman','person-kristina-kratofil','person-quynh-tran','person-lotus-kattini'];
@@ -56,7 +56,14 @@ function create(scene,roster){
   allocated.push(home);
   actors.set(row.id,{...row,index:i,home:[...home],pos:[...home],mode:'idle',activity:'work',until:2+(i*7)%17,path:[],round:0,variant:[...row.id].reduce((n,c)=>n+c.charCodeAt(0),0)%7,visited:new Set(),seated:true,hidden:false,carry:null});}
  const groups=new Map();for(const a of actors.values())if(a.projectId){if(!groups.has(a.projectId))groups.set(a.projectId,[]);groups.get(a.projectId).push(a.id);}
- const rotations=[...groups.values()].filter(ids=>ids.length>2).map(ids=>{const absent=ids[ids.length-1],a=actors.get(absent);a.mode='offsite';a.hidden=true;return{ids,absent,nextAt:100,turn:0,departing:null,retryAt:0};});
+ // Participant presence: a fixed number are in the office, the rest are
+ // outside. People swap through the lift; no team stays empty for long.
+ const LIFT=[1220,500],participants=[...actors.values()].filter(a=>!a.id.startsWith('staff-'));
+ const presence={target:Math.min(options.present??PRESENT_TARGET,participants.length),maxTeamAbsence:options.maxTeamAbsence??MAX_TEAM_ABSENCE,nextAt:20,swaps:[],absentSince:new Map(),turn:0};
+ {const inside=new Set(['person-maxim-ilin','person-pavel-isaykov','person-antun-matijasec','person-javier-garcia-zaballos'].filter(id=>actors.has(id)));
+  for(const ids of groups.values())if(!ids.some(id=>inside.has(id)))inside.add(ids[0]);
+  for(const a of participants)if(inside.size<presence.target)inside.add(a.id);
+  for(const a of participants){a.enteredAt=0;a.offSince=-Infinity;if(!inside.has(a.id)){a.mode='offsite';a.hidden=true;}}}
  // Start with varied, useful occupations already spread across the floor.
  const gymActor=actors.get('person-antun-matijasec');if(gymActor){gymActor.pos=[260,2240];gymActor.activity='exercise';gymActor.seated=false;gymActor.arrived=0;gymActor.until=22;gymActor.visited.add('exercise');}
  const outsideActor=actors.get('person-javier-garcia-zaballos');if(outsideActor){outsideActor.pos=[840,2520];outsideActor.activity='smoke';outsideActor.seated=false;outsideActor.arrived=0;outsideActor.until=24;outsideActor.visited.add('smoke');outsideActor.visited.add('away');}
@@ -65,7 +72,7 @@ function create(scene,roster){
  for(const id of staffIds.slice(1)){actors.get(id).hidden=true;actors.get(id).mode='offsite';}
  const visible=except=>[...actors.values()].filter(b=>b!==except&&!b.hidden);
  const walkers=()=>[...actors.values()].filter(b=>b.mode==='walking').length;
- const choices={walk:[[620,920],[470,1190],[650,680],[700,340],[650,2140],[730,2320],[1080,2120]],coffee:[[780,740]],water:[[790,850]],food:[[1020,58]],away:[[1220,500]]};
+ const choices={walk:[[620,920],[470,1190],[650,680],[700,340],[650,2140],[730,2320],[1080,2120]],coffee:[[780,740]],water:[[790,850]],food:[[1020,58]]};
  const atStation=(kind,except)=>visible(except).some(b=>b.activity===kind&&['walking','idle','departing'].includes(b.mode));
  function go(a,type,target){
   if(a.mode!=='walking'&&walkers()>=MAX_WALKERS)return false;
@@ -94,11 +101,46 @@ function create(scene,roster){
    const preferred=a.home;
    a.targetSeat=preferred||a.home;if(dist(a.pos,a.targetSeat)<10){a.seated=scene.staticLayers.some(c=>['chair','lecture'].includes(c.kind)&&c.anchor&&dist(a.pos,c.anchor)<12);a.until=clock+22+a.index%15;return;}if(go(a,'work',a.targetSeat))return;
   }else if(kind==='away'&&smokers.has(a.id)){const spot=a.id==='person-pavel-isaykov'?[440,2520]:[840,2520];if(go(a,'smoke',spot))return;
+  }else if(kind==='away'){a.wantsOut=true;
   }else if(choices[kind]&&!atStation(kind,a)){
    const targets=[...choices[kind]].sort((b,c)=>dist(a.home,b)-dist(a.home,c));for(const target of targets)if(go(a,kind,target))return;
   }
   // Busy destinations do not create queues: wait at the current work place.
   a.until=clock+12+a.index%7;
+ }
+
+ const inOffice=a=>a.mode!=='offsite';
+ const team=a=>groups.get(a.projectId)||[a.id];
+ const teamPresent=a=>team(a).filter(id=>inOffice(actors.get(id))).length;
+ function arrive(a){a.pos=[...LIFT];a.hidden=false;a.enteredAt=clock;a.wantsOut=false;if(!go(a,'return',a.home)){a.mode='idle';a.activity='return';a.seated=false;a.until=clock+2;}}
+ function startSwap(){
+  const absent=[...presence.absentSince.entries()].sort((x,y)=>x[1]-y[1]).map(([id])=>id),reserved=new Set(presence.swaps.map(w=>w.in));
+  const count=participants.filter(inOffice).length+presence.swaps.filter(w=>w.in&&!w.out).length;
+  const pool=participants.filter(a=>a.mode==='offsite'&&!reserved.has(a.id)&&(clock-a.offSince>=30||absent.includes(a.projectId)));
+  pool.sort((x,y)=>(absent.includes(x.projectId)?absent.indexOf(x.projectId):99)-(absent.includes(y.projectId)?absent.indexOf(y.projectId):99)||teamPresent(x)-teamPresent(y)||x.offSince-y.offSince||(x.index+presence.turn)%7-(y.index+presence.turn)%7);
+  const incoming=pool[0];
+  const leaving=participants.filter(a=>inOffice(a)&&!a.hidden&&!a.pinned&&a.mode==='idle'&&!a.partner&&clock-a.enteredAt>40&&!presence.swaps.some(w=>w.out===a.id)&&(incoming&&a.projectId===incoming.projectId?true:teamPresent(a)>1||!presence.absentSince.size));
+  leaving.sort((x,y)=>Number(!!y.wantsOut)-Number(!!x.wantsOut)||teamPresent(y)-teamPresent(x)||x.enteredAt-y.enteredAt||(x.index+presence.turn)%5-(y.index+presence.turn)%5);
+  presence.turn++;
+  if(count<presence.target&&incoming){arrive(incoming);return true;}
+  if(count>presence.target){for(const a of leaving)if(go(a,'away',LIFT)){a.rotationOut=true;presence.swaps.push({out:a.id,in:null,at:clock});return true;}return false;}
+  if(!incoming)return false;
+  for(const a of leaving)if(go(a,'away',LIFT)){a.rotationOut=true;presence.swaps.push({out:a.id,in:incoming.id,at:clock});return true;}
+  return false;
+ }
+ function updatePresence(){
+  for(const ids of groups.values()){const pid=actors.get(ids[0]).projectId,here=ids.some(id=>inOffice(actors.get(id)));if(here)presence.absentSince.delete(pid);else if(!presence.absentSince.has(pid))presence.absentSince.set(pid,clock);}
+  for(const swap of [...presence.swaps]){const out=actors.get(swap.out);
+   if(out.mode==='offsite'){out.offSince=clock;out.wantsOut=false;presence.swaps.splice(presence.swaps.indexOf(swap),1);if(swap.in)arrive(actors.get(swap.in));}
+   else if(out.activity!=='away'||clock-swap.at>90){out.rotationOut=false;presence.swaps.splice(presence.swaps.indexOf(swap),1);if(out.activity==='away'&&!go(out,'return',out.home)){out.mode='idle';out.until=clock+3;}}
+  }
+  const waiting=[...presence.absentSince.entries()].filter(([pid,since])=>!presence.swaps.some(w=>w.in&&actors.get(w.in).projectId===pid));
+  const overdue=waiting.find(([,since])=>clock-since>presence.maxTeamAbsence-25);
+  if(overdue){const a=participants.find(b=>b.projectId===overdue[0]&&b.mode==='offsite');if(a){arrive(a);presence.nextAt=Math.min(presence.nextAt,clock+4);}}
+  const urgent=waiting.some(([,since])=>clock-since>35);
+  if(presence.swaps.length<2&&(clock>=presence.nextAt||urgent&&presence.swaps.length<1||participants.filter(inOffice).length>presence.target&&!presence.swaps.length)){
+   if(startSwap())presence.nextAt=clock+16+(presence.turn*7)%14;else presence.nextAt=clock+4;
+  }
  }
  function step(dt){clock+=dt;
   const staff=actors.get(staffShift.active);
@@ -107,14 +149,9 @@ function create(scene,roster){
    if(fitsArea([1220,500],visible(next).map(b=>b.pos))&&!visible(next).some(b=>dist(b.pos,[1220,500])<60)){
     next.pos=[1220,500];if(go(next,'staff-in',next.home)){staffShift.index=(staffShift.index+1)%staffIds.length;staffShift.active=next.id;staffShift.departing=false;staffShift.nextAt=Infinity;}
    }
+  }else if(staff&&staffShift.departing&&staff.mode!=='departing'&&staff.activity!=='staff-out'){staffShift.departing=false;staffShift.nextAt=clock+10;
   }else if(staff&&!staffShift.departing&&clock>=staffShift.nextAt&&!staff.pinned&&go(staff,'staff-out',[1220,500])){staff.rotationOut=true;staffShift.departing=true;}
 
-  for(const group of rotations){
-   if(clock<group.retryAt)continue;
-   if(group.departing){const out=actors.get(group.departing),incoming=actors.get(group.absent);
-    if(out.mode==='offsite'&&!visible(incoming).some(b=>dist(b.pos,[1220,500])<60)&&fitsArea([1220,500],visible(incoming).map(b=>b.pos))){incoming.pos=[1220,500];if(go(incoming,'return',incoming.home)){group.absent=out.id;group.departing=null;group.nextAt=clock+100;}else{incoming.hidden=true;group.retryAt=clock+3;}}
-   }else if(clock>=group.nextAt){const id=group.ids[group.turn++%group.ids.length],a=actors.get(id);if(id!==group.absent&&!a.hidden&&!a.pinned&&go(a,'rotate-out',[1220,500])){a.rotationOut=true;group.departing=id;}else group.retryAt=clock+5;}
-  }
   for(const a of actors.values()){
    if(a.carryUntil&&clock>a.carryUntil)a.carry=null;if(a.pinned||a.mode==='offsite')continue;
    if(a.mode==='departing'){if(clock>a.until){a.mode=a.rotationOut?'offsite':'away';a.hidden=true;a.until=clock+15+a.index%10;}continue;}
@@ -123,7 +160,7 @@ function create(scene,roster){
     a.moving=false;let left=dt*(54+(a.index%4)*3);
     while(left>0&&a.path.length){const target=a.path[0],distance=dist(a.pos,target);if(distance<.1){a.path.shift();continue;}const travel=Math.min(left,distance),next=[a.pos[0]+(target[0]-a.pos[0])*travel/distance,a.pos[1]+(target[1]-a.pos[1])*travel/distance],others=visible(a);
      const blocked=!nav.canStep(a.pos,next,(['work','food','return','lecture','exercise','staff-in'].includes(a.activity))&&a.path.length===1)||!fitsArea(next,others.map(b=>b.pos))||others.some(b=>dist(next,b.pos)<45&&dist(next,b.pos)<dist(a.pos,b.pos));
-     if(blocked){a.blocked=(a.blocked||0)+dt;if(a.blocked>2&&clock>(a.replanAt||0)){a.replanAt=clock+4;const detour=nav.route(a.pos,a.goal,['work','food','return','lecture','exercise','staff-in'].includes(a.activity),others.map(b=>b.pos));if(detour.length>1){a.path=detour.slice(1);a.blocked=0;}else if(a.blocked>12&&!['away','return','rotate-out'].includes(a.activity)){if(!go(a,'return',a.home)){a.mode='idle';a.activity='walk';a.until=clock+5;} }}break;}
+     if(blocked){a.blocked=(a.blocked||0)+dt;if(a.blocked>2&&clock>(a.replanAt||0)){a.replanAt=clock+4;const detour=nav.route(a.pos,a.goal,['work','food','return','lecture','exercise','staff-in'].includes(a.activity),others.map(b=>b.pos));if(detour.length>1){a.path=detour.slice(1);a.blocked=0;}else if(a.blocked>12&&!['away','return','rotate-out','staff-out'].includes(a.activity)){if(!go(a,'return',a.home)){a.mode='idle';a.activity='walk';a.until=clock+5;} }}break;}
      a.blocked=0;a.moving=true;a.walkDistance=(a.walkDistance||0)+travel;a.walkBack=(next[0]+next[1])<(a.pos[0]+a.pos[1]);a.facingLeft=(next[0]-a.pos[0])-(next[1]-a.pos[1])<0;a.pos=next;left-=travel;if(travel===distance)a.path.shift();
     }
     if(!a.path.length){const returning=a.activity==='return'||a.activity==='staff-in';if(a.activity==='staff-in')staffShift.nextAt=clock+60;if(returning)a.activity='work';a.mode='idle';a.arrived=clock;a.until=clock+(a.activity==='work'?26:a.activity==='lecture'?30:a.activity==='exercise'?18:a.activity==='chat'?16:a.activity==='smoke'?20:6)+(a.index%15);a.seated=['food','work','lecture'].includes(a.activity)&&scene.staticLayers.some(chair=>['chair','lecture'].includes(chair.kind)&&chair.anchor&&dist(a.pos,chair.anchor)<12);
@@ -134,9 +171,10 @@ function create(scene,roster){
    }else if(a.activity==='chat'&&a.partner&&actors.get(a.partner)?.mode==='walking'&&clock<a.started+70){a.until=clock+12;}
    else if(clock>a.until){a.partner=null;a.targetSeat=null;if(a.activity!=='work'){if(!go(a,'return',a.home))a.until=clock+5;}else plan(a);}
   }
+  updatePresence();
  }
  function words(a,lang){if(a.hidden)return '';const partner=actors.get(a.partner);if(a.activity==='chat'&&a.mode==='idle'&&partner?.mode==='idle'&&partner.activity==='chat'&&dist(a.pos,partner.pos)<100)return Math.floor(clock/2+(a.id<a.partner?0:1))%2?'…':'';const list=phrases[a.activity==='rotate-out'?'away':a.activity]?.[lang]||phrases[a.activity]?.en;return list&&clock-(a.mode==='walking'?a.started:a.arrived)<3.8?list[a.variant]:'';}
- return{actors,nav,step,words,get time(){return clock},activities,plan,rotations,staffShift,limits:{radius:DENSITY_RADIUS,area:AREA_LIMIT,walkers:MAX_WALKERS},fitsArea};
+ return{actors,nav,step,words,get time(){return clock},activities,plan,presence,staffShift,limits:{radius:DENSITY_RADIUS,area:AREA_LIMIT,walkers:MAX_WALKERS},fitsArea};
 }
 window.BirdOfficeLife={create,navigation,activities};
 })();

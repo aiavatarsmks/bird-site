@@ -110,3 +110,4 @@ body.office-page{height:100dvh;overflow:hidden}
 /* Veo frames supply the full gait; never add a second procedural bounce. */
 .office-scene .has-walk-cycle .pixel-body{animation:none!important}
 .life-carry{pointer-events:none}
+.office-team-label[data-anchor-person]{pointer-events:none}
