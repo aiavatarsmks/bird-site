@@ -162,4 +162,9 @@ CREATE TABLE IF NOT EXISTS office_hour_bookings(slot_id TEXT PRIMARY KEY REFEREN
 UPDATE sessions SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE revoked_at IS NULL AND user_id IN (SELECT id FROM users WHERE login='bird-deploy-check' AND role='member');
 UPDATE users SET status='disabled',updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE login='bird-deploy-check' AND role='member';
 `},
+ // Owner chosen by the site owner on 5 Nov; only an account that existed before this release, only while there is no owner.
+ {id:9,name:'owner-maksid',sql:`
+UPDATE users SET role='platform_owner',updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE login='maksid' AND status='active' AND created<'2026-11-05T09:12:00.000Z' AND NOT EXISTS(SELECT 1 FROM users WHERE role='platform_owner');
+UPDATE invites SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE kind='platform_owner' AND used_at IS NULL AND revoked_at IS NULL AND EXISTS(SELECT 1 FROM users WHERE role='platform_owner');
+`},
 ];

@@ -9,6 +9,8 @@ window.BIRD_ACCOUNT_TEXT={
  login:{en:'Login',hr:'Korisničko ime',ru:'Логин'},
  loginHint:{en:'3 to 60 characters: letters, digits, dot, @, hyphen. An email address also works.',hr:'3 do 60 znakova: slova, brojke, točka, @, crtica. Može i adresa e-pošte.',ru:'От 3 до 60 символов: латинские буквы, цифры, точка, @, дефис. Можно использовать email.'},
  password:{en:'Password',hr:'Lozinka',ru:'Пароль'},
+ showPassword:{en:'Show',hr:'Prikaži',ru:'Показать'},
+ hidePassword:{en:'Hide',hr:'Sakrij',ru:'Скрыть'},
  passwordHint:{en:'At least 10 characters.',hr:'Najmanje 10 znakova.',ru:'Не меньше 10 символов.'},
  newPassword:{en:'New password',hr:'Nova lozinka',ru:'Новый пароль'},
  currentPassword:{en:'Current password',hr:'Trenutna lozinka',ru:'Текущий пароль'},

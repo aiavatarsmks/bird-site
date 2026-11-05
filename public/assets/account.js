@@ -37,7 +37,7 @@ function shell(active,body){
  return `<div class="acc"><div class="acc-head"><div><span class="eyebrow">${esc(tr('urole_'+me.role))}</span><h1>${esc(me.displayName)}</h1></div><a class="acc-office" href="#/office">${tr('office')} ↗</a></div><nav class="acc-tabs" aria-label="${tr('nav')}">${tabs.map(([h,l,k])=>`<a href="${h}" ${k===active?'aria-current="page"':''}>${esc(l)}${k==='overview'&&cache.unread?` <b class="acc-dot">${cache.unread}</b>`:''}</a>`).join('')}</nav>${flashHtml()}<div class="acc-body">${body}</div><p class="acc-small">${tr('unofficial')}</p></div>`;
 }
 function flashHtml(){if(!flash)return '';const f=flash;flash=null;return `<p class="acc-flash ${f.error?'is-error':''}" role="${f.error?'alert':'status'}">${f.html}</p>`;}
-const field=(name,label,{type='text',value='',hint='',required=false,attrs=''}={})=>`<label class="acc-field"><span>${esc(label)}</span>${type==='textarea'?`<textarea name="${name}" ${required?'required':''} ${attrs}>${esc(value)}</textarea>`:`<input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${attrs}>`}${hint?`<small>${esc(hint)}</small>`:''}</label>`;
+const field=(name,label,{type='text',value='',hint='',required=false,attrs=''}={})=>`<label class="acc-field"><span>${esc(label)}</span>${type==='textarea'?`<textarea name="${name}" ${required?'required':''} ${attrs}>${esc(value)}</textarea>`:type==='password'?`<span class="acc-pass"><input name="${name}" type="password" value="${esc(value)}" ${required?'required':''} ${attrs}><button type="button" class="acc-pass-toggle" data-act="toggle-password" aria-pressed="false">${tr('showPassword')}</button></span>`:`<input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${attrs}>`}${hint?`<small>${esc(hint)}</small>`:''}</label>`;
 const select=(name,label,options,value)=>`<label class="acc-field"><span>${esc(label)}</span><select name="${name}">${options.map(([v,l])=>`<option value="${esc(v)}" ${String(v)===String(value)?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
 const statusChip=s=>`<span class="acc-chip is-${esc(s)}">${esc(tr('st_'+s))}</span>`;
 const empty=()=>`<p class="acc-muted">${tr('none')}</p>`;
@@ -373,6 +373,7 @@ async function onSubmit(e){
 async function onClick(e){
  const el=e.target.closest('[data-act]');if(!el||!root.contains(el)||el.tagName==='SELECT')return;
  const d=el.dataset,act=d.act;
+ if(act==='toggle-password'){e.preventDefault();const input=el.previousElementSibling,show=input.type==='password';input.type=show?'text':'password';el.textContent=tr(show?'hidePassword':'showPassword');el.setAttribute('aria-pressed',String(show));input.focus();return;}
  if(act==='count'){const form=el.closest('form'),input=form.elements.count,max=Number(form.closest('.acc-task')?.querySelector('.acc-counter')?.textContent.match(/\/\s*(\d+)/)?.[1]||100);input.value=Math.max(0,Math.min(max,Number(input.value)+Number(d.d)));form.elements.countOut.value=input.value;return;}
  if(act==='office-me')return;
  if(act==='codes-done'){cache.codes=null;go(d.next||'#/account');return;}
