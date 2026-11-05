@@ -172,4 +172,7 @@ UPDATE invites SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE kind='p
 UPDATE users SET role='platform_owner',updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE login='maksid' AND status='active' AND created<'2026-11-05T09:20:00.000Z' AND NOT EXISTS(SELECT 1 FROM users WHERE role='platform_owner');
 UPDATE invites SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE kind='platform_owner' AND used_at IS NULL AND revoked_at IS NULL AND EXISTS(SELECT 1 FROM users WHERE role='platform_owner');
 `},
+ {id:11,name:'lecture-feedback',sql:`
+CREATE TABLE IF NOT EXISTS lecture_feedback(user_id TEXT NOT NULL REFERENCES users(id),lecture_id TEXT NOT NULL REFERENCES lectures(id),score INTEGER NOT NULL CHECK(score BETWEEN 1 AND 10),comment TEXT NOT NULL DEFAULT '',created TEXT NOT NULL,updated TEXT NOT NULL,PRIMARY KEY(user_id,lecture_id));
+`},
 ];

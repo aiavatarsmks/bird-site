@@ -56,6 +56,7 @@ function codesView(codes,next){return `<div class="acc acc-auth"><h1>${tr('codes
 async function overviewView(){
  const [projects,tasks,notes,claims,help,news]=await Promise.all([api('GET','/api/projects?mine=1'),api('GET','/api/tasks'),api('GET','/api/notifications?limit=8'),api('GET','/api/people/claims'),api('GET','/api/help/confirmations'),api('GET','/api/announcements'),]);
  const quests=await api('GET','/api/quests').catch(()=>({items:[]}));
+ const due=await api('GET','/api/feedback/due').catch(()=>({items:[]}));
  const teamProjects=projects.items.filter(p=>['owner','editor','member'].includes(p.role)&&p.status!=='archived');
  const checks=await Promise.all(teamProjects.map(p=>api('GET',`/api/projects/${encodeURIComponent(p.id)}/checkins`).then(r=>({p,r})).catch(()=>null)));
  const missing=checks.filter(c=>c&&!c.r.items.some(i=>i.week===c.r.week));
@@ -63,7 +64,7 @@ async function overviewView(){
  const character=await api('GET','/api/me/character');
  const open=tasks.items.filter(t=>['not_started','draft','changes_requested'].includes(t.status)&&t.task.status==='published');
  const claimBlock=character.person?.confirmed?'':await claimForm(claims.items);
- return shell('overview',`${quests.items.map(q=>`<section class="acc-card acc-quest"><div class="acc-card-head"><h2>${tr('quest')}: ${esc(pick(q.title))}</h2><b>${q.done}/${q.target}</b></div><div class="acc-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${q.target}" aria-valuenow="${q.done}"><span style="width:${Math.round(q.done/q.target*100)}%"></span></div><small class="acc-muted">${q.complete?tr('questDone'):tr('questNote')}</small></section>`).join('')}${news.items.length?`<section class="acc-card acc-news ${unreadNews.length?'is-unread':''}"><div class="acc-card-head"><h2>${tr('announcements')}</h2>${unreadNews.length?`<button data-act="news-read">${tr('markRead')}</button>`:''}</div><ul class="acc-list">${news.items.slice(0,3).map(n=>`<li><div><strong>${n.pinned?'📌 ':''}${esc(n.title)}</strong><p class="acc-pre">${esc(n.body)}</p><small>${esc(n.author)} · ${date(n.created,true)}</small></div></li>`).join('')}</ul></section>`:''}${missing.map(c=>`<p class="acc-flash acc-reminder"><a href="#/account/project/${esc(c.p.id)}/checkin">${tr('checkinMissing')}: <strong>${esc(c.p.name)}</strong> →</a></p>`).join('')}<div class="acc-grid">
+ return shell('overview',`${due.items.slice(0,1).map(l=>`<section class="acc-card acc-feedback"><h2>${tr('feedbackTitle')}</h2><p class="acc-muted">${esc(pick(l.title))} · ${date(l.date)}</p><form data-form="feedback" data-id="${esc(l.id)}"><fieldset class="acc-field"><legend>${tr('feedbackScore')}</legend><div class="acc-scale">${Array.from({length:10},(_,i)=>`<label><input type="radio" name="score" value="${i+1}" required><span>${i+1}</span></label>`).join('')}</div></fieldset>${field('comment',tr('feedbackComment'),{type:'textarea',attrs:'rows="2" maxlength="1000"'})}<button class="acc-secondary">${tr('send')}</button><small class="acc-muted">${tr('feedbackAnon')}</small></form></section>`).join('')}${quests.items.map(q=>`<section class="acc-card acc-quest"><div class="acc-card-head"><h2>${tr('quest')}: ${esc(pick(q.title))}</h2><b>${q.done}/${q.target}</b></div><div class="acc-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${q.target}" aria-valuenow="${q.done}"><span style="width:${Math.round(q.done/q.target*100)}%"></span></div><small class="acc-muted">${q.complete?tr('questDone'):tr('questNote')}</small></section>`).join('')}${news.items.length?`<section class="acc-card acc-news ${unreadNews.length?'is-unread':''}"><div class="acc-card-head"><h2>${tr('announcements')}</h2>${unreadNews.length?`<button data-act="news-read">${tr('markRead')}</button>`:''}</div><ul class="acc-list">${news.items.slice(0,3).map(n=>`<li><div><strong>${n.pinned?'📌 ':''}${esc(n.title)}</strong><p class="acc-pre">${esc(n.body)}</p><small>${esc(n.author)} · ${date(n.created,true)}</small></div></li>`).join('')}</ul></section>`:''}${missing.map(c=>`<p class="acc-flash acc-reminder"><a href="#/account/project/${esc(c.p.id)}/checkin">${tr('checkinMissing')}: <strong>${esc(c.p.name)}</strong> →</a></p>`).join('')}<div class="acc-grid">
  <section class="acc-card"><div class="acc-card-head"><h2>${tr('myProjects')}</h2><a class="acc-secondary" href="#/account/new-project">+ ${tr('newProject')}</a></div>${projects.items.length?`<ul class="acc-list">${projects.items.map(p=>`<li><a href="#/account/project/${esc(p.id)}"><strong>${esc(p.name)}</strong><small>${esc(tr('role_'+p.role))} · ${esc(tr('st_'+p.status))}</small></a></li>`).join('')}</ul>`:empty()}</section>
  <section class="acc-card"><div class="acc-card-head"><h2>${tr('tasks')}</h2><a href="#/account/tasks">${tr('open')} →</a></div>${open.length?`<ul class="acc-list">${open.slice(0,6).map(taskRow).join('')}</ul>`:empty()}</section>
  ${help.items.length?`<section class="acc-card"><h2>${tr('helpRequests')}</h2><ul class="acc-list">${help.items.map(h=>`<li><div><strong>${esc(h.helperName)}</strong><small>${esc(h.note)}</small></div><span class="acc-actions"><button data-act="help" data-id="${esc(h.id)}" data-decision="confirmed" class="acc-secondary">${tr('confirmHelp')}</button><button data-act="help" data-id="${esc(h.id)}" data-decision="declined">${tr('decline')}</button></span></li>`).join('')}</ul></section>`:''}
@@ -196,7 +197,7 @@ async function projectView(id,tab='edit'){
 
 // Admin ------------------------------------------------------------------------------
 function adminShell(active,body){
- const tabs=[['overview',tr('overview')],['checkins',tr('checkins')],['reviews',tr('reviews')],['tasks',tr('tasks')],['lectures',tr('lectures')],['import',tr('import')],['news',tr('announcements')],['mentors',tr('mentors')],['claims',tr('claims')],['users',tr('users')],['audit',tr('audit')]];
+ const tabs=[['overview',tr('overview')],['insights',tr('insights')],['checkins',tr('checkins')],['reviews',tr('reviews')],['tasks',tr('tasks')],['lectures',tr('lectures')],['import',tr('import')],['news',tr('announcements')],['mentors',tr('mentors')],['claims',tr('claims')],['users',tr('users')],['audit',tr('audit')]];
  return shell('admin',`<nav class="acc-tabs acc-subtabs">${tabs.map(([k,l])=>`<a href="#/admin/${k}" ${k===active?'aria-current="page"':''}>${esc(l)}</a>`).join('')}</nav>${body}`);
 }
 async function adminView(tab='overview',id){
@@ -243,6 +244,19 @@ async function adminView(tab='overview',id){
   <form data-form="lecture" class="acc-card"><h2>${tr('addLecture')}</h2>${field('date',tr('lectureDate'),{type:'date',required:true})}${field('speaker',tr('speaker'),{attrs:'maxlength="120"'})}${['en','hr','ru'].map(x=>field('title_'+x,tr('title')+' '+x.toUpperCase(),{required:x==='en',attrs:'maxlength="200"'})).join('')}<button class="acc-secondary">${tr('save')}</button></form>
   <form data-form="bulk-verify" class="acc-card"><h2>${tr('bulkVerify')}</h2>${select('lectureId',tr('lectures'),l.items.map(x=>[x.id,pick(x.title)+' · '+x.date]),l.items.at(-1)?.id)}<div class="acc-checks">${(await api('GET','/api/admin/users')).items.map(u=>`<label class="acc-check"><input type="checkbox" name="userId" value="${esc(u.id)}"> ${esc(u.displayName)}</label>`).join('')}</div><button class="acc-primary">${tr('verify')}</button></form>
   <h2>${tr('attendance')}</h2>${a.items.length?`<ul class="acc-list">${a.items.map(x=>`<li><div><strong>${esc(x.userName)}</strong><small>${esc(pick(l.items.find(y=>y.id===x.lectureId)?.title))} · ${tr(x.kind==='verified_by_admin'?'verified':'selfReported')}</small></div>${x.kind==='self_reported'?`<button data-act="verify" data-user="${esc(x.userId)}" data-lecture="${esc(x.lectureId)}" class="acc-secondary">${tr('verify')}</button>`:''}</li>`).join('')}</ul>`:empty()}`);
+ }
+ if(tab==='insights'){
+  const [d,fb,hook]=await Promise.all([api('GET','/api/admin/digest'),api('GET','/api/admin/feedback'),api('GET','/api/admin/chat-hook')]);
+  const names=a=>a.length?a.map(esc).join(', '):'—';
+  return adminShell(tab,`<section class="acc-card"><div class="acc-card-head"><h2>${tr('digest')} · ${esc(d.week)}</h2>${hook.configured?`<button class="acc-secondary" data-act="digest-send">${tr('sendDigest')}</button>`:''}</div><ul class="acc-list acc-digest">
+   <li><span>${tr('digestNoCheckin')}</span><b>${names(d.noCheckin)}</b></li>
+   <li><span>${tr('digestRisk')}</span><b>${names(d.atRisk.map(t=>t.name))}</b></li>
+   <li><span>${tr('digestHelp')}</span><b>${names(d.needsHelp)}</b></li>
+   <li><span><a href="#/admin/reviews">${tr('digestReview')}</a></span><b>${d.waitingReview}</b></li>
+   <li><span><a href="#/admin/lectures">${tr('digestAttendance')}</a></span><b>${d.unverifiedAttendance}</b></li>
+   <li><span>${tr('digestNew')}</span><b>${d.newAccounts}</b></li></ul>${hook.configured?'':`<p class="acc-note">${tr('digestHookNote')}</p>`}</section>
+  <section class="acc-card"><h2>${tr('lectureFeedback')}</h2>${fb.items.length?`<div class="acc-table-wrap"><table class="acc-table"><thead><tr><th>${tr('lectures')}</th><th>${tr('answers')}</th><th>${tr('average')}</th><th>NPS</th></tr></thead><tbody>${fb.items.map(l=>`<tr><td><strong>${esc(pick(l.title))}</strong><small>${date(l.date)}</small>${l.comments.length?`<details><summary>${tr('comments')} (${l.comments.length})</summary><ul class="acc-todo">${l.comments.map(c=>`<li>${esc(c)}</li>`).join('')}</ul></details>`:''}</td><td>${l.answers}</td><td>${l.average??'—'}</td><td>${l.nps??'—'}</td></tr>`).join('')}</tbody></table></div><p class="acc-note">${tr('npsNote')}</p>`:empty()}</section>
+  ${me.role==='platform_owner'?`<section class="acc-card"><h2>${tr('backup')}</h2><p class="acc-muted">${tr('backupNote')}</p><a class="acc-secondary" href="/api/admin/backup.sqlite" download>${tr('backupDownload')}</a></section>`:''}`);
  }
  if(tab==='checkins'){
   const c=await api('GET','/api/admin/checkins'+(id?'?week='+encodeURIComponent(id):''));
@@ -365,6 +379,7 @@ async function onSubmit(e){
   if(kind==='quest'){await api('POST','/api/admin/quests',{title:{en:f.get('qt_en'),hr:f.get('qt_hr'),ru:f.get('qt_ru')},taskId:f.get('taskId'),target:Number(f.get('target'))});setFlash(tr('saved'));render();return;}
   if(kind==='chat-hook'){await api('PUT','/api/admin/chat-hook',{url:f.get('url')});setFlash(tr('saved'));render();return;}
   if(kind==='announcement'){await api('POST','/api/admin/announcements',{title:f.get('title'),body:f.get('body'),pinned:f.get('pinned')==='on',toChat:f.get('toChat')==='on'});setFlash(tr('saved'));render();return;}
+  if(kind==='feedback'){await api('POST',`/api/lectures/${encodeURIComponent(form.dataset.id)}/feedback`,{score:Number(f.get('score')),comment:f.get('comment')});setFlash(tr('feedbackThanks'));render();return;}
   if(kind==='lecture'){await api('POST','/api/admin/lectures',{date:f.get('date'),speaker:f.get('speaker'),title:{en:f.get('title_en'),hr:f.get('title_hr'),ru:f.get('title_ru')}});render();return;}
  });
  delete form.dataset.busy;[...form.querySelectorAll('button')].forEach(b=>b.disabled=false);
@@ -404,6 +419,7 @@ async function onClick(e){
   else if(act==='unbook'){await api('DELETE',`/api/office-hours/${encodeURIComponent(d.id)}/book`);render();}
   else if(act==='slot-cancel'){await api('DELETE','/api/admin/office-hours/'+encodeURIComponent(d.id));render();}
   else if(act==='quest-close'){await api('DELETE','/api/admin/quests/'+encodeURIComponent(d.id));render();}
+  else if(act==='digest-send'){await api('POST','/api/admin/digest/send',{});setFlash(tr('digestSent'));render();}
   else if(act==='news-read'){await api('POST','/api/announcements/read',{});render();}
   else if(act==='news-archive'){await api('DELETE','/api/admin/announcements/'+encodeURIComponent(d.id));render();}
   else if(act==='hook-revoke'){await api('DELETE','/api/admin/form-hooks/'+encodeURIComponent(d.id));render();}

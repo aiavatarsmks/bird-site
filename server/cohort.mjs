@@ -74,7 +74,7 @@ export async function setChatHook(ctx){
 }
 export function chatHookStatus(ctx){requireAdmin(ctx);return json({configured:!!ctx.db.query("SELECT value FROM settings WHERE key='chat_webhook' AND value<>''").get()});}
 /** Copies an announcement to the team chat. Failures never block the announcement. */
-async function postToChat(db,title,body,origin){
+export async function postToChat(db,title,body,origin){
  const url=db.query("SELECT value FROM settings WHERE key='chat_webhook' AND value<>''").get()?.value;if(!url||!CHAT_HOOK.test(url))return;
  const text=`*${title}*\n${body}${origin?`\n${origin}/#/account`:''}`;
  const payload=url.includes('discord')?{content:text.replace(/\*/g,'**').slice(0,1900)}:{text:text.slice(0,3500)};

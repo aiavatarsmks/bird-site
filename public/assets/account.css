@@ -109,3 +109,13 @@ pre.acc-pre{font:inherit;background:#f7f5ef;padding:10px;border-radius:6px;margi
 .acc-field .acc-pass input{padding-right:96px}
 .acc-pass-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);min-height:34px;padding:0 12px;border:1px solid #b9bcb1;border-radius:5px;background:#f3f1ea;color:var(--ink);font:inherit;font-size:14px;cursor:pointer}
 .acc-pass-toggle:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.acc-scale{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}
+.acc-scale label{display:block}
+.acc-scale input{position:absolute;opacity:0;pointer-events:none}
+.acc-scale span{display:flex;align-items:center;justify-content:center;min-height:42px;border:1px solid #b9bcb1;border-radius:6px;background:#fff;font-weight:600;cursor:pointer}
+.acc-scale input:checked+span{background:var(--ink);color:#fff;border-color:var(--ink)}
+.acc-scale input:focus-visible+span{outline:2px solid var(--ink);outline-offset:2px}
+.acc-feedback form>small{display:block;margin-top:8px}
+.acc-digest li{display:flex;justify-content:space-between;gap:12px}
+.acc-digest b{text-align:right}
+@media (max-width:420px){.acc-scale{grid-template-columns:repeat(5,minmax(0,1fr))}}

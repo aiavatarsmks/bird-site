@@ -17,6 +17,7 @@ import * as admin from './admin.mjs';
 import * as imports from './imports.mjs';
 import * as cohort from './cohort.mjs';
 import * as mentors from './mentors.mjs';
+import * as insights from './insights.mjs';
 import {seedCurated} from './seed.mjs';
 import {createIntegration,CONTRACT} from './integration.mjs';
 import {localStorage,noScanner} from './storage.mjs';
@@ -182,6 +183,12 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('DELETE','/api/admin/quests/:id',(ctx,p)=>cohort.closeQuest(ctx,p.id),{auth:user});
  on('GET','/api/teams/ranking',ctx=>cohort.teamRanking(ctx));
  on('GET','/api/calendar.ics',ctx=>cohort.calendar(ctx));
+ on('GET','/api/feedback/due',ctx=>insights.feedbackDue(ctx),{auth:user});
+ on('POST','/api/lectures/:id/feedback',(ctx,p)=>insights.saveFeedback(ctx,p.id),{auth:user});
+ on('GET','/api/admin/feedback',ctx=>insights.adminFeedback(ctx),{auth:user});
+ on('GET','/api/admin/digest',ctx=>insights.digest(ctx),{auth:user});
+ on('POST','/api/admin/digest/send',ctx=>insights.sendDigest(ctx),{auth:user});
+ on('GET','/api/admin/backup.sqlite',ctx=>insights.downloadBackup(ctx),{auth:user});
  on('GET','/api/admin/audit',ctx=>admin.auditLog(ctx),{auth:user});
  on('GET','/api/admin/settings',ctx=>admin.settings(ctx),{auth:user});
 
