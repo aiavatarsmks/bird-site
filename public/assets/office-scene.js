@@ -168,11 +168,18 @@ addTable(110,1930,250,65);chair(165,2035,true);chair(305,2035,true);
 addTable(505,1930,230,65);chair(555,2035,true);chair(685,2035,true);
 addTable(930,1950,280,65);equipment(990,1980,1);equipment(1150,1980,1);chair(1010,2050,true);chair(1170,2050,true);
 addTable(930,2220,280,65);equipment(990,2250,1);equipment(1150,2250,1);chair(1010,2320,true);chair(1170,2320,true);
-let tower=polygon(quad(180,2140,165,165),'#586a62','#3b4942',2);
-for(const[x,y]of [[205,2170],[305,2170],[205,2260],[305,2260]])tower+=box(x,y,7,7,155,'#536164','#263b39');
-for(const y of [2173,2263])tower+=line(P(208,y,155),P(310,y,155),'#283e3b',7);
-for(const x of [208,308]){tower+=line(P(x,2174,150),P(x,2265,150),'#354c47',6);tower+=line(P(x,2195,75),P(x,2310,75),'#334c45',7);tower+=box(x-9,2210,24,35,83,'#33433d','#223b30',75);}
-tower+=box(245,2160,26,14,118,'#34433c','#263b32',48);
+// Idle pull-up rack drawn to match the generated exercise frames (same tubes and back panel),
+// so the station looks the same with and without a person on it.
+const rack=(()=>{const [ax,ay]=P(260,2240),k=184/352,q=(x,y)=>`${(ax+(x-192)*k).toFixed(1)},${(ay+(y-332)*k).toFixed(1)}`;
+ const tube=(pts,w=12)=>`<polyline points="${pts.map(([x,y])=>q(x,y)).join(' ')}" fill="none" stroke="#1e2414" stroke-width="${w*k+4}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${pts.map(([x,y])=>q(x,y)).join(' ')}" fill="none" stroke="#4b5232" stroke-width="${w*k+1}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${pts.map(([x,y])=>q(x-2,y-1)).join(' ')}" fill="none" stroke="#737a4c" stroke-width="${Math.max(1.5,w*k/2.5)}" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>`;
+ let g=`<polygon points="${[[118,330],[214,286],[300,330],[204,374]].map(([x,y])=>q(x,y-48)).join(' ')}" fill="#1f2a22" opacity=".18"/>`;
+ g+=`<polygon points="${[[140,84],[232,46],[232,232],[140,270]].map(([x,y])=>q(x,y)).join(' ')}" fill="#fbfbf5" stroke="#d8dccb" stroke-width="1"/>`;
+ g+=tube([[232,236],[232,30]]);g+=tube([[232,236],[290,266]]);g+=tube([[214,226],[260,250],[214,272]],7);
+ g+=tube([[136,140],[232,100]],8);g+=tube([[136,205],[232,165]],8);
+ g+=tube([[104,276],[204,326]]);g+=tube([[136,270],[136,64],[232,30]]);g+=tube([[136,264],[176,284],[176,312]],7);
+ g+=tube([[170,96],[296,42]],8);
+ return `<g class="exercise-rack">${g}</g>`;})();
+let tower=rack;
 add(265,2240,tower,'exercise',{footprint:[180,2140,165,175]});
 wall(60,1840,60,2460,110,{tag:'extension-side'});
 wall(880,1840,1260,1840,100,{tag:'extra-office-divider'});
@@ -183,8 +190,9 @@ wall(1260,1840,1260,2460,43,{near:true,tag:'extension-edge'});
 wall(60,2460,600,2460,110,{tag:'terrace-boundary'});wall(700,2460,1260,2460,110,{tag:'terrace-boundary'});
 let exit=box(597,2457,6,6,117,'#9aa9a3','#596d64')+box(697,2457,6,6,117,'#9aa9a3','#596d64');
 exit+=line(P(600,2460,115),P(700,2460,115),'#637e72',6);
-exit+=polygon([P(602,2460),P(669,2502),P(669,2502,108),P(602,2460,108)],'#c7d9d2','#536d62',2,'fill-opacity=".35"');
-exit+=line(P(651,2490,49),P(651,2490,61),'#415f50',3);
+// The glass door is closed by default and swings open only while someone passes.
+exit+=`<g class="door-leaf-closed">${polygon([P(602,2460),P(698,2460),P(698,2460,108),P(602,2460,108)],'#c7d9d2','#536d62',2,'fill-opacity=".35"')}${line(P(688,2460,49),P(688,2460,61),'#415f50',3)}</g>`;
+exit+=`<g class="door-leaf-open">${polygon([P(602,2460),P(669,2502),P(669,2502,108),P(602,2460,108)],'#c7d9d2','#536d62',2,'fill-opacity=".35"')}${line(P(651,2490,49),P(651,2490,61),'#415f50',3)}</g>`;
 const[ex,ey]=P(650,2460,135);exit+=`<rect x="${ex-19}" y="${ey-8}" width="38" height="16" fill="#456d54"/><path d="M${ex-10} ${ey}h20m-5-5 5 5-5 5" stroke="#eef2d7" stroke-width="2" fill="none"/>`;
 add(650,2460,exit,'terrace-door');
 function railing(x1,y1,x2,y2){const length=Math.hypot(x2-x1,y2-y1),n=Math.ceil(length/110);for(let i=0;i<n;i++){const a=[x1+(x2-x1)*i/n,y1+(y2-y1)*i/n],b=[x1+(x2-x1)*(i+1)/n,y1+(y2-y1)*(i+1)/n];const rail=line(P(...a,55),P(...b,55),'#657770',5)+line(P(...a,26),P(...b,26),'#84958c',3)+line(P(...a),P(...a,55),'#63736c',4);add((a[0]+b[0])/2,(a[1]+b[1])/2,rail,'railing');}}

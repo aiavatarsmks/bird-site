@@ -200,7 +200,7 @@ function startOfficeLife(){
     if(!a.hidden)actorPositions.push({x,y,depth:Number(n.layer.dataset.depth)});
    }
    for(const chair of BirdOfficeScene.staticLayers.filter(x=>['chair','lecture','exercise'].includes(x.kind))){const layer=svg.querySelector(`[data-layer-id="${chair.id}"]`);if(layer)layer.style.visibility=occupiedChairs.has(chair.id)?'hidden':'';}
-   svg.querySelector('[data-wall-tag="elevator"]')?.classList.toggle('life-door-active',[...life.actors.values()].some(a=>a.mode==='departing'));
+   svg.querySelector('[data-scene-kind="terrace-door"]')?.classList.toggle('is-open',[...life.actors.values()].some(a=>!a.hidden&&Math.hypot(a.pos[0]-650,a.pos[1]-2460)<95));svg.querySelector('[data-wall-tag="elevator"]')?.classList.toggle('life-door-active',[...life.actors.values()].some(a=>a.mode==='departing'));
    for(const wall of BirdOfficeScene.staticLayers.filter(x=>x.kind==='wall')){const el=svg.querySelector(`[data-layer-id="${wall.id}"]`);const faded=BirdOfficeScene.isOccluded(wall,actorPositions);el?.classList.toggle('is-faded',faded);if(el)el.dataset.occluded=String(faded);}
    const layers=[...staticNodes,...nodes.map(n=>n.layer)].filter(n=>n.dataset.ground!=='true');layers.sort((a,b)=>Number(a.dataset.depth)-Number(b.dataset.depth));
    const protectedLayer=document.activeElement?.closest?.('.iso-layer')||nodes.find(n=>n.el.matches(':hover'))?.layer;let anchor=svg.querySelector('.office-map-label,.scene-person-label');for(const layer of layers.reverse()){if(layer!==protectedLayer&&layer.nextElementSibling!==anchor)svg.insertBefore(layer,anchor);anchor=layer;}

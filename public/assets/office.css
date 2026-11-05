@@ -141,3 +141,5 @@ body.office-fullscreen{overflow:hidden}
 .office-board.is-fullscreen .office-area-nav{flex-direction:row!important;height:auto!important;bottom:auto!important;align-items:flex-start!important;box-shadow:none!important;border:0!important;width:auto!important;max-height:52px}
 body.office-fullscreen .office-intro{display:none!important}
 @media (orientation:landscape) and (max-height:540px){.office-page .office-area-nav{flex-direction:row!important;height:auto!important;bottom:auto!important;align-items:flex-start!important;box-shadow:none!important;border:0!important;width:auto!important;max-height:52px;top:8px!important}}
+
+[data-scene-kind="terrace-door"] .door-leaf-open{display:none}[data-scene-kind="terrace-door"].is-open .door-leaf-open{display:inline}[data-scene-kind="terrace-door"].is-open .door-leaf-closed{display:none}
