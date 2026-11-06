@@ -147,3 +147,24 @@ pre.acc-pre{font:inherit;background:#f7f5ef;padding:10px;border-radius:6px;margi
 .acc-mark.is-self_reported{background:#fff4d6;border-color:#c79a2a}
 .acc-rank-gap{list-style:none;color:var(--muted);text-align:center}
 tr[hidden]{display:none}
+.acc-tick{display:flex;align-items:center;justify-content:center;width:44px;height:44px;margin:-10px -6px;cursor:pointer}
+.acc-tick input{width:22px;height:22px;margin:0}
+.acc-matrix td:first-child{width:44px}
+.acc-matrix td:first-child+th[scope=row]{left:44px}
+.acc-lang-block{border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.acc-lang-block>summary{cursor:pointer;font-weight:600;min-height:32px}
+.acc-list li>a:first-child strong::after{content:' ›';color:var(--muted)}
+/* A soft edge shows that a menu or table continues to the side. */
+.acc-tabs,.acc-table-wrap{background-image:linear-gradient(to left,rgba(0,0,0,.1),transparent);background-size:18px 100%;background-repeat:no-repeat;background-position:right}
+.acc-tabs{background-attachment:scroll}
+.acc-actions>a{min-height:44px;display:inline-flex;align-items:center}
+@media(max-width:600px){
+ .acc-subtabs{flex-wrap:wrap;overflow:visible;background:none}
+ .acc-attendance-table{min-width:0}
+ .acc-attendance-table tr>:nth-child(n+5){display:none}
+ .acc-teams-table{min-width:0}
+ .acc-teams-table tr>:nth-child(5),.acc-teams-table tr>:nth-child(6),.acc-teams-table tr>:nth-child(7),.acc-teams-table tr>:nth-child(9){display:none}
+ .acc-teams-table td:nth-child(8) small{display:none}
+ .acc-matrix th[scope=row]{min-width:0}
+}
+
