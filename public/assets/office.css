@@ -145,7 +145,7 @@ body.office-fullscreen .office-intro{display:none!important}
 [data-scene-kind="terrace-door"] .door-leaf-open{display:none}[data-scene-kind="terrace-door"].is-open .door-leaf-open{display:inline}[data-scene-kind="terrace-door"].is-open .door-leaf-closed{display:none}
 .office-quest{position:absolute;z-index:5;left:50%;top:10px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;max-width:min(520px,70%);padding:7px 12px 9px;border-radius:8px;background:rgba(252,250,243,.94);color:#263d34;text-decoration:none;font-size:13px;box-shadow:0 3px 12px rgba(0,0,0,.18);overflow:hidden}.office-quest span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.office-quest i{position:absolute;left:0;bottom:0;height:3px;background:#d6b56a}@media(max-width:720px){.office-quest{top:10px;left:10px;right:150px;transform:none;font-size:12px;max-width:none}}.office-board.is-fullscreen .office-quest{top:66px}
 /* Office dock: Profile, Tasks, Mentors stay over the map at any zoom. */
-.office-hud{position:absolute;inset:0;z-index:6;pointer-events:none;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+.office-hud{position:absolute;inset:0;z-index:13;pointer-events:none;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
 .hud-dock{position:absolute;left:12px;top:12px;display:flex;flex-direction:column;gap:8px;pointer-events:auto}
 .hud-btn{position:relative;width:64px;min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 4px;border:1.5px solid #d6dccb;border-radius:14px;background:rgba(252,250,243,.96);color:#263d34;box-shadow:0 4px 14px rgba(0,0,0,.22);cursor:pointer;font:inherit}
 .hud-btn>span{font-size:22px;line-height:1}
@@ -156,7 +156,7 @@ body.office-fullscreen .office-intro{display:none!important}
 .hud-face img{width:100%;height:100%;object-fit:cover;display:block}
 .hud-face>span{font-size:20px;font-weight:700}
 .hud-badge{position:absolute;top:-6px;right:-6px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#b5482e;color:#fff;font-size:12px;line-height:22px;text-align:center}
-.hud-panel{position:absolute;left:82px;top:12px;width:min(360px,calc(100% - 100px));max-height:calc(100% - 24px);display:flex;flex-direction:column;background:#fcfaf3;color:#263d34;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.3);pointer-events:auto;overflow:hidden}
+.hud-panel{position:absolute;left:82px;top:12px;width:min(360px,calc(100% - 100px));max-height:calc(100% - 170px);display:flex;flex-direction:column;background:#fcfaf3;color:#263d34;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.3);pointer-events:auto;overflow:hidden}
 .hud-panel header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px;border-bottom:1px solid #e3e5da}
 .hud-panel h2{margin:0;font:600 18px/1.2 Georgia,serif}
 .hud-panel header button{width:44px;height:44px;border:0;background:none;font-size:26px;color:#263d34;cursor:pointer;border-radius:8px}
@@ -252,3 +252,18 @@ body.office-fullscreen .office-intro{display:none!important}
 .office-card-member{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:72px;padding:6px 8px;border:1px solid #e3e5da;border-radius:10px;background:#f6f8f1;font:inherit;color:inherit;cursor:pointer}
 .office-card-member small{font-size:12px}
 .office-card-mini{width:60px;height:55px}
+/* Organiser layer: visible only for organisers. */
+.office-org .office-team-label{visibility:visible;pointer-events:auto}
+.office-org .office-team-label.org-risk rect{stroke:#c0392b;stroke-width:3}
+.office-org .office-team-label.org-watch rect{stroke:#d39b22;stroke-width:3}
+.office-admin{margin-top:14px;padding-top:12px;border-top:2px solid #d6dccb;display:flex;flex-direction:column;gap:8px}
+.office-admin h3,.office-admin p{margin:0}
+.office-org-list{margin:0;padding-left:18px;font-size:14px}
+.office-org-late{color:#c0392b}
+.office-org-nudge{display:flex;flex-direction:column;gap:6px}
+.office-org-nudge textarea{width:100%;box-sizing:border-box;font:inherit;padding:6px 8px;border:1px solid #c4ccb9;border-radius:6px}
+.hud-toggle{display:flex;gap:8px;align-items:center;font-size:14px;margin-bottom:10px}
+.hud-attention li>small{display:block;padding:0 10px 8px 34px;color:#5d6658}
+.hud-team-dot.is-risk{background:#c0392b}.hud-team-dot.is-watch{background:#d39b22}.hud-team-dot.is-ok{background:#3f9a5b}
+.hud-mentors li.is-highlight{outline:2px solid #d39b22;border-radius:8px}
+

@@ -1,7 +1,7 @@
 /** People, character claims, invitations and "my character". */
 import {fail,json,readJson,text,oneOf,sha256,token,newId,rateLimit,page} from './http.mjs';
 import {nowIso} from './db.mjs';
-import {audit,isAdmin,isOwner,requireAdmin,requireProject} from './permissions.mjs';
+import {audit,isAdmin,requireAdmin,requireProject} from './permissions.mjs';
 import {requireUser,APPEARANCES,rotateSession,publicUser} from './auth.mjs';
 import {notify} from './notifications.mjs';
 
@@ -23,7 +23,7 @@ function linkPerson(db,user,personId,actor){
  db.query('UPDATE users SET person_id=?,updated=? WHERE id=?').run(personId,now,user.id);
  if(previous&&previous!==personId)db.query("UPDATE people SET status='archived',updated=? WHERE id=? AND kind='visitor'").run(now,previous);
  for(const {id} of db.query('SELECT p.id FROM projects p JOIN team_people t ON t.team_id=p.team_id WHERE t.person_id=?').all(personId))
-  db.query("INSERT INTO memberships(project_id,user_id,role,created) VALUES(?,?,'member',?) ON CONFLICT(project_id,user_id) DO UPDATE SET revoked_at=NULL WHERE revoked_at IS NOT NULL").run(id,user.id,now);
+  db.query("INSERT INTO memberships(project_id,user_id,role,created) VALUES(?,?,'editor',?) ON CONFLICT(project_id,user_id) DO UPDATE SET revoked_at=NULL,role='editor' WHERE revoked_at IS NOT NULL OR role='member'").run(id,user.id,now);
  db.query("UPDATE person_claims SET status='withdrawn',decided_at=? WHERE user_id=? AND status='pending' AND person_id<>?").run(now,user.id,personId);
  audit(db,actor,'person.link','person',personId,{user:user.id});
 }
@@ -83,7 +83,7 @@ export async function createInvite(ctx){
  }else if(kind==='person'){
   requireAdmin(ctx);personId=text(body.personId,{max:80},'personId');
   if(!ctx.db.query("SELECT 1 FROM people WHERE id=? AND kind='participant'").get(personId))fail(404,'NOT_FOUND');
- }else{if(!isOwner(user))fail(403,'FORBIDDEN');role='program_admin';}
+ }else{requireAdmin(ctx);role='program_admin';}
  const code=token(18),id=newId('inv');
  ctx.db.query('INSERT INTO invites(id,code_hash,kind,project_id,person_id,role,created_by,expires,created) VALUES(?,?,?,?,?,?,?,?,?)').run(id,sha256(code),kind,projectId,personId,role,user.id,Date.now()+days*86400000,nowIso());
  audit(ctx.db,user.id,'invite.create',kind,projectId||personId||'platform',{invite:id,role});

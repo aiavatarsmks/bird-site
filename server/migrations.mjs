@@ -199,4 +199,12 @@ UPDATE mentors SET area='Legal & IP',bio=CASE WHEN bio='' THEN 'Intellectual pro
 UPDATE mentors SET area='Legal & IP',bio=CASE WHEN bio='' THEN 'Startup law and AI regulation' ELSE bio END,updated=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='mentor-marijana-sarolic-robic' AND area='Mentor speed dating';
 UPDATE mentors SET area='General' WHERE id LIKE 'mentor-%' AND area='Mentor speed dating';
 `},
+ // Organiser tools. People linked to a team by an organiser edit their own team's project.
+ {id:16,name:'organiser-tools',sql:`
+ALTER TABLE lectures ADD COLUMN time TEXT NOT NULL DEFAULT '';
+ALTER TABLE lectures ADD COLUMN place TEXT NOT NULL DEFAULT '';
+CREATE TABLE IF NOT EXISTS organiser_notes(id TEXT PRIMARY KEY,target_type TEXT NOT NULL CHECK(target_type IN ('team','user')),target_id TEXT NOT NULL,body TEXT NOT NULL,author TEXT NOT NULL,created TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS organiser_notes_target ON organiser_notes(target_type,target_id,created);
+UPDATE memberships SET role='editor' WHERE role='member' AND revoked_at IS NULL AND EXISTS(SELECT 1 FROM users u JOIN projects p ON p.id=memberships.project_id JOIN team_people t ON t.team_id=p.team_id AND t.person_id=u.person_id WHERE u.id=memberships.user_id);
+`},
 ];

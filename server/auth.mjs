@@ -165,6 +165,12 @@ export async function changePassword(ctx){
  ctx.db.query('UPDATE sessions SET revoked_at=? WHERE user_id=? AND id<>? AND revoked_at IS NULL').run(now,ctx.user.id,ctx.session.id);
  return json({ok:true});
 }
+/** One extra recovery code for an organiser to hand over in person. Existing codes keep working. */
+export function addRecoveryCode(db,userId){
+ const c=token(9).replace(/[-_]/g,'x').slice(0,12).toUpperCase(),code=c.slice(0,4)+'-'+c.slice(4,8)+'-'+c.slice(8,12);
+ db.query('INSERT INTO recovery_codes(user_id,code_hash) VALUES(?,?)').run(userId,sha256(code));
+ return code;
+}
 export async function regenerateCodes(ctx){
  requireUser(ctx);const body=await readJson(ctx.request);
  const current=ctx.db.query('SELECT hash FROM password_credentials WHERE user_id=?').get(ctx.user.id);

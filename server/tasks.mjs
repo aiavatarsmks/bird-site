@@ -68,7 +68,7 @@ export async function updateTask(ctx,id){
  const current=ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(id);if(!current)fail(404,'NOT_FOUND');
  if(Number(body.version)!==current.version)fail(409,'CONFLICT',{currentVersion:current.version});
  if(current.status!=='draft'&&(body.type!==current.type||body.scope!==current.scope))fail(409,'INVALID_STATE');
- const t=cleanTask(body);
+ const t=cleanTask({audience:current.audience,...body});
  ctx.db.query('UPDATE task_templates SET week_id=?,type=?,scope=?,xp=?,counter_target=?,requires_review=?,self_report=?,repeat_rule=?,checklist=?,translations=?,audience=?,due_at=?,reviewer_user_id=?,visibility=?,completion_mode=?,pick_mode=?,version=version+1,updated=? WHERE id=? AND version=?').run(t.week_id,t.type,t.scope,t.xp,t.counter_target,t.requires_review,t.self_report,t.repeat_rule,t.checklist,t.translations,t.audience,t.due_at,t.reviewer_user_id,t.visibility,t.completion_mode,t.pick_mode,nowIso(),id,current.version);
  audit(ctx.db,admin.id,'task.update','task',id,{});
  return json({task:taskView(ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(id))});
@@ -92,9 +92,16 @@ export function adminTasks(ctx){
 
 // Assignment -------------------------------------------------------------------
 function targets(db,task,{userIds,projectIds}={}){
+ // Chosen recipients on a task for everyone would quietly reach everyone.
+ if(task.audience!=='selected'&&(userIds?.length||projectIds?.length))fail(400,'INVALID_FIELDS',{field:'audience'});
  if(task.scope==='personal'){
-  if(task.audience==='selected'){const ids=(userIds||[]).slice(0,500);return ids.length?db.query(`SELECT id,display_name name FROM users WHERE status='active' AND id IN (${ids.map(()=>'?').join(',')})`).all(...ids):[];}
-  return db.query("SELECT id,display_name name FROM users WHERE status='active' ORDER BY created").all();
+  if(task.audience==='selected'){
+   const ids=new Set((userIds||[]).slice(0,500).map(String));
+   // A team chosen for a personal task means each of its members.
+   for(const p of (projectIds||[]).slice(0,100))for(const m of db.query("SELECT user_id FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").all(String(p)))ids.add(m.user_id);
+   const list=[...ids];return list.length?db.query(`SELECT id,display_name name FROM users WHERE status='active' AND id IN (${list.map(()=>'?').join(',')})`).all(...list):[];
+  }
+  return db.query("SELECT id,display_name name FROM users WHERE status='active' AND role='member' ORDER BY created").all();
  }
  const base="SELECT p.id,json_extract(p.draft,'$.name') name FROM projects p WHERE p.status<>'archived' AND EXISTS(SELECT 1 FROM memberships m WHERE m.project_id=p.id AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member'))";
  if(task.audience==='selected'){const ids=(projectIds||[]).slice(0,500);return ids.length?db.query(base+` AND p.id IN (${ids.map(()=>'?').join(',')})`).all(...ids):[];}
@@ -123,14 +130,26 @@ export async function assignTask(ctx,id){
  return json({created,period});
 }
 
+/** Reminder to everyone whose assignment of this task is not finished yet. */
+export async function nudgeOpen(ctx,id){
+ const admin=requireAdmin(ctx),body=await readJson(ctx.request);
+ const message=text(body.message,{min:1,max:300,multiline:true},'message');
+ const rows=ctx.db.query("SELECT a.user_id,a.project_id FROM assignments a LEFT JOIN submissions s ON s.assignment_id=a.id WHERE a.task_id=? AND coalesce(s.status,'not_started') IN ('not_started','draft','changes_requested')").all(id);
+ const ids=new Set();
+ for(const r of rows){if(r.user_id)ids.add(r.user_id);else for(const m of ctx.db.query("SELECT user_id FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").all(r.project_id))ids.add(m.user_id);}
+ ctx.db.transaction(()=>{for(const uid of ids)notify(ctx.db,uid,'nudge',{message,from:admin.display_name});})();
+ audit(ctx.db,admin.id,'nudge.open','task',id,{sent:ids.size});
+ return json({sent:ids.size});
+}
+
 /** Gives a new or newly linked participant the active tasks of their set. */
 export function assignForUser(db,user){
  const tasks=db.query("SELECT * FROM task_templates WHERE status='published' AND audience='all_participants' AND pick_mode='assigned' AND (due_at IS NULL OR due_at>?)").all(nowIso());
  const projects=db.query("SELECT p.id FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') AND p.status<>'archived'").all(user.id);
  for(const task of tasks){
   const period=periodFor(task);
-  if(task.scope==='personal')assignAll(db,task,[{id:user.id}],period);
-  else assignAll(db,task,projects,period);
+  if(task.scope==='team')assignAll(db,task,projects,period);
+  else if(user.role==='member')assignAll(db,task,[{id:user.id}],period);
  }
 }
 
@@ -290,7 +309,7 @@ export function reviewQueue(ctx){
   AND (?4=1 OR t.reviewer_user_id=?5 OR EXISTS(SELECT 1 FROM memberships m WHERE m.project_id=a.project_id AND m.user_id=?5 AND m.role='reviewer' AND m.revoked_at IS NULL))
   ORDER BY s.updated LIMIT ?6 OFFSET ?7`).all(status,project,period,admin?1:0,user.id,limit+1,offset);
  if(!admin&&!rows.length&&!ctx.db.query("SELECT 1 FROM memberships WHERE user_id=? AND role='reviewer' AND revoked_at IS NULL").get(user.id)&&!ctx.db.query('SELECT 1 FROM task_templates WHERE reviewer_user_id=?').get(user.id))fail(403,'FORBIDDEN');
- return json({items:rows.slice(0,limit).map(r=>{const task=ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(r.task_id);const who=r.user_id?ctx.db.query('SELECT display_name FROM users WHERE id=?').get(r.user_id)?.display_name:null;return {...assignmentView(ctx.db,{id:r.assignment_id,period:r.period,project_id:r.project_id,user_id:r.user_id,task_id:r.task_id,created:r.created},task),submissionId:r.id,userName:who};}),hasMore:rows.length>limit});
+ return json({items:rows.slice(0,limit).map(r=>{const task=ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(r.task_id);const who=r.user_id?ctx.db.query('SELECT display_name FROM users WHERE id=?').get(r.user_id)?.display_name:null;const author=ctx.db.query('SELECT display_name FROM users WHERE id=?').get(r.submitted_by)?.display_name||'';return {...assignmentView(ctx.db,{id:r.assignment_id,period:r.period,project_id:r.project_id,user_id:r.user_id,task_id:r.task_id,created:r.created},task),submissionId:r.id,userName:who,authorName:author};}),hasMore:rows.length>limit});
 }
 export async function review(ctx,submissionId){
  const user=requireUser(ctx),body=await readJson(ctx.request);

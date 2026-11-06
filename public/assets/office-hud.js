@@ -51,9 +51,18 @@
   st_not_started:{en:'Not started',hr:'Nije započeto',ru:'Не начато'},
   st_draft:{en:'Draft',hr:'Nacrt',ru:'Черновик'},
   st_changes_requested:{en:'Changes requested',hr:'Potrebne izmjene',ru:'Нужны правки'},
+  attention:{en:'Attention',hr:'Pažnja',ru:'Внимание'},
+  allCalm:{en:'All calm, nothing urgent.',hr:'Sve je mirno.',ru:'Всё спокойно, срочного нет.'},
+  labelsOn:{en:'Show team labels with signals',hr:'Prikaži oznake timova sa signalima',ru:'Показывать метки команд с сигналами'},
+  toReview:{en:'to review',hr:'za pregled',ru:'на проверку'},
+  noVisit:{en:'no visit for 7+ days',hr:'bez posjeta 7+ dana',ru:'нет визита 7+ дней'},
+  overdue:{en:'overdue',hr:'kasni',ru:'просрочено'},
+  needsHelp:{en:'asked for help',hr:'traži pomoć',ru:'просят помощи'},
+  noAccounts:{en:'nobody registered',hr:'nitko nije registriran',ru:'никто не зарегистрирован'},
+  openAdmin:{en:'Admin panel',hr:'Administracija',ru:'Админ-панель'},
  };
  const OPEN=new Set(['not_started','draft','changes_requested']);
- let lang='en',open=null,area='',data=null,loading=null,host=null,error='',loadedAt=0,photoVersion=0,linksNote='',context={};
+ let lang='en',open=null,area='',highlight=null,data=null,loading=null,host=null,error='',loadedAt=0,photoVersion=0,linksNote='',context={};
  const t=k=>T[k]?.[lang]||T[k]?.en||k;
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const title=tr=>tr?.[lang]?.title||tr?.en?.title||'';
@@ -65,14 +74,17 @@
   if(loading)return loading;
   loading=(async()=>{
    const auth=await get('/api/auth/me').catch(()=>({user:null})),me=auth.user;
-   const [tasks,profile,mentors,notes,lectures]=await Promise.all([
+   const organiser=['program_admin','platform_owner'].includes(me?.role);
+   const [tasks,profile,mentors,notes,lectures,today]=await Promise.all([
     me?get('/api/tasks').catch(()=>({items:[]})):{items:[]},
     me?get('/api/me/profile').catch(()=>null):null,
     get('/api/mentors').catch(()=>({items:[]})),
     me?get('/api/notifications?limit=10').catch(()=>({items:[]})):{items:[]},
     get('/api/lectures').catch(()=>({items:[],today:''})),
+    organiser?get('/api/admin/today').catch(()=>null):null,
    ]);
-   data={me,csrf:auth.csrf||'',profile,lectures,messages:notes.items.filter(n=>n.kind==='nudge'&&!n.read),tasks:tasks.items.filter(x=>OPEN.has(x.status)&&x.task?.status==='published'),xp:profile?.xp??null,mentors:mentors.items};
+   const recent=Date.now()-7*86400000;
+   data={me,csrf:auth.csrf||'',profile,lectures,today,messages:notes.items.filter(n=>n.kind==='nudge'&&(!n.read||Date.parse(n.created)>recent)),tasks:tasks.items.filter(x=>OPEN.has(x.status)&&x.task?.status==='published'),xp:profile?.xp??null,mentors:mentors.items};
    loadedAt=Date.now();loading=null;return data;
   })();
   return loading;
@@ -88,10 +100,16 @@
  const myCharacter=()=>{const c=data?.profile?.character;const m=c&&context.member?.(c.personId);return m?.img?m:null;};
  function dock(){
   const me=data?.me,count=data?.tasks.length||0;
+  const flagged=attentionTeams().length;
   return `<div class="hud-dock" role="toolbar" aria-label="BIRD">
-   ${me?`<button class="hud-btn hud-face ${myCharacter()?'hud-face-char':''}" data-hud="profile" aria-pressed="${open==='profile'}" aria-label="${t('profile')}">${myCharacter()?sprite(myCharacter().img,'hud-sprite-dock'):face(me,44)}</button>${data.messages.length?`<b class="hud-badge hud-badge-face" aria-label="${t('messages')}">${data.messages.length}</b>`:''}`:`<button class="hud-btn hud-guest" data-hud="profile" aria-pressed="${open==='profile'}"><span aria-hidden="true">👤</span><small>${t('signIn')}</small></button>`}
-   ${BUTTONS.map(([k,icon])=>`<button class="hud-btn" data-hud="${k}" aria-pressed="${open===k}"><span aria-hidden="true">${icon}</span><small>${t(k)}</small>${k==='tasks'&&me&&count?`<b class="hud-badge">${count}</b>`:''}</button>`).join('')}
+   ${me?`<button class="hud-btn hud-face ${myCharacter()?'hud-face-char':''}" data-hud="profile" aria-pressed="${open==='profile'}" aria-label="${t('profile')}">${myCharacter()?sprite(myCharacter().img,'hud-sprite-dock'):face(me,44)}</button>${data.messages.some(n=>!n.read)?`<b class="hud-badge hud-badge-face" aria-label="${t('messages')}">${data.messages.filter(n=>!n.read).length}</b>`:''}`:`<button class="hud-btn hud-guest" data-hud="profile" aria-pressed="${open==='profile'}"><span aria-hidden="true">👤</span><small>${t('signIn')}</small></button>`}
+   ${data?.today?`<button class="hud-btn" data-hud="attention" aria-pressed="${open==='attention'}"><span aria-hidden="true">!</span><small>${t('attention')}</small>${flagged?`<b class="hud-badge">${flagged}</b>`:''}</button>`:''}${BUTTONS.map(([k,icon])=>`<button class="hud-btn" data-hud="${k}" aria-pressed="${open===k}"><span aria-hidden="true">${icon}</span><small>${t(k)}</small>${k==='tasks'&&me&&count?`<b class="hud-badge">${count}</b>`:''}</button>`).join('')}
   </div>`;
+ }
+ const attentionTeams=()=>(data?.today?.teams||[]).filter(x=>x.members&&(x.level!=='ok'||x.waiting||x.inactive));
+ function attentionPanel(){
+  const list=attentionTeams(),why=x=>[...x.signals.filter(k=>k==='needs_help'||k==='overdue_tasks'||k==='no_accounts').map(k=>t({needs_help:'needsHelp',overdue_tasks:'overdue',no_accounts:'noAccounts'}[k])),...(x.waiting?[x.waiting+' '+t('toReview')]:[]),...(x.inactive?[t('noVisit')]:[])].join(' · ');
+  return `<label class="hud-toggle"><input type="checkbox" data-hud-labels ${context.labels?.()?'checked':''}> ${t('labelsOn')}</label>${list.length?`<ul class="hud-list hud-attention">${list.map(x=>`<li><button class="hud-team" data-hud-team="${esc(x.id)}"><span class="hud-team-dot is-${esc(x.level)}"></span><strong>${esc(x.name)}</strong><small>${x.percent===null?'—':x.percent+'%'}</small></button><small>${esc(why(x))}</small></li>`).join('')}</ul>`:`<p>${t('allCalm')}</p>`}<div class="hud-actions"><a class="hud-primary" href="#/admin">${t('openAdmin')}</a></div>`;
  }
  function guest(){return `<p>${t('guestNote')}</p><div class="hud-actions"><a class="hud-primary" href="#/account/register">${t('register')}</a><a class="hud-secondary" href="#/account">${t('signIn')}</a></div>`;}
  function profilePanel(){
@@ -118,14 +136,14 @@
   return `<ul class="hud-list">${[...l.items].reverse().map(x=>{const past=x.date<=l.today,a=x.attendance;return `<li><div class="hud-lecture"><span class="hud-date">${esc(day(x.date))}</span><div><strong>${esc(x.title[lang]||x.title.en)}</strong>${x.speaker?`<small>${esc(x.speaker)}</small>`:''}<small>${!past?t('upcoming'):a?`✓ ${t('attended')}${a.kind==='verified_by_admin'?' · '+t('confirmed'):''}`:''}</small></div></div><div class="hud-actions"><a class="hud-secondary" href="#/${esc(x.id)}">${t('notes')}</a>${past&&me&&!a?`<a class="hud-link" href="#/account/tasks">${t('markAttendance')}</a>`:''}</div></li>`;}).join('')}</ul>`;
  }
  function mentorsPanel(){
-  const me=data.me,areas=[...new Set(data.mentors.map(m=>m.area))],list=data.mentors.filter(m=>!area||m.area===area);
+  const me=data.me,areas=[...new Set(data.mentors.map(m=>m.area))],list=data.mentors.filter(m=>!area||m.area===area).sort((a,b)=>(b.id===highlight)-(a.id===highlight));
   if(!data.mentors.length)return `<p>${t('noMentors')}</p>`;
-  return `${areas.length>1?`<div class="hud-chips">${['',...areas].map(a=>`<button data-hud-area="${esc(a)}" aria-pressed="${a===area}">${esc(a||t('all'))}</button>`).join('')}</div>`:''}<ul class="hud-list hud-mentors">${list.map(m=>`<li><div class="hud-mentor-head">${window.BIRD_OFFICE_WALK?.[m.id]?sprite('assets/'+m.id+'-thumb.webp','hud-sprite-mentor'):`<span class="hud-mentor-face ${m.gender==='f'?'is-f':''}">${esc(initials(m.name))}</span>`}<div><strong>${esc(m.name)}</strong><small class="hud-area">${esc(m.area)}</small></div></div>${m.bio?`<p>${esc(m.bio)}</p>`:''}<small>${m.nextFree?`${t('next')}: ${esc(when(m.nextFree))}`:t('noSlots')}</small><div class="hud-actions">${m.freeSlots?`<a class="hud-secondary" href="${me?'#/account/mentors/'+esc(m.id):'#/account/register'}">${t('book')}</a>`:''}${m.link?`<a class="hud-link" href="${esc(m.link)}" target="_blank" rel="noopener noreferrer">${t('linkedIn')} ↗</a>`:''}</div></li>`).join('')}</ul>`;
+  return `${areas.length>1?`<div class="hud-chips">${['',...areas].map(a=>`<button data-hud-area="${esc(a)}" aria-pressed="${a===area}">${esc(a||t('all'))}</button>`).join('')}</div>`:''}<ul class="hud-list hud-mentors">${list.map(m=>`<li class="${m.id===highlight?'is-highlight':''}"><div class="hud-mentor-head">${window.BIRD_OFFICE_WALK?.[m.id]?sprite('assets/'+m.id+'-thumb.webp','hud-sprite-mentor'):`<span class="hud-mentor-face ${m.gender==='f'?'is-f':''}">${esc(initials(m.name))}</span>`}<div><strong>${esc(m.name)}</strong><small class="hud-area">${esc(m.area)}</small></div></div>${m.bio?`<p>${esc(m.bio)}</p>`:''}<small>${m.nextFree?`${t('next')}: ${esc(when(m.nextFree))}`:t('noSlots')}</small><div class="hud-actions">${m.freeSlots?`<a class="hud-secondary" href="${me?'#/account/mentors/'+esc(m.id):'#/account/register'}">${t('book')}</a>`:''}${m.link?`<a class="hud-link" href="${esc(m.link)}" target="_blank" rel="noopener noreferrer">${t('linkedIn')} ↗</a>`:''}</div></li>`).join('')}</ul>`;
  }
  function panel(){
   if(!open||!data)return '';
   const me=data.me;
-  const body=open==='profile'?profilePanel():open==='tasks'?(me?(data.tasks.length?`<ul class="hud-list">${data.tasks.slice(0,8).map(x=>`<li><a href="#/account/task/${esc(x.id)}"><strong>${esc(title(x.task.translations))}</strong><small>${x.task.xp} ${t('points')} · ${t('st_'+x.status)}</small></a></li>`).join('')}</ul>`:`<p>${t('noTasks')}</p>`)+`<div class="hud-actions"><a class="hud-primary" href="#/account/tasks">${t('allTasks')}</a></div>`:guest()):open==='teams'?teamsPanel():open==='lectures'?lecturesPanel():mentorsPanel();
+  const body=open==='attention'?attentionPanel():open==='profile'?profilePanel():open==='tasks'?(me?(data.tasks.length?`<ul class="hud-list">${data.tasks.slice(0,8).map(x=>`<li><a href="#/account/task/${esc(x.id)}"><strong>${esc(title(x.task.translations))}</strong><small>${x.task.xp} ${t('points')} · ${t('st_'+x.status)}</small></a></li>`).join('')}</ul>`:`<p>${t('noTasks')}</p>`)+`<div class="hud-actions"><a class="hud-primary" href="#/account/tasks">${t('allTasks')}</a></div>`:guest()):open==='teams'?teamsPanel():open==='lectures'?lecturesPanel():mentorsPanel();
   return `<section class="hud-panel" role="dialog" aria-label="${t(open)}"><header><h2>${t(open)}</h2><button data-hud-close aria-label="${t('close')}">×</button></header><div class="hud-body">${body}</div></section>`;
  }
  function paint(){
@@ -138,13 +156,14 @@
   // Keep taps on the dock away from the map's pan and zoom handlers.
   for(const type of ['pointerdown','wheel','dblclick','touchstart'])el.addEventListener(type,e=>e.stopPropagation(),{passive:true});
   el.addEventListener('click',async e=>{
-   const b=e.target.closest('[data-hud]');if(b){open=open===b.dataset.hud?null:b.dataset.hud;error='';paint();if(open){await load(true);paint();if(open==='profile'&&data.messages.length)fetch('/api/notifications/read',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','x-csrf-token':data.csrf},body:'{}'}).catch(()=>{});}return;}
+   const b=e.target.closest('[data-hud]');if(b){open=open===b.dataset.hud?null:b.dataset.hud;highlight=null;error='';paint();if(open){await load(true);paint();if(open==='profile'&&data.messages.some(n=>!n.read)){for(const n of data.messages)n.read=true;paint();}if(open==='profile'&&data.messages.length)fetch('/api/notifications/read',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','x-csrf-token':data.csrf},body:'{}'}).catch(()=>{});}return;}
    if(e.target.closest('[data-hud-close]')){open=null;paint();return;}
    const a=e.target.closest('[data-hud-area]');if(a){area=a.dataset.hudArea;paint();return;}
    const team=e.target.closest('[data-hud-team]');if(team){open=null;paint();context.select?.(team.dataset.hudTeam,team.dataset.hudPerson||null);return;}
    if(e.target.closest('a[href^="#"]')){open=null;}
   });
   el.addEventListener('change',async e=>{
+   if(e.target.matches('[data-hud-labels]')){context.labels?.(e.target.checked);return;}
    const input=e.target.closest('[data-hud-photo]');if(!input?.files?.[0])return;
    try{await upload(input.files[0]);error='';photoVersion=Date.now();await load(true);}catch{error=t('photoError');}
    paint();
@@ -172,5 +191,5 @@
   paint();
   load().then(paint);
  }
- window.BirdOfficeHud={mount,refresh:()=>load(true).then(paint),open:async name=>{open=name;paint();await load();paint();}};
+ window.BirdOfficeHud={mount,refresh:()=>load(true).then(paint),open:async(name,mentorId=null)=>{open=name;highlight=mentorId;if(mentorId)area='';paint();await load();paint();}};
 })();

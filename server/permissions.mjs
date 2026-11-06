@@ -5,10 +5,8 @@ export function audit(db,actor,action,targetType,targetId,detail={}){
  db.query('INSERT INTO audit_log(actor,action,target_type,target_id,detail,created) VALUES(?,?,?,?,?,?)').run(actor||null,action,targetType,String(targetId),JSON.stringify(detail),new Date().toISOString());
 }
 
-export const isOwner=u=>u?.role==='platform_owner';
 export const isAdmin=u=>u?.role==='program_admin'||u?.role==='platform_owner';
 export function requireAdmin(ctx){if(!ctx.user)fail(401,'UNAUTHENTICATED');if(!isAdmin(ctx.user))fail(403,'FORBIDDEN');return ctx.user;}
-export function requireOwner(ctx){if(!ctx.user)fail(401,'UNAUTHENTICATED');if(!isOwner(ctx.user))fail(403,'FORBIDDEN');return ctx.user;}
 
 export function membership(db,projectId,userId){
  if(!userId)return null;
@@ -50,11 +48,12 @@ export const PERMISSION_MATRIX=[
  ['Read published lectures, projects and office cards','guest, everyone'],
  ['Edit own profile and own confirmed character','member'],
  ['Create own project','member'],
- ['Edit project description and files','project owner, editor, admin'],
+ ['Edit project description, links and files','own team (assigned by an organiser), admin'],
  ['Manage project team and invitations, archive','project owner, admin'],
  ['Read team material, act on team tasks','project owner, editor, member'],
  ['Read assigned projects and reports','reviewer (only assigned projects), admin'],
  ['Create and publish tasks, review reports, verify attendance','program admin, platform owner'],
  ['Approve character claims, moderate','program admin, platform owner'],
- ['Grant or revoke program admin, change settings','platform owner'],
+ ['Grant or revoke program admin, change settings, download backups','program admin, platform owner'],
+ ['Change the platform owner','nobody in the product, only through the code'],
 ];

@@ -194,7 +194,7 @@ export async function addMetric(ctx,id){
 }
 export function projectJournal(ctx,id){
  const {access}=requireProject(ctx.db,ctx.user,id,'read');
- const milestones=ctx.db.query('SELECT id,title,due,done_at,created FROM project_milestones WHERE project_id=? ORDER BY created DESC LIMIT 50').all(id);
+ const milestones=access.team||access.review?ctx.db.query('SELECT id,title,due,done_at,created FROM project_milestones WHERE project_id=? ORDER BY created DESC LIMIT 50').all(id):[];
  const metrics=ctx.db.query(`SELECT m.id,m.name,m.value,m.measured_on,m.visibility,u.display_name author FROM project_metrics m JOIN users u ON u.id=m.author WHERE m.project_id=? ${access.team?'':"AND m.visibility='public'"} ORDER BY m.measured_on DESC LIMIT 50`).all(id);
  return json({milestones:milestones.map(m=>({id:m.id,title:m.title,due:m.due,doneAt:m.done_at})),metrics:metrics.map(m=>({id:m.id,name:m.name,value:m.value,measuredOn:m.measured_on,visibility:m.visibility,author:m.author}))});
 }

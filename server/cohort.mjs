@@ -104,19 +104,37 @@ export function readAnnouncements(ctx){
  return json({ok:true});
 }
 
-/** Team ranking: only team totals and weekly gain; personal tasks and private metrics stay out. */
+/**
+ * Fair team score: the share of what this team could earn, so a team of one and a team of four compete equally.
+ * Team tasks count once. Personal tasks are averaged over the members, and nobody loses for an optional task.
+ * Tasks given to one team only count for that team. Weekly check-ins count for every week the cohort reported.
+ */
+export function teamScore(db,projectId,memberIds){
+ const tally=rows=>{let earned=0,available=0;for(const r of rows){const done=r.sub==='accepted';if(done)earned+=r.xp;if(done||r.pick_mode!=='catalog')available+=r.xp;}return {earned,available};};
+ const query="SELECT t.xp,t.pick_mode,coalesce(s.status,'') sub FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id WHERE t.status IN ('published','closed') AND ";
+ const team=tally(db.query(query+'a.project_id=?').all(projectId));
+ const personal=memberIds.length?tally(db.query(query+`a.user_id IN (${memberIds.map(()=>'?').join(',')})`).all(...memberIds)):{earned:0,available:0};
+ const manual=(type,ids)=>ids.length?db.query(`SELECT coalesce(sum(amount),0) n FROM xp_ledger WHERE beneficiary_type=? AND beneficiary_id IN (${ids.map(()=>'?').join(',')}) AND source_key LIKE 'manual:%'`).get(type,...ids).n:0;
+ const size=memberIds.length||1,weeks=db.query('SELECT count(DISTINCT week) n FROM checkins').get().n;
+ const checkins=db.query('SELECT count(*) n FROM checkins WHERE project_id=?').get(projectId).n*CHECKIN_XP;
+ const earned=team.earned+personal.earned/size+checkins+manual('project',[projectId])+manual('user',memberIds)/size;
+ const available=team.available+personal.available/size+weeks*CHECKIN_XP;
+ return {earned:Math.round(earned),available:Math.round(available),percent:available?Math.max(0,Math.min(100,Math.round(earned/available*100))):null};
+}
+
+/** Team ranking by fair percentage. Personal tasks and private metrics stay out. */
 export function teamRanking(ctx){
  const week=isoWeek(),since=new Date(Date.now()-7*86400000).toISOString();
  const rows=ctx.db.query("SELECT p.id,json_extract(p.published,'$.name') name FROM projects p WHERE p.status='published' AND p.published IS NOT NULL").all();
  const items=rows.filter(r=>r.id).map(p=>{
   const members=ctx.db.query("SELECT user_id FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").all(p.id).map(m=>m.user_id);
   const team=projectXp(ctx.db,p.id),weekGain=ctx.db.query("SELECT coalesce(sum(amount),0) n FROM xp_ledger WHERE beneficiary_type='project' AND beneficiary_id=? AND created>=?").get(p.id,since).n;
-  return {projectId:p.id,name:p.name,teamXp:team,weekGain,streak:streak(ctx.db,p.id),members:members.length};
- }).filter(t=>t.members>0||t.teamXp>0).sort((a,b)=>b.teamXp-a.teamXp||b.weekGain-a.weekGain||a.name.localeCompare(b.name));
+  return {projectId:p.id,name:p.name,percent:teamScore(ctx.db,p.id,members).percent,teamXp:team,weekGain,streak:streak(ctx.db,p.id),members:members.length};
+ }).filter(t=>t.members>0||t.teamXp>0).sort((a,b)=>(b.percent??-1)-(a.percent??-1)||b.teamXp-a.teamXp||b.weekGain-a.weekGain||a.name.localeCompare(b.name));
  return json({week,items,rules:{checkinXp:CHECKIN_XP}});
 }
 
-/** Risk signals: a team is flagged only when two or more signals coincide. */
+/** Risk signals: red needs overdue work plus another signal; one soft signal alone stays calm. */
 export function riskSignals(db,projectId,memberIds){
  const week=isoWeek(),signals=[];
  // Teams without accounts cannot report anything yet: flag once, softly.
@@ -129,11 +147,12 @@ export function riskSignals(db,projectId,memberIds){
  if(held&&memberIds.length){const seen=db.query(`SELECT count(*) n FROM attendance WHERE user_id IN (${memberIds.map(()=>'?').join(',')})`).get(...memberIds).n;if(seen<held*memberIds.length/2)signals.push('low_attendance');}
  const help=db.query('SELECT needs_help FROM checkins WHERE project_id=? AND week=?').get(projectId,week);
  if(help?.needs_help)signals.push('needs_help');
- const level=signals.filter(s=>s!=='needs_help').length>=2?'risk':signals.length?'watch':'ok';
+ const count=signals.filter(s=>s!=='needs_help').length;
+ const level=count>=2&&overdue?'risk':count>=2||signals.includes('needs_help')?'watch':'ok';
  return {level,signals};
 }
 
-const csvCell=v=>{const s=String(v??'');return /[",\n;]/.test(s)||/^[=+\-@]/.test(s)?`"${(/^[=+\-@]/.test(s)?"'":'')+s.replace(/"/g,'""')}"`:s;};
+export const csvCell=v=>{const s=String(v??'');return /[",\n;]/.test(s)||/^[=+\-@]/.test(s)?`"${(/^[=+\-@]/.test(s)?"'":'')+s.replace(/"/g,'""')}"`:s;};
 /** Funder report: one row per team. Opens in Google Sheets / Excel. */
 export function exportCsv(ctx){
  requireAdmin(ctx);

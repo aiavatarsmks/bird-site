@@ -20,6 +20,7 @@ import * as mentors from './mentors.mjs';
 import * as insights from './insights.mjs';
 import * as avatars from './avatars.mjs';
 import * as profile from './profile.mjs';
+import * as organiser from './organiser.mjs';
 import {seedCurated} from './seed.mjs';
 import {createIntegration,CONTRACT} from './integration.mjs';
 import {localStorage,noScanner} from './storage.mjs';
@@ -146,12 +147,15 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('POST','/api/admin/tasks/:id/status',(ctx,p)=>tasks.setTaskStatus(ctx,p.id),{auth:user});
  on('GET','/api/admin/tasks/:id/preview',(ctx,p)=>tasks.previewAssign(ctx,p.id),{auth:user});
  on('POST','/api/admin/tasks/:id/assign',(ctx,p)=>tasks.assignTask(ctx,p.id),{auth:user});
+ on('POST','/api/admin/tasks/:id/nudge-open',(ctx,p)=>tasks.nudgeOpen(ctx,p.id),{auth:user});
  on('POST','/api/admin/submissions/:id/revoke',(ctx,p)=>tasks.revokeAcceptance(ctx,p.id),{auth:user});
  on('GET','/api/admin/lectures',ctx=>lectures.adminLectures(ctx),{auth:user});
  on('POST','/api/admin/lectures',ctx=>lectures.saveLecture(ctx,null),{auth:user});
  on('PUT','/api/admin/lectures/:id',(ctx,p)=>lectures.saveLecture(ctx,p.id),{auth:user});
  on('GET','/api/admin/attendance',ctx=>lectures.adminAttendance(ctx),{auth:user});
  on('POST','/api/admin/attendance',ctx=>lectures.verifyAttendance(ctx),{auth:user});
+ on('POST','/api/admin/attendance/remove',ctx=>lectures.removeAttendance(ctx),{auth:user});
+ on('GET','/api/admin/attendance/matrix',ctx=>lectures.attendanceMatrix(ctx),{auth:user});
  // Catalogue, marking, imports, cohort tools
  on('GET','/api/catalog',ctx=>tasks.catalog(ctx),{auth:user});
  on('POST','/api/catalog/:id/take',(ctx,p)=>tasks.takeTask(ctx,p.id),{auth:user});
@@ -202,6 +206,15 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('POST','/api/admin/digest/send',ctx=>insights.sendDigest(ctx),{auth:user});
  on('GET','/api/admin/backup.sqlite',ctx=>insights.downloadBackup(ctx),{auth:user});
  on('GET','/api/admin/audit',ctx=>admin.auditLog(ctx),{auth:user});
+ on('GET','/api/admin/today',ctx=>organiser.today(ctx),{auth:user});
+ on('GET','/api/admin/office-signals',ctx=>organiser.officeSignals(ctx),{auth:user});
+ on('GET','/api/admin/team/:id',(ctx,p)=>organiser.teamRecord(ctx,p.id),{auth:user});
+ on('GET','/api/admin/person/:id',(ctx,p)=>organiser.personRecord(ctx,p.id),{auth:user});
+ on('POST','/api/admin/xp',ctx=>organiser.adjustXp(ctx),{auth:user});
+ on('POST','/api/admin/notes',ctx=>organiser.addNote(ctx),{auth:user});
+ on('PUT','/api/admin/users/:id/team',(ctx,p)=>organiser.setTeam(ctx,p.id),{auth:user});
+ on('POST','/api/admin/users/:id/reset-code',(ctx,p)=>organiser.resetCode(ctx,p.id),{auth:user});
+ on('GET','/api/admin/export-people.csv',ctx=>organiser.exportPeople(ctx),{auth:user});
  on('GET','/api/admin/settings',ctx=>admin.settings(ctx),{auth:user});
 
  async function handleApi(request,server){

@@ -6,7 +6,7 @@ import {requireUser} from './auth.mjs';
 
 const zagrebToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Zagreb',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 
-const lectureView=(l,mine)=>({id:l.id,date:l.date,speaker:l.speaker,title:JSON.parse(l.title),status:l.status,...(mine!==undefined?{attendance:mine?{kind:mine.kind,note:mine.note,created:mine.created}:null}:{})});
+const lectureView=(l,mine)=>({id:l.id,date:l.date,time:l.time||'',place:l.place||'',speaker:l.speaker,title:JSON.parse(l.title),status:l.status,...(mine!==undefined?{attendance:mine?{kind:mine.kind,note:mine.note,created:mine.created}:null}:{})});
 
 export function listLectures(ctx){
  const rows=ctx.db.query("SELECT * FROM lectures WHERE status='published' ORDER BY date").all();
@@ -36,10 +36,16 @@ export function adminAttendance(ctx){
  const rows=ctx.db.query('SELECT a.*,u.display_name,u.login FROM attendance a JOIN users u ON u.id=a.user_id WHERE (?1 IS NULL OR a.lecture_id=?1) ORDER BY a.created DESC LIMIT ?2 OFFSET ?3').all(lectureId,limit+1,offset);
  return json({items:rows.slice(0,limit).map(r=>({userId:r.user_id,userName:r.display_name,login:r.login,lectureId:r.lecture_id,kind:r.kind,note:r.note,created:r.created})),hasMore:rows.length>limit});
 }
+/** Attendance can be confirmed only for a lecture that exists and already took place. */
+function heldLecture(db,lectureId){
+ const lecture=db.query('SELECT date FROM lectures WHERE id=?').get(lectureId);
+ if(!lecture)fail(404,'NOT_FOUND');
+ if(lecture.date>zagrebToday())fail(409,'INVALID_STATE');
+}
 export async function verifyAttendance(ctx){
  const admin=requireAdmin(ctx),body=await readJson(ctx.request);
  const userId=text(body.userId,{max:80},'userId'),lectureId=text(body.lectureId,{max:80},'lectureId');
- if(!ctx.db.query('SELECT 1 FROM lectures WHERE id=?').get(lectureId)||!ctx.db.query('SELECT 1 FROM users WHERE id=?').get(userId))fail(404,'NOT_FOUND');
+ heldLecture(ctx.db,lectureId);if(!ctx.db.query('SELECT 1 FROM users WHERE id=?').get(userId))fail(404,'NOT_FOUND');
  const now=nowIso();
  ctx.db.query("INSERT INTO attendance(user_id,lecture_id,kind,verified_by,created,updated) VALUES(?,?,'verified_by_admin',?,?,?) ON CONFLICT(user_id,lecture_id) DO UPDATE SET kind='verified_by_admin',verified_by=excluded.verified_by,updated=excluded.updated").run(userId,lectureId,admin.id,now,now);
  audit(ctx.db,admin.id,'attendance.verify','lecture',lectureId,{user:userId});
@@ -47,14 +53,33 @@ export async function verifyAttendance(ctx){
  return json({ok:true});
 }
 
+/** Removes a wrong attendance mark, verified or self-reported. */
+export async function removeAttendance(ctx){
+ const admin=requireAdmin(ctx),body=await readJson(ctx.request);
+ const userId=text(body.userId,{max:80},'userId'),lectureId=text(body.lectureId,{max:80},'lectureId');
+ const r=ctx.db.query('DELETE FROM attendance WHERE user_id=? AND lecture_id=?').run(userId,lectureId);
+ if(!r.changes)fail(404,'NOT_FOUND');
+ audit(ctx.db,admin.id,'attendance.remove','lecture',lectureId,{user:userId});
+ return json({ok:true});
+}
+/** Who came to which held lecture, grouped by team. */
+export function attendanceMatrix(ctx){
+ requireAdmin(ctx);const today=zagrebToday();
+ const lectures=ctx.db.query("SELECT * FROM lectures WHERE status='published' AND date<=? ORDER BY date").all(today).map(l=>lectureView(l));
+ const marks=new Map(ctx.db.query('SELECT user_id,lecture_id,kind FROM attendance').all().map(a=>[a.user_id+'|'+a.lecture_id,a.kind]));
+ const people=ctx.db.query("SELECT u.id,u.display_name,(SELECT json_extract(p.draft,'$.name') FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=u.id AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') LIMIT 1) team FROM users u WHERE u.status='active' AND u.role='member' ORDER BY team IS NULL,team,u.display_name").all();
+ return json({lectures,people:people.map(p=>({id:p.id,name:p.display_name,team:p.team||'',marks:Object.fromEntries(lectures.map(l=>[l.id,marks.get(p.id+'|'+l.id)||null]))}))});
+}
+
 export async function saveLecture(ctx,id){
  const admin=requireAdmin(ctx),body=await readJson(ctx.request);
  const date=text(body.date,{max:10},'date');if(!/^\d{4}-\d{2}-\d{2}$/.test(date))fail(400,'INVALID_FIELDS',{field:'date'});
  const title={};for(const l of ['en','hr','ru'])title[l]=text(body.title?.[l],{min:l==='en'?1:0,max:200},'title.'+l);
- const speaker=text(body.speaker,{max:120,optional:true},'speaker');
+ const speaker=text(body.speaker,{max:120,optional:true},'speaker'),time=text(body.time,{max:5,optional:true},'time'),place=text(body.place,{max:160,optional:true},'place');
+ if(time&&!/^\d{2}:\d{2}$/.test(time))fail(400,'INVALID_FIELDS',{field:'time'});
  const status=['draft','published','archived'].includes(body.status)?body.status:'published';
  const now=nowIso(),lectureId=id||newId('lecture');
- ctx.db.query('INSERT INTO lectures(id,date,speaker,title,status,created,updated) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET date=excluded.date,speaker=excluded.speaker,title=excluded.title,status=excluded.status,updated=excluded.updated').run(lectureId,date,speaker,JSON.stringify(title),status,now,now);
+ ctx.db.query('INSERT INTO lectures(id,date,time,place,speaker,title,status,created,updated) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET date=excluded.date,time=excluded.time,place=excluded.place,speaker=excluded.speaker,title=excluded.title,status=excluded.status,updated=excluded.updated').run(lectureId,date,time,place,speaker,JSON.stringify(title),status,now,now);
  if(body.material){const url=httpUrl(body.material.url,'material.url');if(url)ctx.db.query('INSERT INTO lecture_materials(id,lecture_id,label,url,created) VALUES(?,?,?,?,?)').run(newId('mat'),lectureId,text(body.material.label,{max:120},'material.label'),url,now);}
  audit(ctx.db,admin.id,id?'lecture.update':'lecture.create','lecture',lectureId,{});
  return json({lecture:lectureView(ctx.db.query('SELECT * FROM lectures WHERE id=?').get(lectureId))},id?200:201);
@@ -63,7 +88,7 @@ export function adminLectures(ctx){requireAdmin(ctx);return json({items:ctx.db.q
 
 export async function bulkVerify(ctx){
  const admin=requireAdmin(ctx),body=await readJson(ctx.request);
- const lectureId=text(body.lectureId,{max:80},'lectureId');if(!ctx.db.query('SELECT 1 FROM lectures WHERE id=?').get(lectureId))fail(404,'NOT_FOUND');
+ const lectureId=text(body.lectureId,{max:80},'lectureId');heldLecture(ctx.db,lectureId);
  const ids=Array.isArray(body.userIds)?body.userIds.slice(0,500):[];const now=nowIso();let changed=0;
  ctx.db.transaction(()=>{for(const userId of ids){if(!ctx.db.query('SELECT 1 FROM users WHERE id=?').get(userId))continue;
   const r=ctx.db.query("INSERT INTO attendance(user_id,lecture_id,kind,verified_by,created,updated) VALUES(?,?,'verified_by_admin',?,?,?) ON CONFLICT(user_id,lecture_id) DO UPDATE SET kind='verified_by_admin',verified_by=excluded.verified_by,updated=excluded.updated WHERE attendance.kind<>'verified_by_admin'").run(userId,lectureId,admin.id,now,now);
