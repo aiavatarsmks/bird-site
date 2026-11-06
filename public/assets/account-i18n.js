@@ -313,7 +313,7 @@ window.BIRD_ACCOUNT_TEXT={
  tf_attendance:{en:'Missed lectures',hr:'Propuštena predavanja',ru:'Не были на лекциях'},
  tf_pitch:{en:'No deck',hr:'Bez prezentacije',ru:'Без презентации'},
  tf_waiting:{en:'To review',hr:'Za pregled',ru:'На проверку'},
- nudgePick:{en:'Tick teams in the table below and send one message to all of them.',hr:'Označite timove u tablici i pošaljite im jednu poruku.',ru:'Отметьте команды в таблице ниже и отправьте им одно сообщение.'},
+ nudgePick:{en:'Tick teams in the table. Only teams with registered people have a box.',hr:'Označite timove u tablici. Polje za odabir imaju samo timovi s registriranim članovima.',ru:'Отметьте команды в таблице. Галочка есть только у команд с зарегистрированными участниками.'},
  noAccount:{en:'No account yet',hr:'Još nema računa',ru:'Аккаунта пока нет'},
  noAccountNote:{en:'Messages cannot reach this person until they register. Send them an invitation.',hr:'Poruke ne dolaze do ove osobe dok se ne registrira. Pošaljite pozivnicu.',ru:'Сообщения не дойдут, пока человек не зарегистрируется. Отправьте приглашение.'},
  noAccountsYet:{en:'Nobody has registered yet',hr:'Još nitko nije registriran',ru:'Пока никто не зарегистрирован'},
@@ -391,4 +391,8 @@ window.BIRD_ACCOUNT_TEXT={
  permWho3:{en:'organisers',hr:'organizatori',ru:'организаторы'},
  perm4:{en:'Change the platform owner',hr:'Promjena vlasnika platforme',ru:'Сменить владельца платформы'},
  permWho4:{en:'only through the code',hr:'samo kroz kod',ru:'только через код'},
+ saveChanges:{en:'Save changes',hr:'Spremi promjene',ru:'Сохранить изменения'},
+ publishChanges:{en:'Publish changes',hr:'Objavi promjene',ru:'Опубликовать изменения'},
+ dateHint:{en:'dd/mm/yyyy',hr:'dd.mm.gggg.',ru:'дд.мм.гггг'},
+ dateTimeHint:{en:'dd/mm/yyyy, hh:mm',hr:'dd.mm.gggg., hh:mm',ru:'дд.мм.гггг, чч:мм'},
 };

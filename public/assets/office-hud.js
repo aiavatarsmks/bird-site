@@ -60,6 +60,7 @@
   needsHelp:{en:'asked for help',hr:'traži pomoć',ru:'просят помощи'},
   noAccounts:{en:'nobody registered',hr:'nitko nije registriran',ru:'никто не зарегистрирован'},
   openAdmin:{en:'Admin panel',hr:'Administracija',ru:'Админ-панель'},
+  newProject:{en:'Add a project',hr:'Dodaj projekt',ru:'Добавить проект'},
  };
  const OPEN=new Set(['not_started','draft','changes_requested']);
  let lang='en',open=null,area='',highlight=null,data=null,loading=null,host=null,error='',loadedAt=0,photoVersion=0,linksNote='',context={};
@@ -124,7 +125,7 @@
    <h3>${t('links')}</h3><form class="hud-links" data-hud-links><label><span>${t('linkedin')}</span><input name="linkedin" type="url" inputmode="url" placeholder="https://www.linkedin.com/in/…" value="${esc(p.links.linkedin)}" maxlength="300"></label><label><span>${t('website')}</span><input name="website" type="url" inputmode="url" placeholder="https://" value="${esc(p.links.website)}" maxlength="300"></label><button class="hud-secondary">${t('save')}</button>${linksNote?`<small role="status">${esc(linksNote)}</small>`:''}</form>`:''}
    ${error?`<p class="hud-error" role="alert">${esc(error)}</p>`:''}<p class="hud-muted">${t('photoNote')}</p>
    ${p&&!p.character?`<p class="hud-muted">${t('noCharacter')}</p>`:''}
-   <div class="hud-actions"><a class="hud-primary" href="#/account">${t('cabinet')}</a>${['program_admin','platform_owner'].includes(me.role)?`<a class="hud-secondary" href="#/admin">${t('admin')}</a>`:''}</div>`;
+   <div class="hud-actions"><a class="hud-primary" href="#/account">${t('cabinet')}</a><a class="hud-secondary" href="#/account/new-project">+ ${t('newProject')}</a>${['program_admin','platform_owner'].includes(me.role)?`<a class="hud-secondary" href="#/admin">${t('admin')}</a>`:''}</div>`;
  }
  function teamsPanel(){
   const teams=context.teams?.()||[];

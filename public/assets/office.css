@@ -266,13 +266,62 @@ body.office-fullscreen .office-intro{display:none!important}
 .hud-attention li>small{display:block;padding:0 10px 8px 34px;color:#5d6658}
 .hud-team-dot.is-risk{background:#c0392b}.hud-team-dot.is-watch{background:#d39b22}.hud-team-dot.is-ok{background:#3f9a5b}
 .hud-mentors li.is-highlight{outline:2px solid #d39b22;border-radius:8px}
+/* Phone: the dock is a bottom bar under the thumb, map tools sit above it and search folds away. */
 @media(max-width:720px){
- .office-page .office-intro>.office-primary{font-size:0;width:52px;min-width:52px;padding:0;display:flex;align-items:center;justify-content:center}
- .office-page .office-intro>.office-primary::before{content:'+';font-size:24px;line-height:1}
- .office-page .office-area-nav{max-width:calc(100% - 88px)}
-}
-@media(max-width:720px){
- .office-page .office-side.has-selection{max-height:calc(100% - 24px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+ .office-page .office-intro{padding:0!important;border:0;background:none;box-shadow:none;pointer-events:none}
+ .office-page .office-intro>.office-primary{display:none}
+ .hud-dock{left:8px;right:8px;top:auto;bottom:max(8px,env(safe-area-inset-bottom));flex-direction:row;gap:4px;align-items:stretch}
+ .hud-dock>.hud-btn{flex:1 1 0;width:auto;min-width:0;min-height:56px;height:56px}
+ .hud-dock>.hud-face{flex:0 0 56px;width:56px}
+ .hud-btn small{font-size:10px}
+ .office-page .office-toolbar{left:68px;right:8px;bottom:calc(72px + env(safe-area-inset-bottom));padding:4px}
+ .office-page .office-board.is-expanded .office-toolbar{left:8px}
+ .office-page .office-toolbar .camera-tools button{flex:1 1 0;min-width:0}
+ .office-page .office-toolbar .camera-tools button[data-action=motion]{font-size:0;flex:1 1 0}
+ .office-page .office-toolbar .camera-tools button[data-action=motion]::before{content:'❚❚';font-size:14px}
+ .office-page .office-toolbar .camera-tools button[data-action=motion][aria-pressed=false]::before{content:'▶'}
+ .office-page .office-toolbar .camera-tools button[data-action=fit]{flex:1.6 1 0}
+ .office-page .office-area-nav{left:8px;right:auto;bottom:calc(72px + env(safe-area-inset-bottom));max-width:none;padding:4px}
+ .office-page .office-area-nav>:not(.office-controls-toggle){display:none}
+ .office-page .office-area-nav .office-controls-toggle{font-size:0;width:48px;min-height:48px;padding:0}
+ .office-page .office-area-nav .office-controls-toggle::before{content:'⌕';font-size:24px;line-height:1}
+ .office-page .office-board.is-expanded .office-area-nav{left:8px;right:8px;bottom:calc(252px + env(safe-area-inset-bottom));max-width:none;flex-wrap:wrap}
+ .office-page .office-board.is-expanded .office-area-nav>*{display:block}
+ .office-page .office-board.is-expanded .office-area-nav>.office-placement-note{display:none}
+ .office-page .office-minimap{bottom:136px}
+ .office-page .office-board.is-expanded .office-minimap{display:none}
+ .office-quest{left:8px;right:8px;top:8px;transform:none;max-width:none}
+ .hud-panel{left:8px;right:8px;top:8px;max-height:calc(100% - 152px);z-index:7}
+ .office-page .office-side.has-selection{max-height:calc(100% - 152px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
  .office-page .office-side.has-selection .office-details{overflow:visible;max-height:none}
 }
-
+@media(max-width:720px){.office-page .top-nav a:not(:first-child):not(:last-child){display:none}}
+/* Phone on its side: dock and map tools share the bottom edge. */
+@media(max-height:500px){
+ .hud-dock{left:8px;right:auto;top:auto;bottom:max(8px,env(safe-area-inset-bottom));flex-direction:row;gap:4px;--face:52px}
+ .hud-dock>.hud-btn,.hud-dock>.hud-face{flex:0 0 52px;width:52px;min-height:52px;height:52px;padding:2px}
+ .hud-face{height:52px}
+ .hud-btn small{font-size:8px}
+ .office-page .office-minimap{display:none}
+ .office-page .office-area-nav,.office-page .office-board.is-expanded .office-area-nav{left:8px;right:auto;top:8px;bottom:auto;max-width:none;padding:4px;flex-wrap:nowrap}
+ .office-page .office-area-nav>:not(.office-controls-toggle),.office-page .office-board.is-expanded .office-area-nav>:not(.office-controls-toggle){display:none}
+ .office-page .office-area-nav .office-controls-toggle{display:block;font-size:0;width:48px;height:48px;min-height:48px;padding:0}
+ .office-page .office-area-nav .office-controls-toggle::before{content:'⌕';font-size:24px;line-height:1}
+ .office-page .office-board.is-expanded .office-toolbar{top:8px;bottom:auto;left:72px;right:8px;width:auto;grid-template-columns:1fr 1fr}
+ .office-page .office-board.is-expanded .office-toolbar .office-search,.office-page .office-board.is-expanded .office-toolbar .office-group-control{display:flex}
+ .office-page .office-board.is-expanded .office-toolbar .camera-tools{grid-column:1/-1;justify-content:flex-end}
+ .office-page .office-toolbar{left:auto;right:8px;bottom:max(8px,env(safe-area-inset-bottom));padding:4px}
+ .office-page .office-toolbar .office-search,.office-page .office-toolbar .office-group-control{display:none}
+ .office-page .office-toolbar{grid-template-columns:auto;width:auto}
+ .office-page .office-toolbar .camera-tools{gap:4px;width:auto}
+ .office-page .office-toolbar .camera-tools button{height:44px;min-height:44px;flex:0 0 44px;width:44px;padding:0}
+ .office-page .office-toolbar .camera-tools button[data-action=fit]{flex:0 0 auto;width:auto;padding:0 6px}
+ .office-page .office-toolbar .camera-tools button[data-action=motion]{font-size:0;flex:0 0 44px}
+ .office-page .office-toolbar .camera-tools button[data-action=motion]::before{content:'❚❚';font-size:13px}
+ .office-page .office-toolbar .camera-tools button[data-action=motion][aria-pressed=false]::before{content:'▶'}
+ .office-page .office-intro>.office-primary{display:none}
+ .office-page .office-intro{padding:0!important;border:0;background:none;box-shadow:none;pointer-events:none}
+ .office-quest{display:none}
+ .hud-panel{left:8px;right:auto;top:8px;width:min(420px,calc(100% - 16px));max-height:calc(100% - 16px);z-index:7}
+ .office-page .office-side.has-selection{top:8px;right:8px;width:320px;max-height:calc(100% - 80px);overflow-y:auto}
+}

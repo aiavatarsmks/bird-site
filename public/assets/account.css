@@ -159,7 +159,11 @@ tr[hidden]{display:none}
 .acc-tabs{background-attachment:scroll}
 .acc-actions>a{min-height:44px;display:inline-flex;align-items:center}
 @media(max-width:600px){
- .acc-subtabs{flex-wrap:wrap;overflow:visible;background:none}
+ .acc-admin .acc-head{display:none}
+ .acc-admin .acc-tabs a{min-height:40px;padding:8px 9px;font-size:14px}
+ .acc-admin>.acc-tabs{margin-bottom:6px}
+ .acc-subtabs{margin-bottom:10px}
+ .acc-subtabs-2{margin-top:-6px}
  .acc-attendance-table{min-width:0}
  .acc-attendance-table tr>:nth-child(n+5){display:none}
  .acc-teams-table{min-width:0}
@@ -167,4 +171,7 @@ tr[hidden]{display:none}
  .acc-teams-table td:nth-child(8) small{display:none}
  .acc-matrix th[scope=row]{min-width:0}
 }
+.acc-date{position:relative;display:block}
+.acc-date.is-empty input:not(:focus)::-webkit-datetime-edit{opacity:0}
+.acc-date.is-empty:not(:focus-within)::after{content:attr(data-hint);position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
 
