@@ -51,7 +51,7 @@ function signals(db){
   const seen=ids.map(id=>lastSeen(db,id)).filter(Boolean).sort().at(-1)||null;
   const waiting=db.query(`SELECT count(*) n FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE s.status='submitted' AND (a.project_id=? ${ids.length?`OR a.user_id IN (${ids.map(()=>'?').join(',')})`:''})`).get(p.id,...ids).n;
   return {id:p.id,name:nameOf(p),level:risk.level,signals:risk.signals,percent:teamScore(db,p.id,ids).percent,members:ids.length,waiting,lastSeen:seen,inactive:!!ids.length&&(!seen||Date.parse(now)-Date.parse(seen)>7*86400000)};
- }).sort((a,b)=>({risk:0,watch:1,ok:2}[a.level]-{risk:0,watch:1,ok:2}[b.level])||(a.percent??-1)-(b.percent??-1));
+ }).sort((a,b)=>({risk:0,watch:1,ok:2}[a.level]-{risk:0,watch:1,ok:2}[b.level])||a.percent-b.percent);
  return {teams};
 }
 /** Admin-only overlay for the office: never mixed into public office data. */

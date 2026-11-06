@@ -6,7 +6,7 @@ import {requireUser} from './auth.mjs';
 import {award,projectXp,userXp} from './progress.mjs';
 import {isoWeek} from './tasks.mjs';
 
-const CHECKIN_XP=10;
+const CHECKIN_XP=10,START_SCORE=10;
 const weekBefore=(week,n=1)=>{const [y,w]=week.split('-W').map(Number);const d=new Date(Date.UTC(y,0,4+(w-1)*7-n*7));return isoWeek(d);};
 
 /** Consecutive weeks with a check-in; one missed week inside the run is forgiven. */
@@ -108,6 +108,7 @@ export function readAnnouncements(ctx){
  * Fair team score: the share of what this team could earn, so a team of one and a team of four compete equally.
  * Team tasks count once. Personal tasks are averaged over the members, and nobody loses for an optional task.
  * Tasks given to one team only count for that team. Weekly check-ins count for every week the cohort reported.
+ * Every team starts from the same 10 and the remaining 90 follow the share of earned points.
  */
 export function teamScore(db,projectId,memberIds){
  const tally=rows=>{let earned=0,available=0;for(const r of rows){const done=r.sub==='accepted';if(done)earned+=r.xp;if(done||r.pick_mode!=='catalog')available+=r.xp;}return {earned,available};};
@@ -119,7 +120,8 @@ export function teamScore(db,projectId,memberIds){
  const checkins=db.query('SELECT count(*) n FROM checkins WHERE project_id=?').get(projectId).n*CHECKIN_XP;
  const earned=team.earned+personal.earned/size+checkins+manual('project',[projectId])+manual('user',memberIds)/size;
  const available=team.available+personal.available/size+weeks*CHECKIN_XP;
- return {earned:Math.round(earned),available:Math.round(available),percent:available?Math.max(0,Math.min(100,Math.round(earned/available*100))):null};
+ const share=available?Math.max(0,Math.min(1,earned/available)):0;
+ return {earned:Math.round(earned),available:Math.round(available),percent:Math.round(START_SCORE+(100-START_SCORE)*share)};
 }
 
 /** Team ranking by fair percentage. Personal tasks and private metrics stay out. */
@@ -130,7 +132,7 @@ export function teamRanking(ctx){
   const members=ctx.db.query("SELECT user_id FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").all(p.id).map(m=>m.user_id);
   const team=projectXp(ctx.db,p.id),weekGain=ctx.db.query("SELECT coalesce(sum(amount),0) n FROM xp_ledger WHERE beneficiary_type='project' AND beneficiary_id=? AND created>=?").get(p.id,since).n;
   return {projectId:p.id,name:p.name,percent:teamScore(ctx.db,p.id,members).percent,teamXp:team,weekGain,streak:streak(ctx.db,p.id),members:members.length};
- }).filter(t=>t.members>0||t.teamXp>0).sort((a,b)=>(b.percent??-1)-(a.percent??-1)||b.teamXp-a.teamXp||b.weekGain-a.weekGain||a.name.localeCompare(b.name));
+ }).sort((a,b)=>b.percent-a.percent||b.teamXp-a.teamXp||b.weekGain-a.weekGain||a.name.localeCompare(b.name));
  return json({week,items,rules:{checkinXp:CHECKIN_XP}});
 }
 
