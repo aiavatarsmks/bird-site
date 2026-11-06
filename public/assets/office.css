@@ -310,6 +310,7 @@ body.office-fullscreen .office-intro{display:none!important}
  .office-page .office-board.is-expanded .office-toolbar{top:8px;bottom:auto;left:72px;right:8px;width:auto;grid-template-columns:1fr 1fr}
  .office-page .office-board.is-expanded .office-toolbar .office-search,.office-page .office-board.is-expanded .office-toolbar .office-group-control{display:flex}
  .office-page .office-board.is-expanded .office-toolbar .camera-tools{grid-column:1/-1;justify-content:flex-end}
+ .office-page .office-board.is-expanded .hud-dock{display:none}
  .office-page .office-toolbar{left:auto;right:8px;bottom:max(8px,env(safe-area-inset-bottom));padding:4px}
  .office-page .office-toolbar .office-search,.office-page .office-toolbar .office-group-control{display:none}
  .office-page .office-toolbar{grid-template-columns:auto;width:auto}
