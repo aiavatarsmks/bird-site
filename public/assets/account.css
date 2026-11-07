@@ -189,3 +189,9 @@ tr[hidden]{display:none}
 .acc-dm-thread small{color:var(--muted,#6b6b6b);font-size:12px}
 .acc-link{background:none;border:0;padding:0 2px;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;min-height:24px}
 .acc .acc-dm-thread button.acc-link{border:0;background:none;padding:0 2px;min-height:24px;min-width:0;font-size:12px;font-weight:400;color:inherit;text-decoration:underline;box-shadow:none}
+
+/* Team points */
+.acc-wallet .acc-list>li{align-items:flex-start}
+.acc-balance{font-size:22px;white-space:nowrap}
+.acc-history{flex-basis:100%}
+.acc-history summary{cursor:pointer;min-height:32px;font-size:14px}

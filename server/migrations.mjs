@@ -213,5 +213,12 @@ CREATE INDEX IF NOT EXISTS direct_messages_pair ON direct_messages(sender_id,rec
 CREATE INDEX IF NOT EXISTS direct_messages_inbox ON direct_messages(recipient_id,read_at);
 CREATE TABLE IF NOT EXISTS message_blocks(user_id TEXT NOT NULL REFERENCES users(id),blocked_id TEXT NOT NULL REFERENCES users(id),created TEXT NOT NULL,PRIMARY KEY(user_id,blocked_id));
 CREATE TABLE IF NOT EXISTS message_reports(id TEXT PRIMARY KEY,message_id TEXT NOT NULL REFERENCES direct_messages(id),reporter_id TEXT NOT NULL REFERENCES users(id),created TEXT NOT NULL,resolved_at TEXT,resolved_by TEXT,UNIQUE(message_id,reporter_id));
+`}, // Points become a team currency: mentor sessions and organiser rewards cost points. Bookings made before stay free.
+ {id:18,name:'team-wallet',sql:`
+ALTER TABLE office_hours ADD COLUMN price INTEGER NOT NULL DEFAULT 30;
+ALTER TABLE office_hour_bookings ADD COLUMN cost INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS rewards(id TEXT PRIMARY KEY,title TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',price INTEGER NOT NULL CHECK(price>=0),stock INTEGER,created_by TEXT NOT NULL,created TEXT NOT NULL,archived_at TEXT);
+CREATE TABLE IF NOT EXISTS reward_orders(id TEXT PRIMARY KEY,reward_id TEXT NOT NULL REFERENCES rewards(id),project_id TEXT NOT NULL REFERENCES projects(id),ordered_by TEXT NOT NULL REFERENCES users(id),price INTEGER NOT NULL,note TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),decided_by TEXT,decided_at TEXT,created TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS reward_orders_project ON reward_orders(project_id,status);
 `},
 ];

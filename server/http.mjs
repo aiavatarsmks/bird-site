@@ -15,6 +15,7 @@ const MESSAGES={
  UNSUPPORTED_FILE:'This file type is not accepted.',QUOTA_EXCEEDED:'The storage limit has been reached.',INVITE_INVALID:'This invitation is not valid.',
  BAD_ORIGIN:'The request came from another site.',CSRF:'The page is out of date. Reload and try again.',SERVER_ERROR:'Something went wrong on the server.',
  VERSION_MISMATCH:'Unsupported version.',ALREADY_DONE:'This is already done.',INVALID_STATE:'This action is not available now.',
+ NOT_ENOUGH_POINTS:'The team does not have enough points.',SOLD_OUT:'None left.',
 };
 
 export const SECURITY_HEADERS={'X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'SAMEORIGIN'};
