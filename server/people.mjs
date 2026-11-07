@@ -165,8 +165,11 @@ export async function updateProfile(ctx){
  if(email&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))fail(400,'INVALID_FIELDS',{field:'email'});
  const language=['en','hr','ru'].includes(body.language)?body.language:user.language;
  const optIn=body.leaderboardOptIn!==undefined?(body.leaderboardOptIn?1:0):user.leaderboard_opt_in;
+ // Email choices are kept now and used once organisers switch mail on; nothing is sent before that.
+ const flag=(v,old)=>v!==undefined?(v?1:0):old;
+ const mailMessages=flag(body.emailMessages,user.email_messages),mailReminders=flag(body.emailReminders,user.email_reminders);
  const now=nowIso();
- ctx.db.query('UPDATE users SET display_name=?,email=?,email_verified=CASE WHEN email IS ? THEN email_verified ELSE 0 END,language=?,leaderboard_opt_in=?,updated=? WHERE id=?').run(name,email||null,email||null,language,optIn,now,user.id);
+ ctx.db.query('UPDATE users SET display_name=?,email=?,email_verified=CASE WHEN email IS ? THEN email_verified ELSE 0 END,language=?,leaderboard_opt_in=?,email_messages=?,email_reminders=?,updated=? WHERE id=?').run(name,email||null,email||null,language,optIn,mailMessages,mailReminders,now,user.id);
  ctx.user=ctx.db.query('SELECT * FROM users WHERE id=?').get(user.id);
  ctx.hooks?.onProfileUpdated?.(ctx,ctx.user);
  return json({user:publicUser(ctx.user)});

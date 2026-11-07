@@ -220,5 +220,16 @@ ALTER TABLE office_hour_bookings ADD COLUMN cost INTEGER NOT NULL DEFAULT 0;
 CREATE TABLE IF NOT EXISTS rewards(id TEXT PRIMARY KEY,title TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',price INTEGER NOT NULL CHECK(price>=0),stock INTEGER,created_by TEXT NOT NULL,created TEXT NOT NULL,archived_at TEXT);
 CREATE TABLE IF NOT EXISTS reward_orders(id TEXT PRIMARY KEY,reward_id TEXT NOT NULL REFERENCES rewards(id),project_id TEXT NOT NULL REFERENCES projects(id),ordered_by TEXT NOT NULL REFERENCES users(id),price INTEGER NOT NULL,note TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),decided_by TEXT,decided_at TEXT,created TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS reward_orders_project ON reward_orders(project_id,status);
+`}, // Files in messages, group chats (a team chat follows the team's members), email preferences (stored; sending comes later).
+ {id:19,name:'group-chats-files-email',sql:`
+ALTER TABLE direct_messages ADD COLUMN file_id TEXT REFERENCES files(id);
+CREATE TABLE IF NOT EXISTS chat_groups(id TEXT PRIMARY KEY,title TEXT NOT NULL,project_id TEXT UNIQUE REFERENCES projects(id),created_by TEXT NOT NULL REFERENCES users(id),created TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS chat_members(group_id TEXT NOT NULL REFERENCES chat_groups(id),user_id TEXT NOT NULL REFERENCES users(id),role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('owner','member')),joined TEXT NOT NULL,left_at TEXT,last_read INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(group_id,user_id));
+CREATE INDEX IF NOT EXISTS chat_members_user ON chat_members(user_id,left_at);
+CREATE TABLE IF NOT EXISTS chat_messages(seq INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT NOT NULL UNIQUE,group_id TEXT NOT NULL REFERENCES chat_groups(id),sender_id TEXT NOT NULL REFERENCES users(id),body TEXT NOT NULL,file_id TEXT REFERENCES files(id),created TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS chat_messages_group ON chat_messages(group_id,seq);
+CREATE TABLE IF NOT EXISTS chat_reports(id TEXT PRIMARY KEY,message_id TEXT NOT NULL REFERENCES chat_messages(id),reporter_id TEXT NOT NULL REFERENCES users(id),created TEXT NOT NULL,resolved_at TEXT,resolved_by TEXT,UNIQUE(message_id,reporter_id));
+ALTER TABLE users ADD COLUMN email_messages INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN email_reminders INTEGER NOT NULL DEFAULT 0;
 `},
 ];

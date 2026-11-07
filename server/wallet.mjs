@@ -60,6 +60,7 @@ export async function saveReward(ctx,id){
  return json({id},201);
 }
 export function archiveReward(ctx,id){const admin=requireAdmin(ctx);ctx.db.query('UPDATE rewards SET archived_at=? WHERE id=? AND archived_at IS NULL').run(nowIso(),id);audit(ctx.db,admin.id,'reward.archive','reward',id,{});return json({ok:true});}
+export function restoreReward(ctx,id){const admin=requireAdmin(ctx);if(!ctx.db.query('UPDATE rewards SET archived_at=NULL WHERE id=? AND archived_at IS NOT NULL').run(id).changes)fail(404,'NOT_FOUND');audit(ctx.db,admin.id,'reward.restore','reward',id,{});return json({ok:true});}
 
 export async function orderReward(ctx,id){
  const user=requireUser(ctx),body=await readJson(ctx.request);

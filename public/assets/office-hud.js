@@ -31,7 +31,7 @@
   linkedIn:{en:'LinkedIn',hr:'LinkedIn',ru:'LinkedIn'},
   messages:{en:'Messages and reminders',hr:'Poruke i podsjetnici',ru:'Сообщения и напоминания'},
   reminder:{en:'Reminder',hr:'Podsjetnik',ru:'Напоминание'},
-  dmLink:{en:'Private messages',hr:'Privatne poruke',ru:'Личные сообщения'},dmNew:{en:'new',hr:'novih',ru:'новых'},
+  dmLink:{en:'Private messages',hr:'Privatne poruke',ru:'Личные сообщения'},dmNew:{en:'new',hr:'nove poruke',ru:'новые'},
   signIn:{en:'Sign in',hr:'Prijava',ru:'Войти'},
   register:{en:'Create account',hr:'Izradi račun',ru:'Создать аккаунт'},
   guestNote:{en:'Sign in to see your tasks, points and to book mentors.',hr:'Prijavite se za zadatke, bodove i termine s mentorima.',ru:'Войдите, чтобы видеть свои задания, баллы и записываться к менторам.'},
@@ -120,7 +120,7 @@
   const character=p?.character&&context.member?.(p.character.personId);
   const earned=p?p.badges.filter(b=>b.earned):[];
   return `<div class="hud-profile">${character?sprite(character.img,'hud-sprite-lg'):''}<div class="hud-profile-main"><label class="hud-photo">${face(me,56)}<input type="file" accept="image/*" data-hud-photo hidden><span>${t(me.hasAvatar?'photo':'addPhoto')}</span></label><div><strong>${esc(me.displayName)}</strong>${p?`<small>${p.xp} ${t('points')}</small>`:''}</div></div></div>
-   <a class="hud-link hud-dm" href="#/account/messages">✉ ${t('dmLink')}${data.dm?` · <b>${data.dm} ${t('dmNew')}</b>`:''}</a>
+   <a class="hud-link hud-dm" href="#/account/messages">✉ ${t('dmLink')}${data.dm?` · <b>${t('dmNew')}: ${data.dm}</b>`:''}</a>
    ${data.messages.length?`<ul class="hud-list hud-messages">${data.messages.map(n=>n.kind==='reminder'?`<li class="hud-reminder"><strong>🔔 ${t('reminder')}</strong><p>${n.payload.link?`<a href="${esc(n.payload.link)}">${esc(n.payload.text?.[lang]||n.payload.text?.en||'')}</a>`:esc(n.payload.text?.[lang]||n.payload.text?.en||'')}</p></li>`:`<li><strong>${esc(n.payload.from)}</strong><p>${esc(n.payload.message)}</p></li>`).join('')}</ul>`:''}
    ${p?`<div class="hud-stats"><div><b>${p.xp}</b><small>${t('points')}</small></div><div><b>${p.lectures.verified+p.lectures.selfReported}/${p.lectures.held}</b><small>${t('lecturesAttended')}</small></div><div><b>${p.tasks.done}</b><small>${t('tasksDone')}</small></div></div>
    <h3>${t('badges')} · ${earned.length}/${p.badges.length}</h3><ul class="hud-badges">${p.badges.map(b=>`<li class="${b.earned?'is-earned':''}" title="${esc(b.title[lang]||b.title.en)}"><span aria-hidden="true">${b.earned?'★':'☆'}</span>${esc(b.title[lang]||b.title.en)}</li>`).join('')}</ul>

@@ -23,11 +23,11 @@ const pickTitle=(json,field)=>{const t=JSON.parse(json||'{}');const get=l=>(fiel
 const TEXT={
  task48:{en:(t,a)=>`2 days left for “${t}” (due ${a}).`,hr:(t,a)=>`Još 2 dana za „${t}” (rok ${a}).`,ru:(t,a)=>`До сдачи «${t}» осталось 2 дня (срок ${a}).`},
  task6:{en:(t,a)=>`Due in a few hours: “${t}” (${a}).`,hr:(t,a)=>`Rok za nekoliko sati: „${t}” (${a}).`,ru:(t,a)=>`Через несколько часов срок: «${t}» (${a}).`},
- taskLate:{en:t=>`The deadline for “${t}” has passed. You can still hand it in.`,hr:t=>`Rok za „${t}” je prošao. Još je možete predati.`,ru:t=>`Срок по «${t}» прошёл. Сдать ещё можно.`},
+ taskLate:{en:t=>`The deadline for “${t}” has passed. You can still hand it in.`,hr:t=>`Rok za „${t}” je prošao. Još ga možete predati.`,ru:t=>`Срок по «${t}» прошёл. Сдать ещё можно.`},
  lecture24:{en:(t,a)=>`Tomorrow: “${t}”${a}.`,hr:(t,a)=>`Sutra: „${t}”${a}.`,ru:(t,a)=>`Завтра: «${t}»${a}.`},
  lecture1:{en:(t,a)=>`Starts within an hour: “${t}”${a}.`,hr:(t,a)=>`Počinje za manje od sat vremena: „${t}”${a}.`,ru:(t,a)=>`Меньше чем через час: «${t}»${a}.`},
- feedback:{en:t=>`How was “${t}”? Rate it from 1 to 10, it takes a minute.`,hr:t=>`Kako vam je bilo „${t}”? Ocijenite od 1 do 10, traje minutu.`,ru:t=>`Как прошла «${t}»? Оцените от 1 до 10, это минута.`},
- session:{en:(t,a)=>`Mentor session with ${t} at ${a}.`,hr:(t,a)=>`Sastanak s mentorom ${t} u ${a}.`,ru:(t,a)=>`Встреча с ментором ${t} в ${a}.`},
+ feedback:{en:t=>`How was “${t}”? Rate it from 1 to 10, it takes a minute.`,hr:t=>`Kako vam je bilo na „${t}”? Ocijenite od 1 do 10, treba vam samo minuta.`,ru:t=>`Как прошла «${t}»? Оцените от 1 до 10, это минута.`},
+ session:{en:(t,a)=>`Mentor session with ${t} at ${a}.`,hr:(t,a)=>`Sastanak s mentorom (${t}) u ${a}.`,ru:(t,a)=>`Встреча с ментором ${t} в ${a}.`},
  late2:{en:t=>`Two or more deadlines missed: ${t}.`,hr:t=>`Propuštena dva ili više rokova: ${t}.`,ru:t=>`Пропущено два срока или больше: ${t}.`},
 };
 const message=(type,title,extra)=>Object.fromEntries(['en','hr','ru'].map(l=>[l,TEXT[type][l](title[l]??title,extra)]));

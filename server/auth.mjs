@@ -59,7 +59,7 @@ function makeRecoveryCodes(db,userId){
  return codes;
 }
 
-export function publicUser(u){return u&&{id:u.id,login:u.login,displayName:u.display_name,email:u.email||'',emailVerified:!!u.email_verified,role:u.role,personId:u.person_id,language:u.language,leaderboardOptIn:!!u.leaderboard_opt_in};}
+export function publicUser(u){return u&&{id:u.id,login:u.login,displayName:u.display_name,email:u.email||'',emailVerified:!!u.email_verified,role:u.role,personId:u.person_id,language:u.language,leaderboardOptIn:!!u.leaderboard_opt_in,emailMessages:!!u.email_messages,emailReminders:!!u.email_reminders};}
 
 function validPassword(p){if(typeof p!=='string'||p.length<10||p.length>200)fail(400,'WEAK_PASSWORD');return p;}
 function validLogin(l){const v=typeof l==='string'?l.trim().toLowerCase():'';if(!LOGIN_RE.test(v))fail(400,'INVALID_FIELDS',{field:'login'});return v;}

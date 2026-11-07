@@ -132,30 +132,48 @@ function answerContent(form,type){
  return c;
 }
 
-// Private messages: organisers never read them; the recipient can report one message or block the sender.
+// Private messages and group chats: organisers never read them; anyone in a conversation can report one message or block a person.
 const who=p=>`${esc(p.name)}${p.organiser?` <span class="acc-chip">${tr('dmOrganiser')}</span>`:''}${p.team?`<small>${esc(p.team)}</small>`:''}`;
-async function messagesView(otherId){
+const attachment=f=>!f?'':f.mime.startsWith('image/')?`<a class="acc-dm-file" href="/api/files/${esc(f.id)}" download><img src="/api/files/${esc(f.id)}?inline=1" alt="${esc(f.filename)}" loading="lazy"></a>`:`<a class="acc-dm-file" href="/api/files/${esc(f.id)}" download>📎 ${esc(f.filename)} <small>${size(f.size)}</small></a>`;
+const sendForm=(kind,id)=>`<form data-form="${kind}" data-id="${esc(id)}">${field('body',tr('dmMessage'),{type:'textarea',attrs:'rows="3" maxlength="2000"'})}<label class="acc-dm-attach">${tr('dmAttach')} <input type="file" name="file" accept=".pdf,.pptx,.png,.jpg,.jpeg,.webp"></label><small class="acc-muted">${tr('dmAttachHint')}</small><button class="acc-primary">${tr('dmSend')}</button></form>`;
+const bubble=(m,reportAct,group)=>m.hidden?`<li class="is-hidden"><p>${tr('dmHidden')}</p></li>`:`<li class="${m.mine?'is-mine':''}">${group&&!m.mine?`<b class="acc-dm-from">${esc(m.sender.name)}</b>`:''}${m.body?`<p>${esc(m.body)}</p>`:''}${attachment(m.file)}<small>${date(m.created,true)}${m.mine&&m.read?' · '+tr('dmRead'):''}${!m.mine?(m.reported?' · '+tr('dmReported'):` · <button class="acc-link" data-act="${reportAct}" data-id="${esc(m.id)}" data-confirm="${esc(tr('dmReportConfirm'))}">${tr('dmReport')}</button>`):''}</small></li>`;
+const threadList=(key,t,reportAct,group)=>`${t.hasMore?`<p class="acc-muted">${tr('dmOlder')}</p>`:''}<ol class="acc-dm-thread" data-thread="${esc(key)}" data-count="${t.items.length}" data-last="${esc(t.items.at(-1)?.id||'')}">${t.items.map(m=>bubble(m,reportAct,group)).join('')}</ol>${t.items.length?'':`<p class="acc-muted">${tr('dmFirst')}</p>`}`;
+async function messagesView(otherId,groupId){
+ if(otherId==='g')return groupChatView(groupId);
  if(!otherId){
-  const q=cache.dmQuery||'';
+  const q=cache.dmQuery||'',picked=cache.groupPick||(cache.groupPick=new Map());
   const [list,found]=await Promise.all([api('GET','/api/messages'),q?api('GET','/api/messages/people?q='+encodeURIComponent(q)):null]);
   cache.messages=list.unread;
-  return shell('messages',`<section class="acc-card"><h2>${tr('dmNew')}</h2><p class="acc-muted">${tr('dmPrivacy')}</p><form data-form="dm-find" class="acc-inline">${field('q',tr('dmFind'),{value:q,attrs:'maxlength="60" autocomplete="off"'})}<button class="acc-secondary">${tr('dmSearch')}</button></form>${found?(found.items.length?`<ul class="acc-list acc-dm-people">${found.items.map(p=>`<li><a href="#/account/messages/${esc(p.id)}"><span>${who(p)}</span></a></li>`).join('')}</ul>`:empty()):''}</section>
-  <section class="acc-card"><h2>${tr('dmTab')}</h2>${list.items.length?`<ul class="acc-list acc-dm-list">${list.items.map(c=>`<li class="${c.unread?'is-unread':''}"><a href="#/account/messages/${esc(c.person.id)}"><span class="acc-dm-who">${who(c.person)}</span><span class="acc-dm-last">${c.last.mine?tr('dmYou')+': ':''}${esc(c.last.body)}</span><small>${date(c.last.created,true)}${c.unread?` · <b class="acc-dot">${c.unread}</b>`:''}${c.blocked?' · '+tr('dmBlocked'):''}</small></a></li>`).join('')}</ul>`:`<p class="acc-muted">${tr('dmNone')}</p>`}</section>`);
+  const last=c=>`${c.last.mine?tr('dmYou')+': ':c.kind==='group'&&c.last.who?esc(c.last.who)+': ':''}${esc(c.last.body)}`;
+  return shell('messages',`${list.teamsWithoutChat.length?`<section class="acc-card"><h2>${tr('teamChat')}</h2><p class="acc-muted">${tr('teamChatNote')}</p><div class="acc-actions">${list.teamsWithoutChat.map(t=>`<button class="acc-secondary" data-act="team-chat" data-id="${esc(t.id)}">👥 ${esc(t.name)}</button>`).join('')}</div></section>`:''}
+  <section class="acc-card"><h2>${tr('dmNew')}</h2><p class="acc-muted">${tr('dmPrivacy')}</p><form data-form="dm-find" class="acc-inline">${field('q',tr('dmFind'),{value:q,attrs:'maxlength="60" autocomplete="off"'})}<button class="acc-secondary">${tr('dmSearch')}</button></form>${found?(found.items.length?`<ul class="acc-list acc-dm-people">${found.items.map(p=>`<li><a href="#/account/messages/${esc(p.id)}"><span>${who(p)}</span></a><button class="acc-link" data-act="group-pick" data-id="${esc(p.id)}" data-name="${esc(p.name)}" ${picked.has(p.id)?'disabled':''}>${tr(picked.has(p.id)?'groupPicked':'groupAdd')}</button></li>`).join('')}</ul>`:empty()):''}
+  ${picked.size?`<form data-form="group-new" class="acc-dm-new-group"><h3>${tr('groupNew')}</h3><p class="acc-actions">${[...picked].map(([id,name])=>`<button type="button" class="acc-chip" data-act="group-unpick" data-id="${esc(id)}" aria-label="${esc(tr('remove')+' '+name)}">${esc(name)} ×</button>`).join('')}</p>${field('title',tr('groupTitle'),{required:true,attrs:'maxlength="80"'})}<button class="acc-primary">${tr('groupCreate')}</button></form>`:`<p class="acc-small">${tr('groupHint')}</p>`}</section>
+  <section class="acc-card"><h2>${tr('dmTab')}</h2>${list.items.length?`<ul class="acc-list acc-dm-list">${list.items.map(c=>`<li class="${c.unread?'is-unread':''}"><a href="#/account/messages/${c.kind==='group'?'g/'+esc(c.group.id):esc(c.person.id)}"><span class="acc-dm-who">${c.kind==='group'?`👥 ${esc(c.group.title)}<small>${c.group.team?tr('teamChat')+' · ':''}${tr('groupPeople')}: ${c.group.members}</small>`:who(c.person)}</span><span class="acc-dm-last">${last(c)}</span><small>${date(c.last.created,true)}${c.unread?` · <b class="acc-dot">${c.unread}</b>`:''}${c.blocked?' · '+tr('dmBlocked'):''}</small></a></li>`).join('')}</ul>`:`<p class="acc-muted">${tr('dmNone')}</p>`}</section>`);
  }
  const t=await api('GET','/api/messages/with/'+encodeURIComponent(otherId));
  cache.messages=Math.max(0,(await api('GET','/api/auth/me')).messages||0);
- const closed=!t.canSend;
  return shell('messages',`<a class="acc-back" href="#/account/messages">← ${tr('dmTab')}</a><section class="acc-card acc-dm"><div class="acc-card-head"><h2>${who(t.person)}</h2><button class="acc-secondary" data-act="dm-block" data-id="${esc(otherId)}" data-on="${t.blocked?'0':'1'}" ${t.blocked?'':`data-confirm="${esc(tr('dmBlockConfirm'))}"`}>${tr(t.blocked?'dmUnblock':'dmBlock')}</button></div>
-  ${t.hasMore?`<p class="acc-muted">${tr('dmOlder')}</p>`:''}<ol class="acc-dm-thread" data-thread="${esc(otherId)}" data-count="${t.items.length}" data-last="${esc(t.items.at(-1)?.id||'')}">${t.items.map(m=>`<li class="${m.mine?'is-mine':''}"><p>${esc(m.body)}</p><small>${date(m.created,true)}${m.mine&&m.read?' · '+tr('dmRead'):''}${!m.mine?(m.reported?' · '+tr('dmReported'):` · <button class="acc-link" data-act="dm-report" data-id="${esc(m.id)}" data-confirm="${esc(tr('dmReportConfirm'))}">${tr('dmReport')}</button>`):''}</small></li>`).join('')}</ol>
-  ${t.items.length?'':`<p class="acc-muted">${tr('dmFirst')}</p>`}
-  ${closed?`<p class="acc-note">${tr(t.blocked?'dmYouBlocked':'dmCannot')}</p>`:`<form data-form="dm-send" data-id="${esc(otherId)}">${field('body',tr('dmMessage'),{type:'textarea',required:true,attrs:'rows="3" maxlength="2000"'})}<button class="acc-primary">${tr('dmSend')}</button></form>`}
+  ${threadList(otherId,t,'dm-report',false)}
+  ${t.canSend?sendForm('dm-send',otherId):`<p class="acc-note">${tr(t.blocked?'dmYouBlocked':'dmCannot')}</p>`}
   <p class="acc-small">${tr('dmPrivacy')}</p></section>`);
+}
+async function groupChatView(id){
+ const t=await api('GET','/api/messages/groups/'+encodeURIComponent(id));
+ cache.messages=Math.max(0,(await api('GET','/api/auth/me')).messages||0);
+ const q=cache.groupQuery||'',found=t.owner&&q?await api('GET','/api/messages/people?q='+encodeURIComponent(q)):null,inside=new Set(t.members.map(m=>m.id));
+ return shell('messages',`<a class="acc-back" href="#/account/messages">← ${tr('dmTab')}</a><section class="acc-card acc-dm"><div class="acc-card-head"><h2>👥 ${esc(t.group.title)}<small>${t.group.team?tr('teamChat')+' · ':''}${tr('groupPeople')}: ${t.group.members}</small></h2>${t.group.team?'':`<button class="acc-secondary" data-act="group-leave" data-id="${esc(id)}" data-user="${esc(me.id)}" data-confirm="${esc(tr('groupLeaveConfirm'))}">${tr('groupLeave')}</button>`}</div>
+  <details class="acc-dm-members"><summary>${tr('groupMembers')}</summary><ul class="acc-list">${t.members.map(m=>`<li><span>${who(m)}${m.owner?` <span class="acc-chip">${tr('groupOwner')}</span>`:''}</span>${m.id===me.id?'':`<span class="acc-actions"><a class="acc-link" href="#/account/messages/${esc(m.id)}">${tr('dmWrite')}</a>${t.owner?`<button class="acc-link" data-act="group-leave" data-id="${esc(id)}" data-user="${esc(m.id)}" data-confirm="${esc(tr('groupRemoveConfirm'))}">${tr('remove')}</button>`:''}</span>`}</li>`).join('')}</ul>
+  ${t.owner?`<form data-form="group-rename" data-id="${esc(id)}" class="acc-inline">${field('title',tr('groupTitle'),{value:t.group.title,required:true,attrs:'maxlength="80"'})}<button class="acc-secondary">${tr('save')}</button></form><form data-form="group-find" class="acc-inline">${field('q',tr('groupAddPeople'),{value:q,attrs:'maxlength="60" autocomplete="off"'})}<button class="acc-secondary">${tr('dmSearch')}</button></form>${found?`<ul class="acc-list">${found.items.filter(p=>!inside.has(p.id)).map(p=>`<li><span>${who(p)}</span><button class="acc-secondary" data-act="group-add" data-id="${esc(id)}" data-user="${esc(p.id)}">${tr('groupAdd')}</button></li>`).join('')||`<li>${empty()}</li>`}</ul>`:''}`:t.group.team?`<p class="acc-small">${tr('teamChatNote')}</p>`:''}</details>
+  ${threadList('g/'+id,t,'group-report',true)}
+  ${sendForm('group-send',id)}
+  <p class="acc-small">${tr('groupPrivacy')}</p></section>`);
 }
 // While a conversation is open, new messages appear without a reload unless something is being typed.
 setInterval(async()=>{
  const list=root?.querySelector('[data-thread]');if(!list||document.hidden)return;
- const box=root.querySelector('form[data-form=dm-send] textarea');if(box?.value.trim())return;
- try{const t=await api('GET','/api/messages/with/'+encodeURIComponent(list.dataset.thread));if(String(t.items.length)!==list.dataset.count||(t.items.at(-1)?.id||'')!==list.dataset.last)render();}catch{}
+ const form=root.querySelector('form[data-form$=-send]');if(form?.elements.body?.value.trim()||form?.elements.file?.files.length)return;
+ const key=list.dataset.thread,path=key.startsWith('g/')?'/api/messages/groups/'+encodeURIComponent(key.slice(2)):'/api/messages/with/'+encodeURIComponent(key);
+ try{const t=await api('GET',path);if(String(t.items.length)!==list.dataset.count||(t.items.at(-1)?.id||'')!==list.dataset.last)render();}catch{}
 },10000);
 async function mentorsView(only){
  const [all,projects,mentors,wallets,rewards]=await Promise.all([api('GET','/api/office-hours'),api('GET','/api/projects?mine=1'),api('GET','/api/mentors'),api('GET','/api/wallet'),api('GET','/api/rewards')]);
@@ -193,6 +211,7 @@ async function characterView(){
 async function settingsView(){
  const s=await api('GET','/api/auth/sessions');
  return shell('settings',`<div class="acc-grid"><section class="acc-card"><h2>${tr('settings')}</h2><form data-form="profile">${field('displayName',tr('displayName'),{value:me.displayName,required:true,attrs:'maxlength="80"'})}${field('email',tr('email'),{type:'email',value:me.email,hint:tr('emailNote')})}${select('language',tr('language'),[['en','English'],['hr','Hrvatski'],['ru','Русский']],me.language)}<label class="acc-check"><input type="checkbox" name="leaderboardOptIn" ${me.leaderboardOptIn?'checked':''}> ${tr('leaderboard')}</label><small class="acc-muted">${tr('leaderboardNote')}</small><button class="acc-primary">${tr('save')}</button></form></section>
+ <section class="acc-card"><h2>${tr('emailTitle')}</h2><form data-form="email-prefs"><p class="acc-muted">${tr('emailPrefsNote')}</p><label class="acc-check"><input type="checkbox" name="emailMessages" ${me.emailMessages?'checked':''}> ${tr('emailMessages')}</label><label class="acc-check"><input type="checkbox" name="emailReminders" ${me.emailReminders?'checked':''}> ${tr('emailReminders')}</label>${me.email?'':`<p class="acc-note">${tr('emailNeeded')}</p>`}<button class="acc-secondary">${tr('save')}</button></form></section>
  <section class="acc-card"><h2>${tr('sessions')}</h2><ul class="acc-list">${s.items.map(x=>`<li><div><strong>${esc(x.device)}</strong>${x.current?` <small>(${tr('thisDevice')})</small>`:''}<small>${date(x.lastSeen,true)}</small></div><button data-act="session" data-id="${esc(x.id)}">${tr('revoke')}</button></li>`).join('')}</ul><div class="acc-actions"><button data-act="logout">${tr('signOut')}</button><button data-act="logout-all">${tr('signOutAll')}</button></div></section>
  <section class="acc-card"><h2>${tr('password')}</h2><form data-form="password">${field('currentPassword',tr('currentPassword'),{type:'password',required:true,attrs:'autocomplete="current-password"'})}${field('newPassword',tr('newPassword'),{type:'password',required:true,hint:tr('passwordHint'),attrs:'autocomplete="new-password" minlength="10"'})}<button class="acc-secondary">${tr('save')}</button></form>
  <h3>${tr('newCodes')}</h3><form data-form="codes">${field('currentPassword',tr('currentPassword'),{type:'password',required:true,attrs:'autocomplete="current-password"'})}<button class="acc-secondary">${tr('newCodes')}</button></form></section></div>`);
@@ -419,7 +438,7 @@ async function adminView(tab='today',id){
   const pending=o.items.filter(x=>x.status==='pending');
   return adminShell(tab,`<section class="acc-card"><h2>${tr('rewardOrders')}${pending.length?` <b class="acc-dot">${pending.length}</b>`:''}</h2>${o.items.length?`<ul class="acc-list">${o.items.map(x=>`<li class="${x.status==='pending'?'is-unread':''}"><div><strong>${esc(x.title)}</strong> · <a href="#/admin/team/${esc(x.projectId)}">${esc(x.team)}</a><small>${esc(x.who)} · ${x.price} ${tr('xp')} · ${date(x.created,true)}${x.note?' · '+esc(x.note):''}</small></div>${x.status==='pending'?`<span class="acc-actions"><button class="acc-primary" data-act="order-decide" data-id="${esc(x.id)}" data-status="approved">${tr('approve')}</button><button data-act="order-decide" data-id="${esc(x.id)}" data-status="rejected" data-confirm="${esc(tr('orderRejectConfirm'))}">${tr('reject')}</button></span>`:`<span class="acc-chip ${x.status==='approved'?'is-accepted':''}">${tr('order_'+x.status)}</span>`}</li>`).join('')}</ul>`:empty()}</section>
   <form data-form="reward" class="acc-card"><h2>${tr('newReward')}</h2><p class="acc-muted">${tr('newRewardNote')}</p>${field('title',tr('title'),{required:true,attrs:'maxlength="120"'})}${field('description',tr('rewardDescription'),{type:'textarea',attrs:'rows="2" maxlength="600"'})}<div class="acc-inline">${field('price',tr('slotPrice'),{type:'number',value:50,required:true,attrs:'min="0" max="100000"'})}${field('stock',tr('rewardStock'),{type:'number',attrs:'min="0" max="10000"'})}</div><button class="acc-primary">${tr('save')}</button></form>
-  <section class="acc-card"><h2>${tr('rewardsTitle')}</h2>${r.items.length?`<ul class="acc-list">${r.items.map(x=>`<li><div><strong>${esc(x.title)}</strong><small>${x.price} ${tr('xp')}${x.stock!==null?' · '+tr('rewardLeft')+': '+x.left+'/'+x.stock:''}${x.archived?' · '+tr('archived'):''}</small></div>${x.archived?'':`<button data-act="reward-archive" data-id="${esc(x.id)}" data-confirm="${esc(tr('rewardArchiveConfirm'))}">${tr('remove')}</button>`}</li>`).join('')}</ul>`:empty()}</section>`);
+  <section class="acc-card"><h2>${tr('rewardsTitle')}</h2>${r.items.length?`<ul class="acc-list">${r.items.map(x=>`<li><details class="acc-grow"><summary><strong>${esc(x.title)}</strong> <small>${x.price} ${tr('xp')}${x.stock!==null?' · '+tr('rewardLeft')+': '+x.left+'/'+x.stock:''}${x.archived?' · '+tr('archived'):''}${x.description?' · '+esc(x.description):''}</small></summary><form data-form="reward" data-id="${esc(x.id)}" class="acc-compact">${field('title',tr('title'),{required:true,value:x.title,attrs:'maxlength="120"'})}${field('description',tr('rewardDescription'),{type:'textarea',value:x.description,attrs:'rows="2" maxlength="600"'})}<div class="acc-inline">${field('price',tr('slotPrice'),{type:'number',value:x.price,required:true,attrs:'min="0" max="100000"'})}${field('stock',tr('rewardStock'),{type:'number',value:x.stock??'',hint:tr('rewardStockHint'),attrs:'min="0" max="10000"'})}</div><div class="acc-actions"><button class="acc-primary">${tr('save')}</button>${x.archived?`<button type="button" class="acc-secondary" data-act="reward-restore" data-id="${esc(x.id)}">${tr('rewardRestore')}</button>`:`<button type="button" data-act="reward-archive" data-id="${esc(x.id)}" data-confirm="${esc(tr('rewardArchiveConfirm'))}">${tr('remove')}</button>`}</div></form></details></li>`).join('')}</ul>`:empty()}</section>`);
  }
  if(tab==='reports'){
   const r=await api('GET','/api/admin/message-reports');
@@ -448,7 +467,7 @@ async function render(){
   else if(p[1]==='tasks')html=await tasksView();
   else if(p[1]==='task')html=await taskView(p[2]);
   else if(p[1]==='progress')html=await progressView();
-  else if(p[1]==='messages')html=await messagesView(p[2]);
+  else if(p[1]==='messages')html=await messagesView(p[2],p[3]);
   else if(p[1]==='mentors')html=await mentorsView(p[2]);
   else if(p[1]==='character')html=await characterView();
   else if(p[1]==='settings')html=await settingsView();
@@ -508,6 +527,7 @@ async function onSubmit(e){
   if(kind==='metric'){await api('POST',`/api/projects/${encodeURIComponent(form.dataset.id)}/metrics`,{name:f.get('name'),value:f.get('value'),measuredOn:f.get('measuredOn'),visibility:f.get('visibility')});render();return;}
   if(kind==='answer'){await api('POST',`/api/tasks/${encodeURIComponent(form.dataset.id)}/submit`,{content:answerContent(form,form.dataset.type)},{key:btn?.dataset.key});setFlash(tr('saved'));render();return;}
   if(kind==='character'){const body=Object.fromEntries([...f.entries()]);await api('PUT','/api/me/character',body);setFlash(tr('saved'));render();return;}
+  if(kind==='email-prefs'){const r=await api('PUT','/api/me/profile',{emailMessages:f.get('emailMessages')==='on',emailReminders:f.get('emailReminders')==='on'});me=r.user;setFlash(tr('saved'));render();return;}
   if(kind==='profile'){const r=await api('PUT','/api/me/profile',{displayName:f.get('displayName'),email:f.get('email'),language:f.get('language'),leaderboardOptIn:f.get('leaderboardOptIn')==='on'});me=r.user;setFlash(tr('saved'));render();return;}
   if(kind==='password'){await api('POST','/api/auth/password',{currentPassword:f.get('currentPassword'),newPassword:f.get('newPassword')});setFlash(tr('saved'));render();return;}
   if(kind==='codes'){const r=await api('POST','/api/auth/recovery-codes',{currentPassword:f.get('currentPassword')});cache.codes={codes:r.recoveryCodes,next:'#/account/settings'};render();return;}
@@ -540,10 +560,17 @@ async function onSubmit(e){
   if(kind==='book'){await api('POST',`/api/office-hours/${encodeURIComponent(form.dataset.id)}/book`,{projectId:f.get('projectId'),question:f.get('question')});setFlash(tr('saved'));render();return;}
   if(kind==='meeting-note'){await api('POST',`/api/office-hours/${encodeURIComponent(form.dataset.id)}/note`,{note:f.get('note')});setFlash(tr('saved'));render();return;}
   if(kind==='quest'){await api('POST','/api/admin/quests',{title:{en:f.get('qt_en'),hr:f.get('qt_hr'),ru:f.get('qt_ru')},taskId:f.get('taskId'),target:Number(f.get('target'))});setFlash(tr('saved'));render();return;}
-  if(kind==='reward'){await api('POST','/api/admin/rewards',{title:f.get('title'),description:f.get('description'),price:Number(f.get('price')),stock:f.get('stock')===''?null:Number(f.get('stock'))});setFlash(tr('saved'));render();return;}
+  if(kind==='reward'){const id=form.dataset.id;await api(id?'PUT':'POST','/api/admin/rewards'+(id?'/'+encodeURIComponent(id):''),{title:f.get('title'),description:f.get('description'),price:Number(f.get('price')),stock:f.get('stock')===''?null:Number(f.get('stock'))});setFlash(tr('saved'));render();return;}
   if(kind==='reward-order'){await api('POST',`/api/rewards/${encodeURIComponent(form.dataset.id)}/order`,{projectId:f.get('projectId'),note:f.get('note')});setFlash(tr('rewardOrdered'));render();return;}
   if(kind==='dm-find'){cache.dmQuery=String(f.get('q')||'').trim();render();return;}
-  if(kind==='dm-send'){await api('POST','/api/messages/with/'+encodeURIComponent(form.dataset.id),{body:f.get('body')});render();return;}
+  if(kind==='dm-send'||kind==='group-send'){
+   const file=f.get('file');let fileId;
+   if(file?.size)fileId=(await api('POST','/api/files?purpose=message',undefined,{raw:file,key:idem(),headers:{'X-Filename':encodeURIComponent(file.name),'Content-Type':file.type||'application/octet-stream'}})).file.id;
+   const body=String(f.get('body')||'');if(!body.trim()&&!fileId)return;
+   await api('POST',(kind==='dm-send'?'/api/messages/with/':'/api/messages/groups/')+encodeURIComponent(form.dataset.id),{body,fileId});render();return;}
+  if(kind==='group-new'){const r=await api('POST','/api/messages/groups',{title:f.get('title'),userIds:[...cache.groupPick.keys()]});cache.groupPick=null;cache.dmQuery='';go('#/account/messages/g/'+r.id);return;}
+  if(kind==='group-rename'){await api('PUT','/api/messages/groups/'+encodeURIComponent(form.dataset.id),{title:f.get('title')});setFlash(tr('saved'));render();return;}
+  if(kind==='group-find'){cache.groupQuery=String(f.get('q')||'').trim();render();return;}
   if(kind==='reminders'){await api('PUT','/api/admin/reminders',{enabled:btn?.value==='1'});setFlash(tr('saved'));render();return;}
   if(kind==='chat-hook'){await api('PUT','/api/admin/chat-hook',{url:f.get('url')});setFlash(tr('saved'));render();return;}
   if(kind==='announcement'){await api('POST','/api/admin/announcements',{title:f.get('title'),body:f.get('body'),pinned:f.get('pinned')==='on',toChat:f.get('toChat')==='on'});setFlash(tr('saved'));render();return;}
@@ -577,7 +604,14 @@ async function onClick(e){
   else if(act==='milestone-done'){await api('POST',`/api/projects/${encodeURIComponent(d.project)}/milestones/${encodeURIComponent(d.id)}/done`,{});render();}
   else if(act==='order-decide'){await api('POST','/api/admin/reward-orders/'+encodeURIComponent(d.id),{status:d.status});render();}
   else if(act==='reward-archive'){await api('DELETE','/api/admin/rewards/'+encodeURIComponent(d.id));render();}
+  else if(act==='reward-restore'){await api('POST',`/api/admin/rewards/${encodeURIComponent(d.id)}/restore`);render();}
   else if(act==='dm-block'){await api(d.on==='1'?'POST':'DELETE',`/api/messages/with/${encodeURIComponent(d.id)}/block`);render();}
+  else if(act==='team-chat'){const r=await api('POST','/api/messages/team/'+encodeURIComponent(d.id));go('#/account/messages/g/'+r.id);}
+  else if(act==='group-pick'){cache.groupPick.set(d.id,d.name);render();}
+  else if(act==='group-unpick'){cache.groupPick.delete(d.id);render();}
+  else if(act==='group-add'){await api('POST',`/api/messages/groups/${encodeURIComponent(d.id)}/members`,{userIds:[d.user]});render();}
+  else if(act==='group-leave'){await api('DELETE',`/api/messages/groups/${encodeURIComponent(d.id)}/members/${encodeURIComponent(d.user)}`);if(d.user===me.id)go('#/account/messages');else render();}
+  else if(act==='group-report'){await api('POST','/api/messages/group-report/'+encodeURIComponent(d.id));setFlash(tr('dmReportSent'));render();}
   else if(act==='dm-report'){await api('POST','/api/messages/report/'+encodeURIComponent(d.id));setFlash(tr('dmReportSent'));render();}
   else if(act==='dm-resolve'){await api('POST',`/api/admin/message-reports/${encodeURIComponent(d.id)}/resolve`);render();}
   else if(act==='read'){await api('POST','/api/notifications/read',{});cache.unread=0;render();}

@@ -78,14 +78,25 @@ function projectUsage(db,projectId){
  return db.query("SELECT (SELECT coalesce(sum(size),0) FROM files WHERE status='active' AND project_id=?)+(SELECT coalesce(sum(bytes),0) FROM upload_reservations WHERE project_id=?) n").get(projectId,projectId).n;
 }
 
+function messageUsage(db,userId){
+ return db.query("SELECT (SELECT coalesce(sum(size),0) FROM files WHERE status='active' AND project_id IS NULL AND purpose<>'reference' AND owner_user_id=?1)+(SELECT coalesce(sum(bytes),0) FROM upload_reservations WHERE project_id IS NULL AND user_id=?1) n").get(userId).n;
+}
+// Who may open a file sent in a message: the two people, the chat's current members, or an organiser once it is reported.
+const IN_CONVERSATION=`SELECT 1 FROM file_links l WHERE l.file_id=?1 AND (
+ (l.target_type='dm' AND EXISTS(SELECT 1 FROM direct_messages d WHERE d.id=l.target_id AND (d.sender_id=?2 OR d.recipient_id=?2 OR (?3 AND EXISTS(SELECT 1 FROM message_reports r WHERE r.message_id=d.id)))))
+ OR (l.target_type='chat' AND EXISTS(SELECT 1 FROM chat_messages c WHERE c.id=l.target_id AND (EXISTS(SELECT 1 FROM chat_members m WHERE m.group_id=c.group_id AND m.user_id=?2 AND m.left_at IS NULL) OR (?3 AND EXISTS(SELECT 1 FROM chat_reports r WHERE r.message_id=c.id))))))`;
+
 export function upload(ctx){
  const user=requireUser(ctx);
- const purpose=oneOf(ctx.url.searchParams.get('purpose')||'document',['document','image','reference'],'purpose');
- const projectId=purpose==='reference'?null:ctx.url.searchParams.get('projectId');
- if(purpose!=='reference'){if(!projectId)fail(400,'INVALID_FIELDS',{field:'projectId'});requireProject(ctx.db,user,projectId,'edit');}
+ const asked=oneOf(ctx.url.searchParams.get('purpose')||'document',['document','image','reference','message'],'purpose');
+ // A message file belongs to no project; it opens only for the people in the conversation it is sent to.
+ const loose=asked==='reference'||asked==='message';
+ const projectId=loose?null:ctx.url.searchParams.get('projectId');
+ if(!loose){if(!projectId)fail(400,'INVALID_FIELDS',{field:'projectId'});requireProject(ctx.db,user,projectId,'edit');}
  rateLimit(ctx.db,'upload:'+user.id,60,3600);
  const {name,ext}=checkFilename(ctx.request.headers.get('x-filename'));
  const type=TYPES[ext];
+ const purpose=asked==='message'?type.purpose:asked;
  if(purpose==='document'&&type.purpose!=='document'&&type.purpose!=='image')fail(400,'UNSUPPORTED_FILE');
  if((purpose==='image'||purpose==='reference')&&type.purpose!=='image')fail(400,'UNSUPPORTED_FILE');
  const max=type.purpose==='image'?ctx.config.limits.imageBytes:ctx.config.limits.documentBytes;
@@ -99,6 +110,7 @@ export function upload(ctx){
  ctx.db.transaction(()=>{
   if(usage(ctx.db)+declared>ctx.config.limits.volumeBytes)fail(507,'QUOTA_EXCEEDED');
   if(projectId&&projectUsage(ctx.db,projectId)+declared>ctx.config.limits.projectBytes)fail(507,'QUOTA_EXCEEDED');
+  if(asked==='message'&&messageUsage(ctx.db,user.id)+declared>ctx.config.limits.projectBytes)fail(507,'QUOTA_EXCEEDED');
   if(freeBytes(ctx.config.uploadDir)<declared+ctx.config.limits.minFreeBytes)fail(507,'QUOTA_EXCEEDED');
   ctx.db.query('INSERT INTO upload_reservations(id,user_id,project_id,bytes,expires) VALUES(?,?,?,?,?)').run(reservation,user.id,projectId,declared,Date.now()+600000);
  })();
@@ -136,6 +148,7 @@ export function canReadFile(db,user,file){
  if(file.status!=='active')return false;
  if(user&&file.owner_user_id===user.id)return true;
  if(file.purpose==='reference')return isAdmin(user);
+ if(!file.project_id)return !!user&&!!db.query(IN_CONVERSATION).get(file.id,user.id,isAdmin(user)?1:0);
  const project=db.query('SELECT * FROM projects WHERE id=?').get(file.project_id);if(!project)return false;
  const access=projectAccess(db,user,project);
  if(file.visibility==='public')return project.status==='published'||access.team;
