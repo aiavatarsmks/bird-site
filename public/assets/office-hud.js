@@ -29,7 +29,8 @@
   saved:{en:'Saved',hr:'Spremljeno',ru:'Сохранено'},
   noCharacter:{en:'Link your office character in My account → Character.',hr:'Povežite svoj lik u Moj račun → Moj lik.',ru:'Свяжите своего персонажа в кабинете → «Персонаж».'},
   linkedIn:{en:'LinkedIn',hr:'LinkedIn',ru:'LinkedIn'},
-  messages:{en:'Messages from the organisers',hr:'Poruke organizatora',ru:'Сообщения от организаторов'},
+  messages:{en:'Messages and reminders',hr:'Poruke i podsjetnici',ru:'Сообщения и напоминания'},
+  reminder:{en:'Reminder',hr:'Podsjetnik',ru:'Напоминание'},
   signIn:{en:'Sign in',hr:'Prijava',ru:'Войти'},
   register:{en:'Create account',hr:'Izradi račun',ru:'Создать аккаунт'},
   guestNote:{en:'Sign in to see your tasks, points and to book mentors.',hr:'Prijavite se za zadatke, bodove i termine s mentorima.',ru:'Войдите, чтобы видеть свои задания, баллы и записываться к менторам.'},
@@ -85,7 +86,7 @@
     organiser?get('/api/admin/today').catch(()=>null):null,
    ]);
    const recent=Date.now()-7*86400000;
-   data={me,csrf:auth.csrf||'',profile,lectures,today,messages:notes.items.filter(n=>n.kind==='nudge'&&(!n.read||Date.parse(n.created)>recent)),tasks:tasks.items.filter(x=>OPEN.has(x.status)&&x.task?.status==='published'),xp:profile?.xp??null,mentors:mentors.items};
+   data={me,csrf:auth.csrf||'',profile,lectures,today,messages:notes.items.filter(n=>(n.kind==='nudge'||n.kind==='reminder')&&(!n.read||Date.parse(n.created)>recent)),tasks:tasks.items.filter(x=>OPEN.has(x.status)&&x.task?.status==='published'),xp:profile?.xp??null,mentors:mentors.items};
    loadedAt=Date.now();loading=null;return data;
   })();
   return loading;
@@ -118,7 +119,7 @@
   const character=p?.character&&context.member?.(p.character.personId);
   const earned=p?p.badges.filter(b=>b.earned):[];
   return `<div class="hud-profile">${character?sprite(character.img,'hud-sprite-lg'):''}<div class="hud-profile-main"><label class="hud-photo">${face(me,56)}<input type="file" accept="image/*" data-hud-photo hidden><span>${t(me.hasAvatar?'photo':'addPhoto')}</span></label><div><strong>${esc(me.displayName)}</strong>${p?`<small>${p.xp} ${t('points')}</small>`:''}</div></div></div>
-   ${data.messages.length?`<ul class="hud-list hud-messages">${data.messages.map(n=>`<li><strong>${esc(n.payload.from)}</strong><p>${esc(n.payload.message)}</p></li>`).join('')}</ul>`:''}
+   ${data.messages.length?`<ul class="hud-list hud-messages">${data.messages.map(n=>n.kind==='reminder'?`<li class="hud-reminder"><strong>🔔 ${t('reminder')}</strong><p>${n.payload.link?`<a href="${esc(n.payload.link)}">${esc(n.payload.text?.[lang]||n.payload.text?.en||'')}</a>`:esc(n.payload.text?.[lang]||n.payload.text?.en||'')}</p></li>`:`<li><strong>${esc(n.payload.from)}</strong><p>${esc(n.payload.message)}</p></li>`).join('')}</ul>`:''}
    ${p?`<div class="hud-stats"><div><b>${p.xp}</b><small>${t('points')}</small></div><div><b>${p.lectures.verified+p.lectures.selfReported}/${p.lectures.held}</b><small>${t('lecturesAttended')}</small></div><div><b>${p.tasks.done}</b><small>${t('tasksDone')}</small></div></div>
    <h3>${t('badges')} · ${earned.length}/${p.badges.length}</h3><ul class="hud-badges">${p.badges.map(b=>`<li class="${b.earned?'is-earned':''}" title="${esc(b.title[lang]||b.title.en)}"><span aria-hidden="true">${b.earned?'★':'☆'}</span>${esc(b.title[lang]||b.title.en)}</li>`).join('')}</ul>
    ${p.projects.length?`<h3>${t('myProject')}</h3><div class="hud-actions">${p.projects.map(x=>`<a class="hud-secondary" href="#/account/project/${esc(x.id)}">${esc(x.name)}</a>${x.published&&context.hasProject?.(x.id)?`<button class="hud-link" data-hud-team="${esc(x.id)}">${t('showInOffice')}</button>`:''}`).join('')}</div>`:''}

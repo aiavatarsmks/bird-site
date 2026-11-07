@@ -1,5 +1,12 @@
 /* Interface text for accounts, projects, tasks and admin (EN/HR/RU). */
 window.BIRD_ACCOUNT_TEXT={
+ autoReminders:{en:'Automatic reminders',hr:'Automatski podsjetnici',ru:'Автоматические напоминания'},
+ autoRemindersNote:{en:'Participants see them in their account and in the office: 2 days and a few hours before a deadline, once after it; the day before a lecture and within its last hour, then a rating request; within an hour of a mentor session. Organisers learn when someone has missed two deadlines. Nothing is sent by email or chat.',hr:'Sudionici ih vide u svom računu i u uredu: 2 dana i nekoliko sati prije roka, jednom nakon njega; dan prije predavanja i unutar zadnjeg sata, zatim molba za ocjenu; unutar sata prije sastanka s mentorom. Organizatori saznaju kad netko propusti dva roka. Ništa se ne šalje e-poštom ni u chat.',ru:'Участники видят их в кабинете и в офисе: за 2 дня и за несколько часов до срока, один раз после него; накануне лекции и в последний час перед ней, потом просьба оценить; меньше чем за час до встречи с ментором. Организаторы узнают, если кто-то пропустил два срока. По почте и в чаты ничего не уходит.'},
+ remindersOn:{en:'on',hr:'uključeno',ru:'включены'},remindersOff:{en:'off',hr:'isključeno',ru:'выключены'},
+ remindersWeek:{en:'Reminders in the last 7 days',hr:'Podsjetnika u zadnjih 7 dana',ru:'Напоминаний за 7 дней'},
+ turnOff:{en:'Turn off',hr:'Isključi',ru:'Выключить'},turnOn:{en:'Turn on',hr:'Uključi',ru:'Включить'},
+ remindersOffConfirm:{en:'Stop automatic reminders for everyone?',hr:'Zaustaviti automatske podsjetnike za sve?',ru:'Остановить автоматические напоминания для всех?'},
+ n_reminder:{en:'Reminder',hr:'Podsjetnik',ru:'Напоминание'},
  nav:{en:'My account',hr:'Moj račun',ru:'Мой кабинет'},
  signIn:{en:'Sign in',hr:'Prijava',ru:'Войти'},
  signOut:{en:'Sign out',hr:'Odjava',ru:'Выйти'},

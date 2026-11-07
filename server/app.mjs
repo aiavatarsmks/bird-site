@@ -21,6 +21,7 @@ import * as insights from './insights.mjs';
 import * as avatars from './avatars.mjs';
 import * as profile from './profile.mjs';
 import * as organiser from './organiser.mjs';
+import * as reminders from './reminders.mjs';
 import {seedCurated} from './seed.mjs';
 import {createIntegration,CONTRACT} from './integration.mjs';
 import {localStorage,noScanner} from './storage.mjs';
@@ -175,6 +176,8 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('GET','/api/admin/export.csv',ctx=>cohort.exportCsv(ctx),{auth:user});
  on('GET','/api/announcements',ctx=>cohort.listAnnouncements(ctx),{auth:user});
  on('POST','/api/announcements/read',ctx=>cohort.readAnnouncements(ctx),{auth:user});
+ on('GET','/api/admin/reminders',ctx=>reminders.reminderStatus(ctx),{auth:user});
+ on('PUT','/api/admin/reminders',ctx=>reminders.setReminders(ctx),{auth:user});
  on('GET','/api/admin/chat-hook',ctx=>cohort.chatHookStatus(ctx),{auth:user});
  on('PUT','/api/admin/chat-hook',ctx=>cohort.setChatHook(ctx),{auth:user});
  on('POST','/api/admin/announcements',ctx=>cohort.createAnnouncement(ctx),{auth:user});
