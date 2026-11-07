@@ -31,6 +31,7 @@
   linkedIn:{en:'LinkedIn',hr:'LinkedIn',ru:'LinkedIn'},
   messages:{en:'Messages and reminders',hr:'Poruke i podsjetnici',ru:'Сообщения и напоминания'},
   reminder:{en:'Reminder',hr:'Podsjetnik',ru:'Напоминание'},
+  dmLink:{en:'Private messages',hr:'Privatne poruke',ru:'Личные сообщения'},dmNew:{en:'new',hr:'novih',ru:'новых'},
   signIn:{en:'Sign in',hr:'Prijava',ru:'Войти'},
   register:{en:'Create account',hr:'Izradi račun',ru:'Создать аккаунт'},
   guestNote:{en:'Sign in to see your tasks, points and to book mentors.',hr:'Prijavite se za zadatke, bodove i termine s mentorima.',ru:'Войдите, чтобы видеть свои задания, баллы и записываться к менторам.'},
@@ -86,7 +87,7 @@
     organiser?get('/api/admin/today').catch(()=>null):null,
    ]);
    const recent=Date.now()-7*86400000;
-   data={me,csrf:auth.csrf||'',profile,lectures,today,messages:notes.items.filter(n=>(n.kind==='nudge'||n.kind==='reminder')&&(!n.read||Date.parse(n.created)>recent)),tasks:tasks.items.filter(x=>OPEN.has(x.status)&&x.task?.status==='published'),xp:profile?.xp??null,mentors:mentors.items};
+   data={me,csrf:auth.csrf||'',dm:auth.messages||0,profile,lectures,today,messages:notes.items.filter(n=>(n.kind==='nudge'||n.kind==='reminder')&&(!n.read||Date.parse(n.created)>recent)),tasks:tasks.items.filter(x=>OPEN.has(x.status)&&x.task?.status==='published'),xp:profile?.xp??null,mentors:mentors.items};
    loadedAt=Date.now();loading=null;return data;
   })();
   return loading;
@@ -104,7 +105,7 @@
   const me=data?.me,count=data?.tasks.length||0;
   const flagged=attentionTeams().length;
   return `<div class="hud-dock" role="toolbar" aria-label="BIRD">
-   ${me?`<button class="hud-btn hud-face ${myCharacter()?'hud-face-char':''}" data-hud="profile" aria-pressed="${open==='profile'}" aria-label="${t('profile')}">${myCharacter()?sprite(myCharacter().img,'hud-sprite-dock'):face(me,44)}</button>${data.messages.some(n=>!n.read)?`<b class="hud-badge hud-badge-face" aria-label="${t('messages')}">${data.messages.filter(n=>!n.read).length}</b>`:''}`:`<button class="hud-btn hud-guest" data-hud="profile" aria-pressed="${open==='profile'}"><span aria-hidden="true">👤</span><small>${t('signIn')}</small></button>`}
+   ${me?`<button class="hud-btn hud-face ${myCharacter()?'hud-face-char':''}" data-hud="profile" aria-pressed="${open==='profile'}" aria-label="${t('profile')}">${myCharacter()?sprite(myCharacter().img,'hud-sprite-dock'):face(me,44)}</button>${data.messages.some(n=>!n.read)||data.dm?`<b class="hud-badge hud-badge-face" aria-label="${t('messages')}">${data.messages.filter(n=>!n.read).length+data.dm}</b>`:''}`:`<button class="hud-btn hud-guest" data-hud="profile" aria-pressed="${open==='profile'}"><span aria-hidden="true">👤</span><small>${t('signIn')}</small></button>`}
    ${data?.today?`<button class="hud-btn" data-hud="attention" aria-pressed="${open==='attention'}"><span aria-hidden="true">!</span><small>${t('attention')}</small>${flagged?`<b class="hud-badge">${flagged}</b>`:''}</button>`:''}${BUTTONS.map(([k,icon])=>`<button class="hud-btn" data-hud="${k}" aria-pressed="${open===k}"><span aria-hidden="true">${icon}</span><small>${t(k)}</small>${k==='tasks'&&me&&count?`<b class="hud-badge">${count}</b>`:''}</button>`).join('')}
   </div>`;
  }
@@ -119,6 +120,7 @@
   const character=p?.character&&context.member?.(p.character.personId);
   const earned=p?p.badges.filter(b=>b.earned):[];
   return `<div class="hud-profile">${character?sprite(character.img,'hud-sprite-lg'):''}<div class="hud-profile-main"><label class="hud-photo">${face(me,56)}<input type="file" accept="image/*" data-hud-photo hidden><span>${t(me.hasAvatar?'photo':'addPhoto')}</span></label><div><strong>${esc(me.displayName)}</strong>${p?`<small>${p.xp} ${t('points')}</small>`:''}</div></div></div>
+   <a class="hud-link hud-dm" href="#/account/messages">✉ ${t('dmLink')}${data.dm?` · <b>${data.dm} ${t('dmNew')}</b>`:''}</a>
    ${data.messages.length?`<ul class="hud-list hud-messages">${data.messages.map(n=>n.kind==='reminder'?`<li class="hud-reminder"><strong>🔔 ${t('reminder')}</strong><p>${n.payload.link?`<a href="${esc(n.payload.link)}">${esc(n.payload.text?.[lang]||n.payload.text?.en||'')}</a>`:esc(n.payload.text?.[lang]||n.payload.text?.en||'')}</p></li>`:`<li><strong>${esc(n.payload.from)}</strong><p>${esc(n.payload.message)}</p></li>`).join('')}</ul>`:''}
    ${p?`<div class="hud-stats"><div><b>${p.xp}</b><small>${t('points')}</small></div><div><b>${p.lectures.verified+p.lectures.selfReported}/${p.lectures.held}</b><small>${t('lecturesAttended')}</small></div><div><b>${p.tasks.done}</b><small>${t('tasksDone')}</small></div></div>
    <h3>${t('badges')} · ${earned.length}/${p.badges.length}</h3><ul class="hud-badges">${p.badges.map(b=>`<li class="${b.earned?'is-earned':''}" title="${esc(b.title[lang]||b.title.en)}"><span aria-hidden="true">${b.earned?'★':'☆'}</span>${esc(b.title[lang]||b.title.en)}</li>`).join('')}</ul>

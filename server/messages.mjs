@@ -11,6 +11,7 @@ import {notify} from './notifications.mjs';
 const PAGE=50;
 const person=(db,id)=>db.query("SELECT u.id,u.display_name name,u.role,u.status,(SELECT json_extract(p.draft,'$.name') FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=u.id AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') ORDER BY m.created LIMIT 1) team FROM users u WHERE u.id=?").get(id);
 const view=p=>({id:p.id,name:p.name,team:p.team||'',organiser:isAdmin(p)});
+const talked=(db,a,b)=>!!db.query('SELECT 1 FROM direct_messages WHERE (sender_id=?1 AND recipient_id=?2) OR (sender_id=?2 AND recipient_id=?1) LIMIT 1').get(a,b);
 const blocked=(db,a,b)=>!!db.query('SELECT 1 FROM message_blocks WHERE user_id=? AND blocked_id=?').get(a,b);
 export const unreadMessages=(db,userId)=>db.query('SELECT count(*) n FROM direct_messages d WHERE d.recipient_id=? AND d.read_at IS NULL AND NOT EXISTS(SELECT 1 FROM message_blocks b WHERE b.user_id=d.recipient_id AND b.blocked_id=d.sender_id)').get(userId).n;
 
@@ -26,8 +27,9 @@ export function conversations(ctx){
 /** People one can write to: everyone active, found by name or team. */
 export function directory(ctx){
  const user=requireUser(ctx),q=(ctx.url.searchParams.get('q')||'').trim().toLowerCase().slice(0,60);
- const rows=ctx.db.query("SELECT id FROM users WHERE status='active' AND id<>? ORDER BY display_name COLLATE NOCASE LIMIT 500").all(user.id).map(r=>view(person(ctx.db,r.id)));
- return json({items:(q?rows.filter(p=>(p.name+' '+p.team).toLowerCase().includes(q)):rows).slice(0,100)});
+ const like='%'+q.replace(/[\\%_]/g,m=>'\\'+m)+'%';
+ const rows=ctx.db.query(`SELECT u.id FROM users u WHERE u.status='active' AND u.id<>?1 AND (?2='%%' OR lower(u.display_name) LIKE ?2 ESCAPE '\\' OR EXISTS(SELECT 1 FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=u.id AND m.revoked_at IS NULL AND lower(coalesce(json_extract(p.draft,'$.name'),'')) LIKE ?2 ESCAPE '\\')) ORDER BY u.display_name COLLATE NOCASE LIMIT 100`).all(user.id,like);
+ return json({items:rows.map(r=>view(person(ctx.db,r.id)))});
 }
 /** The account of a person on the office map, if they have one. */
 export function forPerson(ctx,personId){
@@ -38,12 +40,14 @@ export function forPerson(ctx,personId){
 /** One conversation; opening it marks incoming messages as read. */
 export function thread(ctx,otherId){
  const user=requireUser(ctx),other=person(ctx.db,otherId);if(!other||other.id===user.id)fail(404,'NOT_FOUND');
+ if(other.status!=='active'&&!talked(ctx.db,user.id,otherId))fail(404,'NOT_FOUND');
  const before=ctx.url.searchParams.get('before')||'9999';
  const rows=ctx.db.query('SELECT * FROM (SELECT rowid r,* FROM direct_messages WHERE ((sender_id=?1 AND recipient_id=?2) OR (sender_id=?2 AND recipient_id=?1)) AND created<?3 ORDER BY created DESC,rowid DESC LIMIT ?4) ORDER BY created,r').all(user.id,otherId,before,PAGE+1);
  const more=rows.length>PAGE;if(more)rows.shift();
  const reported=new Set(ctx.db.query('SELECT message_id FROM message_reports WHERE reporter_id=?').all(user.id).map(r=>r.message_id));
  ctx.db.query('UPDATE direct_messages SET read_at=? WHERE sender_id=? AND recipient_id=? AND read_at IS NULL').run(nowIso(),otherId,user.id);
- return json({person:{...view(other),active:other.status==='active'},blocked:blocked(ctx.db,user.id,otherId),blockedMe:blocked(ctx.db,otherId,user.id),hasMore:more,
+ // canSend does not say which side blocked, so a block cannot be traced to the person who set it.
+ return json({person:view(other),blocked:blocked(ctx.db,user.id,otherId),canSend:other.status==='active'&&!blocked(ctx.db,user.id,otherId)&&!blocked(ctx.db,otherId,user.id),hasMore:more,
   items:rows.map(m=>({id:m.id,mine:m.sender_id===user.id,body:m.body,created:m.created,read:!!m.read_at,reported:reported.has(m.id)}))});
 }
 export async function send(ctx,otherId){
@@ -57,7 +61,7 @@ export async function send(ctx,otherId){
  return json({id,created},201);
 }
 export function block(ctx,otherId,on){
- const user=requireUser(ctx);if(!person(ctx.db,otherId)||otherId===user.id)fail(404,'NOT_FOUND');
+ const user=requireUser(ctx),other=person(ctx.db,otherId);if(!other||otherId===user.id||(other.status!=='active'&&!talked(ctx.db,user.id,otherId)))fail(404,'NOT_FOUND');
  if(on)ctx.db.query('INSERT OR IGNORE INTO message_blocks(user_id,blocked_id,created) VALUES(?,?,?)').run(user.id,otherId,nowIso());
  else ctx.db.query('DELETE FROM message_blocks WHERE user_id=? AND blocked_id=?').run(user.id,otherId);
  return json({blocked:on});

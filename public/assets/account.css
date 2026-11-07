@@ -195,3 +195,4 @@ tr[hidden]{display:none}
 .acc-balance{font-size:22px;white-space:nowrap}
 .acc-history{flex-basis:100%}
 .acc-history summary{cursor:pointer;min-height:32px;font-size:14px}
+.acc-section-title{font-size:18px;margin:28px 0 12px}

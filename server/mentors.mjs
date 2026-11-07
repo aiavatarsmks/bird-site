@@ -55,6 +55,9 @@ export async function book(ctx,id){
 export function unbook(ctx,id){
  const user=requireUser(ctx);const b=ctx.db.query('SELECT * FROM office_hour_bookings WHERE slot_id=?').get(id);
  if(!b||!(teamRole(ctx.db,b.project_id,user.id)||isAdmin(user)))fail(404,'NOT_FOUND');
+ // After the start the points stay spent; only an organiser can still cancel (and so refund).
+ const slot=ctx.db.query('SELECT starts_at FROM office_hours WHERE id=?').get(id);
+ if(!isAdmin(user)&&Date.parse(slot.starts_at)<=Date.now())fail(409,'INVALID_STATE');
  ctx.db.query('DELETE FROM office_hour_bookings WHERE slot_id=?').run(id);audit(ctx.db,user.id,'officehours.unbook','office_hours',id,{});
  return json({ok:true});
 }

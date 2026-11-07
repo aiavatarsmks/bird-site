@@ -38,12 +38,12 @@ function participants(db){return db.query("SELECT id FROM users WHERE status='ac
 /** Runs every reminder that is due at `now`. Returns how many notifications were created. */
 export function runReminders(db,now=Date.now()){
  if(!enabled(db))return 0;
- const seen=db.query("SELECT 1 FROM notifications WHERE user_id=? AND kind='reminder' AND json_extract(payload,'$.key')=?");
+ const seen=db.query("SELECT 1 FROM notifications WHERE user_id=? AND kind='reminder' AND created>? AND json_extract(payload,'$.key')=?"),since=new Date(Math.min(now,Date.now())-14*24*H).toISOString();
  let sent=0;
- const send=(userIds,key,type,title,extra,link)=>{for(const uid of new Set(userIds)){if(seen.get(uid,key))continue;notify(db,uid,'reminder',{key,type,link,text:message(type,title,extra)});sent++;}};
+ const send=(userIds,key,type,title,extra,link)=>{for(const uid of new Set(userIds)){if(seen.get(uid,since,key))continue;notify(db,uid,'reminder',{key,type,link,text:message(type,title,extra)});sent++;}};
  db.transaction(()=>{
   // Tasks: two days before, a few hours before, and once just after the deadline.
-  const tasks=db.query(`SELECT a.id,a.user_id,a.project_id,t.translations,t.due_at FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id WHERE t.status='published' AND t.pick_mode<>'catalog' AND t.due_at IS NOT NULL AND t.due_at>? AND t.due_at<=? AND coalesce(s.status,'not_started') IN ${OPEN}`).all(new Date(now-24*H).toISOString(),new Date(now+48*H).toISOString());
+  const tasks=db.query(`SELECT a.id,a.user_id,a.project_id,t.translations,t.due_at FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id WHERE a.status='open' AND t.status='published' AND t.pick_mode<>'catalog' AND t.due_at IS NOT NULL AND t.due_at>? AND t.due_at<=? AND coalesce(s.status,'not_started') IN ${OPEN}`).all(new Date(now-24*H).toISOString(),new Date(now+48*H).toISOString());
   for(const a of tasks){
    const due=Date.parse(a.due_at),left=due-now,who=a.user_id?[a.user_id]:members(db,a.project_id);
    const title=pickTitle(a.translations,'title'),at=`${shortDate(due)} ${clock(due)}`;
@@ -52,7 +52,7 @@ export function runReminders(db,now=Date.now()){
    else if(left>24*H)send(who,'task48:'+a.id,'task48',title,at,'#/account/tasks');
   }
   // Organisers: one weekly list of people and teams with two or more open overdue tasks.
-  const late=db.query(`SELECT coalesce(nullif(a.user_id,''),a.project_id) target,max(u.display_name) who,max(json_extract(p.draft,'$.name')) team,count(*) n FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id LEFT JOIN users u ON u.id=a.user_id LEFT JOIN projects p ON p.id=a.project_id WHERE t.status='published' AND t.pick_mode<>'catalog' AND t.due_at IS NOT NULL AND t.due_at<? AND coalesce(s.status,'not_started') IN ${OPEN} GROUP BY target HAVING n>=2`).all(new Date(now).toISOString());
+  const late=db.query(`SELECT coalesce(nullif(a.user_id,''),a.project_id) target,max(u.display_name) who,max(json_extract(p.draft,'$.name')) team,count(*) n FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id LEFT JOIN users u ON u.id=a.user_id LEFT JOIN projects p ON p.id=a.project_id WHERE a.status='open' AND t.status='published' AND t.pick_mode<>'catalog' AND t.due_at IS NOT NULL AND t.due_at<? AND coalesce(s.status,'not_started') IN ${OPEN} GROUP BY target HAVING n>=2`).all(new Date(now).toISOString());
   if(late.length){
    const admins=db.query("SELECT id,role FROM users WHERE status='active'").all().filter(isAdmin).map(u=>u.id);
    const week=isoWeek(new Date(now));
@@ -75,7 +75,7 @@ export function runReminders(db,now=Date.now()){
   }
   // Mentor sessions: within the last hour, to the whole booking team.
   const slots=db.query('SELECT h.id,h.mentor_name,h.starts_at,b.project_id,b.booked_by FROM office_hours h JOIN office_hour_bookings b ON b.slot_id=h.id WHERE h.cancelled_at IS NULL AND h.starts_at>? AND h.starts_at<=?').all(new Date(now).toISOString(),new Date(now+H).toISOString());
-  for(const s of slots)send([s.booked_by,...members(db,s.project_id)],'session:'+s.id,'session',s.mentor_name,clock(Date.parse(s.starts_at)),'#/account');
+  for(const s of slots)send([s.booked_by,...members(db,s.project_id)],'session:'+s.id,'session',s.mentor_name,clock(Date.parse(s.starts_at)),'#/account/mentors');
  })();
  return sent;
 }

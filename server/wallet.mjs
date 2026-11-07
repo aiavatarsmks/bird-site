@@ -13,7 +13,10 @@ import {projectXp,userXp} from './progress.mjs';
 export const DEFAULT_SESSION_PRICE=30;
 const TEAM=['owner','editor','member'];
 export const onTeam=(db,projectId,userId)=>TEAM.includes(membership(db,projectId,userId));
-const members=(db,projectId)=>db.query(`SELECT user_id FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')`).all(projectId).map(r=>r.user_id);
+// A person's own points count for one team only, so nobody can spend them twice: their programme team
+// if they have one, otherwise their earliest project. Archiving does not move them.
+const PRIMARY=`(CASE WHEN p.source='user' THEN 1 ELSE 0 END)`;
+const members=(db,projectId)=>db.query(`SELECT m.user_id FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.project_id=?1 AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') AND NOT EXISTS(SELECT 1 FROM memberships o JOIN projects q ON q.id=o.project_id WHERE o.user_id=m.user_id AND o.revoked_at IS NULL AND o.role IN ('owner','editor','member') AND o.project_id<>?1 AND ((CASE WHEN q.source='user' THEN 1 ELSE 0 END)<${PRIMARY} OR ((CASE WHEN q.source='user' THEN 1 ELSE 0 END)=${PRIMARY} AND (o.created<m.created OR (o.created=m.created AND o.project_id<?1)))))`).all(projectId).map(r=>r.user_id);
 
 export function wallet(db,projectId){
  const earned=projectXp(db,projectId)+members(db,projectId).reduce((n,id)=>n+userXp(db,id),0);
@@ -23,8 +26,9 @@ export function wallet(db,projectId){
 }
 /** Fails when the team cannot pay; call inside the same transaction as the purchase. */
 export function charge(db,projectId,price){
+ if(db.query("SELECT status FROM projects WHERE id=?").get(projectId)?.status==='archived')fail(409,'INVALID_STATE');
  const w=wallet(db,projectId);
- if(w.balance<price)fail(409,'NOT_ENOUGH_POINTS',{balance:w.balance,price});
+ if(price>0&&w.balance<price)fail(409,'NOT_ENOUGH_POINTS',{balance:w.balance,price});
  return w;
 }
 
@@ -65,6 +69,8 @@ export async function orderReward(ctx,id){
  ctx.db.transaction(()=>{
   const r=ctx.db.query('SELECT * FROM rewards WHERE id=? AND archived_at IS NULL').get(id);if(!r)fail(404,'NOT_FOUND');
   const v=rewardView(ctx.db,r);if(v.left===0)fail(409,'SOLD_OUT');
+  // One open order per team and reward keeps organisers' inbox calm, even for free rewards.
+  if(ctx.db.query("SELECT 1 FROM reward_orders WHERE reward_id=? AND project_id=? AND status='pending'").get(id,projectId))fail(409,'ALREADY_DONE');
   charge(ctx.db,projectId,r.price);
   ctx.db.query('INSERT INTO reward_orders(id,reward_id,project_id,ordered_by,price,note,created) VALUES(?,?,?,?,?,?,?)').run(orderId,id,projectId,user.id,r.price,note,nowIso());
  })();
