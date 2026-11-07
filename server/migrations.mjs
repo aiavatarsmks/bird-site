@@ -206,5 +206,12 @@ ALTER TABLE lectures ADD COLUMN place TEXT NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS organiser_notes(id TEXT PRIMARY KEY,target_type TEXT NOT NULL CHECK(target_type IN ('team','user')),target_id TEXT NOT NULL,body TEXT NOT NULL,author TEXT NOT NULL,created TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS organiser_notes_target ON organiser_notes(target_type,target_id,created);
 UPDATE memberships SET role='editor' WHERE role='member' AND revoked_at IS NULL AND EXISTS(SELECT 1 FROM users u JOIN projects p ON p.id=memberships.project_id JOIN team_people t ON t.team_id=p.team_id AND t.person_id=u.person_id WHERE u.id=memberships.user_id);
+`}, // Private messages between any two people. Organisers see only messages someone reported.
+ {id:17,name:'direct-messages',sql:`
+CREATE TABLE IF NOT EXISTS direct_messages(id TEXT PRIMARY KEY,sender_id TEXT NOT NULL REFERENCES users(id),recipient_id TEXT NOT NULL REFERENCES users(id),body TEXT NOT NULL,created TEXT NOT NULL,read_at TEXT);
+CREATE INDEX IF NOT EXISTS direct_messages_pair ON direct_messages(sender_id,recipient_id,created);
+CREATE INDEX IF NOT EXISTS direct_messages_inbox ON direct_messages(recipient_id,read_at);
+CREATE TABLE IF NOT EXISTS message_blocks(user_id TEXT NOT NULL REFERENCES users(id),blocked_id TEXT NOT NULL REFERENCES users(id),created TEXT NOT NULL,PRIMARY KEY(user_id,blocked_id));
+CREATE TABLE IF NOT EXISTS message_reports(id TEXT PRIMARY KEY,message_id TEXT NOT NULL REFERENCES direct_messages(id),reporter_id TEXT NOT NULL REFERENCES users(id),created TEXT NOT NULL,resolved_at TEXT,resolved_by TEXT,UNIQUE(message_id,reporter_id));
 `},
 ];

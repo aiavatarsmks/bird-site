@@ -175,3 +175,17 @@ tr[hidden]{display:none}
 .acc-date.is-empty input:not(:focus)::-webkit-datetime-edit{opacity:0}
 .acc-date.is-empty:not(:focus-within)::after{content:attr(data-hint);position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
 
+
+/* Private messages */
+.acc-dm-list a,.acc-dm-people a{display:grid;gap:2px;width:100%;text-decoration:none;color:inherit;min-height:44px}
+.acc-dm-list li,.acc-dm-people li{padding:8px 0}
+.acc-dm-who small,.acc-dm h2 small{display:block;color:var(--muted,#6b6b6b);font-weight:400;font-size:13px}
+.acc-dm-last{color:var(--muted,#6b6b6b);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acc-dm-list li.is-unread .acc-dm-last{color:inherit;font-weight:600}
+.acc-dm-thread{list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto}
+.acc-dm-thread li{align-self:flex-start;max-width:min(80%,560px);background:#f1ede4;border-radius:14px 14px 14px 4px;padding:8px 12px}
+.acc-dm-thread li.is-mine{align-self:flex-end;background:#e3eddc;border-radius:14px 14px 4px 14px}
+.acc-dm-thread p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.acc-dm-thread small{color:var(--muted,#6b6b6b);font-size:12px}
+.acc-link{background:none;border:0;padding:0 2px;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;min-height:24px}
+.acc .acc-dm-thread button.acc-link{border:0;background:none;padding:0 2px;min-height:24px;min-width:0;font-size:12px;font-weight:400;color:inherit;text-decoration:underline;box-shadow:none}

@@ -66,7 +66,7 @@ function spriteAvatar(member,p,index=0,selected=false,withName=true){
  const source=personal?member.portraitAsset:appearance==='woman'&&OFFICE_ARTWORK.person2?OFFICE_ARTWORK.person2:OFFICE_ARTWORK.person;
  return `<g class="office-person pixel-person ${selected?'is-selected':''}" data-person="${escape(member.id)}" role="button" tabindex="0" aria-label="${escape(member.name+', '+member.role+', '+p.name)}" style="--pixel-delay:${-(index%7)*1.7}s"><title>${escape(member.name+' · '+member.role)}</title><rect class="pixel-person-hit" x="-44" y="-128" width="88" height="144" rx="18"/><ellipse class="person-ring" cy="-10" rx="36" ry="18"/><ellipse cy="-8" rx="25" ry="8" fill="#263c36" opacity=".2"/><g class="pixel-body" >${frames.map((f,j)=>`<svg class="pixel-frame frame-${j}" x="${-renderWidth/2}" y="-132" width="${renderWidth}" height="128" viewBox="${f.join(' ')}" overflow="hidden"><image href="${source}" width="${imageWidth}" height="${imageHeight}"/></svg>`).join('')}</g>${withName?`<text class="person-name" y="19" text-anchor="middle">${escape(truncate(member.name,16))}</text>`:''}</g>`;
 }
-let life=null,lifeFrame=0,cityMode=false,fullscreen=false,keepCamera=false,organiser=null,organiserLoaded=0,organiserLabels=true;
+let life=null,lifeFrame=0,cityMode=false,fullscreen=false,keepCamera=false,organiser=null,viewer=null,organiserLoaded=0,organiserLabels=true;
 // Full-screen office: native Fullscreen API where available, a fixed overlay otherwise (iPhone).
 function setFullscreen(on){
  fullscreen=on;const board=root?.querySelector('.office-board');if(!board)return;
@@ -163,7 +163,7 @@ function occupiedSeat(a){
 // Organiser layer: only for organisers, and never part of the public office data.
 async function loadOrganiser(){
  if(Date.now()-organiserLoaded<60000)return;organiserLoaded=Date.now();
- try{const auth=await (await fetch('/api/auth/me',{credentials:'same-origin'})).json();
+ try{const auth=await (await fetch('/api/auth/me',{credentials:'same-origin'})).json();viewer=auth.user||null;
   if(!['program_admin','platform_owner'].includes(auth.user?.role)){organiser=null;return;}
   const r=await fetch('/api/admin/office-signals',{credentials:'same-origin'});organiser=r.ok?{...await r.json(),csrf:auth.csrf||''}:null;
  }catch{organiser=null;}
@@ -196,6 +196,17 @@ async function fillOrganiserCard(){
  const signal=organiser.teams.find(t=>t.id===projectId);
  slot.innerHTML=`<h3>${orgText('Organiser','Organizator','Организатор')}</h3><p><b>${d.score.percent===null?'—':d.score.percent+'%'}</b> ${orgText('of possible points','mogućih bodova','от возможных баллов')}${signal?.waiting?` · ${signal.waiting} ${orgText('to review','za pregled','на проверку')}`:''}</p>${d.checkins[0]?.blocker?`<p>${orgText('Blocker','Prepreka','Блокер')}: ${escape(d.checkins[0].blocker)}</p>`:''}${orgTasks(d.tasks)}${d.members.length?`<ul class="office-org-list">${d.members.map(m=>`<li>${escape(m.name)} · ${orgDate(m.lastSeen)}</li>`).join('')}</ul>${orgNudge('projectId',projectId)}`:`<p>${orgText('Nobody has registered yet.','Još nitko nije registriran.','Пока никто не зарегистрирован.')}</p>`}<a class="office-secondary" href="#/admin/task/new~team~${escape(projectId)}">${orgText('Give a task','Dodijeli zadatak','Дать задание')}</a><a class="office-secondary" href="#/admin/team/${escape(projectId)}">${orgText('Full record','Puni zapis','Полная запись')} ↗</a>`;
 }
+// Anyone signed in can write to a person on the map who has an account.
+async function fillMessageLink(){
+ if(!viewer||!selection?.personId||!root)return;
+ const details=root.querySelector('#office-card .office-details');if(!details||details.querySelector('.office-dm'))return;
+ const key=selection.personId;details.dataset.dmKey=key;
+ const r=await fetch('/api/messages/person/'+encodeURIComponent(key),{credentials:'same-origin'}).catch(()=>null);
+ if(!r?.ok||details.dataset.dmKey!==key||!details.isConnected||details.querySelector('.office-dm'))return;
+ const {person}=await r.json();if(person.id===viewer.id)return;
+ const a=document.createElement('a');a.className='office-secondary office-dm';a.href='#/account/messages/'+encodeURIComponent(person.id);a.textContent='✉ '+orgText('Write a message','Napiši poruku','Написать');
+ details.prepend(a);
+}
 async function sendOrganiserNudge(form){
  const message=form.elements.message.value.trim();if(!message)return;
  const field=form.dataset.orgNudge,id=form.dataset.orgId;
@@ -209,7 +220,7 @@ async function decorateTeamLabels(){
  if(!store.real||cityMode||!root)return;
  await loadOrganiser();
  if(!root)return;
- paintOrganiserLabels();fillOrganiserCard();
+ paintOrganiserLabels();fillOrganiserCard();fillMessageLink();
  try{const q=(await (await fetch('/api/quests',{credentials:'same-origin'})).json()).items?.[0];const wrap=root?.querySelector('.office-viewport-wrap');if(q&&wrap&&!wrap.querySelector('.office-quest')){const el=document.createElement('a');el.className='office-quest';el.href='#/account';el.innerHTML=`<span>${q.complete?'🎉':'🎯'} ${escape(q.title[language]||q.title.en)}</span><b>${q.done}/${q.target}</b><i style="width:${Math.round(q.done/q.target*100)}%"></i>`;wrap.append(el);}}catch{}
  let data;try{data=await (await fetch('/api/teams/ranking',{credentials:'same-origin'})).json();}catch{return;}
  if(!root)return;

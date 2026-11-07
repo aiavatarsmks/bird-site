@@ -28,7 +28,7 @@ async function api(method,path,body,{key,headers={},raw}={}){
  return data;
 }
 const errText=e=>tr('e_'+(e?.code||'SERVER_ERROR'))+(e?.detail?.field?` (${esc(e.detail.field)})`:'');
-async function loadMe(){try{const r=await api('GET','/api/auth/me');me=r.user;csrf=r.csrf||'';cache.unread=r.unread||0;}catch{me=null;}updateNav();}
+async function loadMe(){try{const r=await api('GET','/api/auth/me');me=r.user;csrf=r.csrf||'';cache.unread=r.unread||0;cache.messages=r.messages||0;}catch{me=null;}updateNav();}
 function updateNav(){document.querySelectorAll('.nav-account').forEach(a=>{a.textContent=me?tr('nav'):tr('signIn');});}
 
 function parts(){return location.hash.replace(/^#\/?/,'').split('/').filter(Boolean);}
@@ -37,8 +37,8 @@ const go=h=>{if(location.hash===h)render();else location.hash=h;};
 
 // Layout -------------------------------------------------------------------------
 function shell(active,body){
- const tabs=active==='admin'?[['#/account','← '+tr('nav'),'account'],['#/admin',tr('admin'),'admin']]:[['#/account',tr('overview'),'overview'],['#/account/tasks',tr('tasks'),'tasks'],['#/account/mentors',tr('mentors'),'mentors'],['#/account/progress',tr('progress'),'progress'],['#/account/character',tr('character'),'character'],['#/account/settings',tr('settings'),'settings'],...(isAdmin()?[['#/admin',tr('admin'),'admin']]:[])];
- return `<div class="acc ${active==='admin'?'acc-admin':''}"><div class="acc-head"><div><span class="eyebrow">${esc(tr('urole_'+me.role))}</span><h1>${esc(me.displayName)}</h1></div><a class="acc-office" href="#/office">${tr('office')} ↗</a></div><nav class="acc-tabs" aria-label="${tr('nav')}">${tabs.map(([h,l,k])=>`<a href="${h}" ${k===active?'aria-current="page"':''}>${esc(l)}${k==='overview'&&cache.unread?` <b class="acc-dot">${cache.unread}</b>`:''}</a>`).join('')}</nav>${flashHtml()}<div class="acc-body">${body}</div><p class="acc-small">${tr('unofficial')}</p></div>`;
+ const tabs=active==='admin'?[['#/account','← '+tr('nav'),'account'],['#/admin',tr('admin'),'admin']]:[['#/account',tr('overview'),'overview'],['#/account/tasks',tr('tasks'),'tasks'],['#/account/messages',tr('dmTab'),'messages'],['#/account/mentors',tr('mentors'),'mentors'],['#/account/progress',tr('progress'),'progress'],['#/account/character',tr('character'),'character'],['#/account/settings',tr('settings'),'settings'],...(isAdmin()?[['#/admin',tr('admin'),'admin']]:[])];
+ return `<div class="acc ${active==='admin'?'acc-admin':''}"><div class="acc-head"><div><span class="eyebrow">${esc(tr('urole_'+me.role))}</span><h1>${esc(me.displayName)}</h1></div><a class="acc-office" href="#/office">${tr('office')} ↗</a></div><nav class="acc-tabs" aria-label="${tr('nav')}">${tabs.map(([h,l,k])=>`<a href="${h}" ${k===active?'aria-current="page"':''}>${esc(l)}${k==='overview'&&cache.unread?` <b class="acc-dot">${cache.unread}</b>`:''}${k==='messages'&&cache.messages?` <b class="acc-dot">${cache.messages}</b>`:''}</a>`).join('')}</nav>${flashHtml()}<div class="acc-body">${body}</div><p class="acc-small">${tr('unofficial')}</p></div>`;
 }
 function flashHtml(){if(!flash)return '';const f=flash;flash=null;return `<p class="acc-flash ${f.error?'is-error':''}" role="${f.error?'alert':'status'}">${f.html}</p>`;}
 // The native date picker stays, but its empty mask follows the site language, not the phone's.
@@ -132,6 +132,31 @@ function answerContent(form,type){
  return c;
 }
 
+// Private messages: organisers never read them; the recipient can report one message or block the sender.
+const who=p=>`${esc(p.name)}${p.organiser?` <span class="acc-chip">${tr('dmOrganiser')}</span>`:''}${p.team?`<small>${esc(p.team)}</small>`:''}`;
+async function messagesView(otherId){
+ if(!otherId){
+  const q=cache.dmQuery||'';
+  const [list,found]=await Promise.all([api('GET','/api/messages'),q?api('GET','/api/messages/people?q='+encodeURIComponent(q)):null]);
+  cache.messages=list.unread;
+  return shell('messages',`<section class="acc-card"><h2>${tr('dmNew')}</h2><p class="acc-muted">${tr('dmPrivacy')}</p><form data-form="dm-find" class="acc-inline">${field('q',tr('dmFind'),{value:q,attrs:'maxlength="60" autocomplete="off"'})}<button class="acc-secondary">${tr('dmSearch')}</button></form>${found?(found.items.length?`<ul class="acc-list acc-dm-people">${found.items.map(p=>`<li><a href="#/account/messages/${esc(p.id)}"><span>${who(p)}</span></a></li>`).join('')}</ul>`:empty()):''}</section>
+  <section class="acc-card"><h2>${tr('dmTab')}</h2>${list.items.length?`<ul class="acc-list acc-dm-list">${list.items.map(c=>`<li class="${c.unread?'is-unread':''}"><a href="#/account/messages/${esc(c.person.id)}"><span class="acc-dm-who">${who(c.person)}</span><span class="acc-dm-last">${c.last.mine?tr('dmYou')+': ':''}${esc(c.last.body)}</span><small>${date(c.last.created,true)}${c.unread?` · <b class="acc-dot">${c.unread}</b>`:''}${c.blocked?' · '+tr('dmBlocked'):''}</small></a></li>`).join('')}</ul>`:`<p class="acc-muted">${tr('dmNone')}</p>`}</section>`);
+ }
+ const t=await api('GET','/api/messages/with/'+encodeURIComponent(otherId));
+ cache.messages=Math.max(0,(await api('GET','/api/auth/me')).messages||0);
+ const closed=t.blocked||t.blockedMe||!t.person.active;
+ return shell('messages',`<a class="acc-back" href="#/account/messages">← ${tr('dmTab')}</a><section class="acc-card acc-dm"><div class="acc-card-head"><h2>${who(t.person)}</h2><button class="acc-secondary" data-act="dm-block" data-id="${esc(otherId)}" data-on="${t.blocked?'0':'1'}" ${t.blocked?'':`data-confirm="${esc(tr('dmBlockConfirm'))}"`}>${tr(t.blocked?'dmUnblock':'dmBlock')}</button></div>
+  ${t.hasMore?`<p class="acc-muted">${tr('dmOlder')}</p>`:''}<ol class="acc-dm-thread" data-thread="${esc(otherId)}" data-count="${t.items.length}" data-last="${esc(t.items.at(-1)?.id||'')}">${t.items.map(m=>`<li class="${m.mine?'is-mine':''}"><p>${esc(m.body)}</p><small>${date(m.created,true)}${m.mine&&m.read?' · '+tr('dmRead'):''}${!m.mine?(m.reported?' · '+tr('dmReported'):` · <button class="acc-link" data-act="dm-report" data-id="${esc(m.id)}" data-confirm="${esc(tr('dmReportConfirm'))}">${tr('dmReport')}</button>`):''}</small></li>`).join('')}</ol>
+  ${t.items.length?'':`<p class="acc-muted">${tr('dmFirst')}</p>`}
+  ${closed?`<p class="acc-note">${tr(t.blocked?'dmYouBlocked':'dmCannot')}</p>`:`<form data-form="dm-send" data-id="${esc(otherId)}">${field('body',tr('dmMessage'),{type:'textarea',required:true,attrs:'rows="3" maxlength="2000"'})}<button class="acc-primary">${tr('dmSend')}</button></form>`}
+  <p class="acc-small">${tr('dmPrivacy')}</p></section>`);
+}
+// While a conversation is open, new messages appear without a reload unless something is being typed.
+setInterval(async()=>{
+ const list=root?.querySelector('[data-thread]');if(!list||document.hidden)return;
+ const box=root.querySelector('form[data-form=dm-send] textarea');if(box?.value.trim())return;
+ try{const t=await api('GET','/api/messages/with/'+encodeURIComponent(list.dataset.thread));if(String(t.items.length)!==list.dataset.count||(t.items.at(-1)?.id||'')!==list.dataset.last)render();}catch{}
+},10000);
 async function mentorsView(only){
  const [all,projects,mentors]=await Promise.all([api('GET','/api/office-hours'),api('GET','/api/projects?mine=1'),api('GET','/api/mentors')]);
  const slots={items:only?all.items.filter(x=>x.mentorId===only):all.items};
@@ -214,8 +239,8 @@ async function projectView(id,tab='edit'){
 }
 
 // Admin ------------------------------------------------------------------------------
-const ADMIN_GROUPS=[{label:'today',tabs:['today']},{label:'teamsNav',tabs:['overview','users','checkins','claims']},{label:'tasks',tabs:['tasks','reviews','import']},{label:'programme',tabs:['lectures','mentors','news','insights']},{label:'settings',tabs:['system','audit']}];
-const TAB_LABEL={overview:'teamsNav',news:'announcements',system:'settings'};
+const ADMIN_GROUPS=[{label:'today',tabs:['today']},{label:'teamsNav',tabs:['overview','users','checkins','claims']},{label:'tasks',tabs:['tasks','reviews','import']},{label:'programme',tabs:['lectures','mentors','news','insights']},{label:'settings',tabs:['system','reports','audit']}];
+const TAB_LABEL={reports:'dmReports',overview:'teamsNav',news:'announcements',system:'settings'};
 function adminShell(active,body){
  const group=ADMIN_GROUPS.find(g=>g.tabs.includes(active))||ADMIN_GROUPS[0];
  const link=(k,l,on)=>`<a href="#/admin/${k}" ${on?'aria-current="page"':''}>${esc(l)}</a>`;
@@ -384,6 +409,10 @@ async function adminView(tab='today',id){
   const [slots,mentors]=await Promise.all([api('GET','/api/office-hours'),api('GET','/api/mentors')]);
   return adminShell(tab,`<section class="acc-card"><h2>${tr('mentorProfiles')}</h2><p class="acc-muted">${tr('mentorProfilesNote')}</p><form data-form="mentor" class="acc-inline">${field('name',tr('mentorName'),{required:true,attrs:'maxlength="100"'})}${field('area',tr('mentorArea'),{required:true,hint:tr('mentorAreaHint'),attrs:'maxlength="60" list="mentor-areas"'})}<datalist id="mentor-areas">${['Sales','Marketing','Product','Fundraising','Legal','Finance','Tech','Pitch'].map(a=>`<option value="${a}">`).join('')}</datalist>${field('bio',tr('mentorBio'),{attrs:'maxlength="600"'})}${field('link',tr('mentorLink'),{type:'url',attrs:'maxlength="300" placeholder="https://"'})}<button class="acc-secondary">${tr('save')}</button></form><ul class="acc-list">${mentors.items.map(m=>`<li><details class="acc-grow"><summary><strong>${esc(m.name)}</strong> <small>${esc(m.area)}${m.bio?' · '+esc(m.bio):''} · ${m.freeSlots} ${tr('freeSlots')}</small></summary><form data-form="mentor" data-id="${esc(m.id)}" class="acc-compact"><div class="acc-inline">${field('name',tr('mentorName'),{required:true,value:m.name,attrs:'maxlength="100"'})}${field('area',tr('mentorArea'),{required:true,value:m.area,attrs:'maxlength="60" list="mentor-areas"'})}</div>${field('bio',tr('mentorBio'),{value:m.bio,attrs:'maxlength="600"'})}${field('link',tr('mentorLink'),{type:'url',value:m.link,attrs:'maxlength="300"'})}<div class="acc-actions"><button class="acc-primary">${tr('save')}</button><button type="button" data-act="mentor-archive" data-id="${esc(m.id)}" data-confirm="${esc(tr('confirmRemoveMentor'))}">${tr('remove')}</button></div></form></details></li>`).join('')}</ul></section><form data-form="slot" class="acc-card"><h2>${tr('newSlot')}</h2><div class="acc-inline">${mentors.items.length?select('mentorId',tr('mentorProfiles'),[['',tr('guestMentor')],...mentors.items.map(m=>[m.id,m.name+' · '+m.area])],mentors.items[0].id):''}${field('mentorName',tr('guestMentor'),{attrs:'maxlength="100"'})}${field('topic',tr('topic'),{attrs:'maxlength="200"'})}</div><div class="acc-inline">${field('startsAt',tr('startsAt'),{type:'datetime-local',required:true})}${field('durationMin',tr('duration'),{type:'number',value:30,attrs:'min="10" max="240"'})}${field('location',tr('location'),{attrs:'maxlength="200"'})}</div><button class="acc-primary">${tr('save')}</button></form><ul class="acc-list">${slots.items.map(x=>`<li><div><strong>${date(x.startsAt,true)} · ${esc(x.mentorName)}</strong><small>${esc(x.topic)}${x.booked?` · ${tr('bookedOther')}: ${esc(x.projectName||'')}${x.question?' · '+esc(x.question):''}${x.note?' · '+esc(x.note):''}`:''}</small></div><button data-act="slot-cancel" data-id="${esc(x.id)}" data-confirm="${esc(tr('confirmCancelSlot'))}">${tr('cancelSlot')}</button></li>`).join('')}</ul>`);
  }
+ if(tab==='reports'){
+  const r=await api('GET','/api/admin/message-reports');
+  return adminShell(tab,`<section class="acc-card"><h2>${tr('dmReports')}</h2><p class="acc-muted">${tr('dmReportsNote')}</p>${r.items.length?`<ul class="acc-list">${r.items.map(x=>`<li class="${x.resolved?'':'is-unread'}"><div><strong><a href="#/admin/person/${esc(x.from.id)}">${esc(x.from.name)}</a> → ${esc(x.to.name)}</strong><p class="acc-pre">${esc(x.body)}</p><small>${date(x.sent,true)} · ${tr('dmReportedOn')} ${date(x.created,true)}</small></div>${x.resolved?statusChip('accepted'):`<button class="acc-secondary" data-act="dm-resolve" data-id="${esc(x.id)}">${tr('dmResolve')}</button>`}</li>`).join('')}</ul>`:empty()}</section>`);
+ }
  if(tab==='audit'){
   const a=await api('GET','/api/admin/audit'+(id?'?prefix='+encodeURIComponent(id):''));
   const kinds=['task','submission','attendance','role','user','xp','nudge','membership','lecture','claim'];
@@ -407,6 +436,7 @@ async function render(){
   else if(p[1]==='tasks')html=await tasksView();
   else if(p[1]==='task')html=await taskView(p[2]);
   else if(p[1]==='progress')html=await progressView();
+  else if(p[1]==='messages')html=await messagesView(p[2]);
   else if(p[1]==='mentors')html=await mentorsView(p[2]);
   else if(p[1]==='character')html=await characterView();
   else if(p[1]==='settings')html=await settingsView();
@@ -417,6 +447,7 @@ async function render(){
  }catch(e){html=me?shell('overview',`<p class="acc-flash is-error" role="alert">${errText(e)}</p>`):authView('login');}
  if(token!==renderToken||!root)return;
  root.innerHTML=html;updateNav();
+ const thread=root.querySelector('.acc-dm-thread');if(thread)thread.scrollTop=thread.scrollHeight;
  if(me&&['account'].includes(p[0])&&(!p[1]||p[1]==='progress'))celebrateBadges();
  const status=root.querySelector('.acc-flash');if(status)status.focus?.();
 }
@@ -496,6 +527,8 @@ async function onSubmit(e){
   if(kind==='book'){await api('POST',`/api/office-hours/${encodeURIComponent(form.dataset.id)}/book`,{projectId:f.get('projectId'),question:f.get('question')});setFlash(tr('saved'));render();return;}
   if(kind==='meeting-note'){await api('POST',`/api/office-hours/${encodeURIComponent(form.dataset.id)}/note`,{note:f.get('note')});setFlash(tr('saved'));render();return;}
   if(kind==='quest'){await api('POST','/api/admin/quests',{title:{en:f.get('qt_en'),hr:f.get('qt_hr'),ru:f.get('qt_ru')},taskId:f.get('taskId'),target:Number(f.get('target'))});setFlash(tr('saved'));render();return;}
+  if(kind==='dm-find'){cache.dmQuery=String(f.get('q')||'').trim();render();return;}
+  if(kind==='dm-send'){await api('POST','/api/messages/with/'+encodeURIComponent(form.dataset.id),{body:f.get('body')});render();return;}
   if(kind==='reminders'){await api('PUT','/api/admin/reminders',{enabled:btn?.value==='1'});setFlash(tr('saved'));render();return;}
   if(kind==='chat-hook'){await api('PUT','/api/admin/chat-hook',{url:f.get('url')});setFlash(tr('saved'));render();return;}
   if(kind==='announcement'){await api('POST','/api/admin/announcements',{title:f.get('title'),body:f.get('body'),pinned:f.get('pinned')==='on',toChat:f.get('toChat')==='on'});setFlash(tr('saved'));render();return;}
@@ -527,6 +560,9 @@ async function onClick(e){
   else if(act==='help'){await api('POST','/api/help/confirmations/'+encodeURIComponent(d.id),{decision:d.decision});render();}
   else if(act==='help-close'){await api('DELETE','/api/help/'+encodeURIComponent(d.id));render();}
   else if(act==='milestone-done'){await api('POST',`/api/projects/${encodeURIComponent(d.project)}/milestones/${encodeURIComponent(d.id)}/done`,{});render();}
+  else if(act==='dm-block'){await api(d.on==='1'?'POST':'DELETE',`/api/messages/with/${encodeURIComponent(d.id)}/block`);render();}
+  else if(act==='dm-report'){await api('POST','/api/messages/report/'+encodeURIComponent(d.id));setFlash(tr('dmReportSent'));render();}
+  else if(act==='dm-resolve'){await api('POST',`/api/admin/message-reports/${encodeURIComponent(d.id)}/resolve`);render();}
   else if(act==='read'){await api('POST','/api/notifications/read',{});cache.unread=0;render();}
   else if(act==='session'){await api('DELETE','/api/auth/sessions/'+encodeURIComponent(d.id));await loadMe();render();}
   else if(act==='logout'||act==='logout-all'){await api('POST','/api/auth/'+act,{});me=null;csrf='';go('#/account');}
