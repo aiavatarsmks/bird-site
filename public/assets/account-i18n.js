@@ -1,5 +1,17 @@
 /* Interface text for accounts, projects, tasks and admin (EN/HR/RU). */
 window.BIRD_ACCOUNT_TEXT={
+ letterTask:{en:'Task from an email',hr:'Zadatak iz e-maila',ru:'Задание из письма'},
+ letterNote:{en:'Paste the whole email, forwarded headers included. The subject becomes the title, the text becomes the instructions, and a date after “deadline”, “by” or “until” becomes the due date. Nothing is saved until you press Save.',hr:'Zalijepite cijeli e-mail, zajedno sa zaglavljima proslijeđene poruke. Predmet postaje naslov, tekst postaje upute, a datum nakon „rok”, „do” ili „najkasnije” postaje rok. Ništa se ne sprema dok ne kliknete Spremi.',ru:'Вставьте письмо целиком, можно вместе с заголовками пересылки. Тема станет названием, текст — инструкцией, а дата после слов «срок», «до» или «дедлайн» — сроком. Ничего не сохраняется, пока вы не нажмёте «Сохранить».'},
+ letterText:{en:'Email text',hr:'Tekst e-maila',ru:'Текст письма'},
+ letterFill:{en:'Fill in the task',hr:'Ispuni zadatak',ru:'Заполнить задание'},
+ letterDone:{en:'Filled in. Check and save. Language:',hr:'Ispunjeno. Provjerite i spremite. Jezik:',ru:'Заполнено. Проверьте и сохраните. Язык:'},
+ letterNoDue:{en:'no deadline found',hr:'rok nije pronađen',ru:'срок не найден'},
+ letterEnCopy:{en:'the same text is in EN, translate it if you like',hr:'isti tekst je i u EN, po želji ga prevedite',ru:'тот же текст стоит в EN, при желании переведите'},
+ letterEmpty:{en:'Paste the email text first.',hr:'Najprije zalijepite tekst e-maila.',ru:'Сначала вставьте текст письма.'},
+ waShare:{en:'Share in WhatsApp',hr:'Podijeli na WhatsAppu',ru:'Поделиться в WhatsApp'},
+ waTitle:{en:'Tell the group',hr:'Obavijestite grupu',ru:'Сообщить в группу'},
+ waNote:{en:'Opens WhatsApp with a short text and a link to the platform; choose the group and send.',hr:'Otvara WhatsApp s kratkim tekstom i poveznicom na platformu; odaberite grupu i pošaljite.',ru:'Откроет WhatsApp с коротким текстом и ссылкой на платформу: выберите группу и отправьте.'},
+ waNewTask:{en:'New task',hr:'Novi zadatak',ru:'Новое задание'},
  pointsWhat:{en:'What can points buy?',hr:'Što mogu dobiti za bodove?',ru:'На что потратить баллы?'},
  pointsDialogTitle:{en:'What your points are for',hr:'Čemu služe bodovi',ru:'Зачем нужны баллы'},
  pointsSpendOn:{en:'Spend them on',hr:'Možete ih potrošiti na',ru:'Их можно потратить на'},

@@ -8,6 +8,9 @@ const loc={en:'en-GB',hr:'hr-HR',ru:'ru-RU'};
 const date=(iso,time=false)=>iso?new Intl.DateTimeFormat(loc[lang],{day:'numeric',month:'short',year:'numeric',...(time?{hour:'2-digit',minute:'2-digit'}:{}),timeZone:'Europe/Zagreb'}).format(new Date(iso.length===10?iso+'T12:00:00Z':iso)):'';
 const size=n=>n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
 const pick=o=>o?.[lang]||o?.en||'';
+// WhatsApp cannot be connected cheaply, so organisers post a ready text with a link back to the platform.
+const siteLink=hash=>location.origin+location.pathname+hash;
+const waLink=text=>`<a class="acc-secondary acc-wa" href="https://wa.me/?text=${encodeURIComponent(text.slice(0,1800))}" target="_blank" rel="noopener noreferrer">${tr('waShare')}</a>`;
 const seen=iso=>iso?`${tr('lastSeen')}: ${date(iso,true)}`:tr('neverSeen');
 const idle=iso=>!iso||Date.now()-Date.parse(iso)>7*86400000;
 // Authored task text falls back to English with a visible language marker.
@@ -99,6 +102,20 @@ function pointsCard(wallets,rewards){
  const offers=[`<li><div><strong>🗓 ${tr('pointsMeeting')}</strong><small>${tr('pointsMeetingNote')}</small></div><b>${pts(price)}</b></li>`,...rewards.items.slice(0,4).map(r=>`<li><div><strong>🎁 ${esc(r.title)}</strong>${r.description?`<small>${esc(r.description)}</small>`:''}</div><b>${pts(r.price)}</b></li>`)].join('');
  return `<section class="acc-card acc-points"><div class="acc-card-head"><h2>${tr('walletTitle')}</h2><button class="acc-secondary" data-act="points-help">${tr('pointsWhat')}</button></div><ul class="acc-list">${rows}</ul><div class="acc-actions"><a class="acc-primary" href="#/account/mentors">${tr('pointsBook')}</a></div></section>
  <dialog class="acc-dialog" id="acc-points" aria-labelledby="acc-points-title" ${auto?`data-auto="${esc(JSON.stringify({intro:true,can:[...new Set([...(seen.can||[]),...can])]}))}"`:''}><h2 id="acc-points-title">${tr('pointsDialogTitle')}</h2><ul class="acc-list">${wallets.items.map(w=>`<li><span>${esc(w.name)}</span><b>${pts(w.balance)}</b></li>`).join('')}</ul><h3>${tr('pointsSpendOn')}</h3><ul class="acc-list acc-offers">${offers}</ul><p class="acc-muted">${tr('pointsEarn')}</p><div class="acc-actions"><a class="acc-primary" href="#/account/mentors" data-act="points-close">${tr('pointsBook')}</a><a class="acc-secondary" href="#/account/tasks" data-act="points-close">${tr('pointsTasks')}</a><button data-act="points-close">${tr('gotIt')}</button></div></dialog>`;
+}
+// Fills the new-task form from a pasted email; the organiser checks it and saves.
+function fillFromLetter(){
+ const form=root.querySelector('form[data-form=task]'),out=root.querySelector('#letter-result');
+ const r=window.BirdLetter?.parse(root.querySelector('#letter-text').value);
+ if(!form||!r||!r.instructions){out.textContent=tr('letterEmpty');return;}
+ const set=(name,value)=>{const el=form.elements[name];if(el&&value)el.value=value;};
+ set('title_'+r.language,r.title);set('instructions_'+r.language,r.instructions);
+ // English is required, so the original text goes there too until someone translates it.
+ if(r.language!=='en'){if(!form.elements.title_en.value)set('title_en',r.title);if(!form.elements.instructions_en.value)set('instructions_en',r.instructions);}
+ if(r.dueLocal)set('dueAt',r.dueLocal);
+ form.querySelectorAll('.acc-lang-block').forEach(d=>{if(d.querySelector(`[name=title_${r.language}]`))d.open=true;});
+ out.textContent=`${tr('letterDone')} ${r.language.toUpperCase()} · ${r.dueAt?tr('due')+' '+date(r.dueAt.toISOString(),true):tr('letterNoDue')}${r.language!=='en'?' · '+tr('letterEnCopy'):''}`;
+ form.elements['title_'+r.language]?.focus();
 }
 async function claimForm(claims){
  const people=(await api('GET','/api/people?limit=100')).items.filter(p=>p.kind==='participant');
@@ -367,7 +384,7 @@ async function adminView(tab='today',id){
  }
  if(tab==='tasks'){
   const list=await api('GET','/api/admin/tasks');
-  return adminShell(tab,`<a class="acc-secondary" href="#/admin/task/new">+ ${tr('newTask')}</a><ul class="acc-list">${list.items.map(t=>`<li><a href="#/admin/task/${esc(t.id)}"><strong>${authored(t.translations,'title')}</strong><small>${esc(tr('type_'+t.type))} · ${esc(tr(t.scope==='team'?'team':'personal'))} · ${t.xp} ${tr('xp')} · ${t.assigned} ${tr('assigned')}${t.waiting?` · ${t.waiting} ${tr('waiting')}`:''}</small></a>${statusChip(t.status)}</li>`).join('')}</ul>`);
+  return adminShell(tab,`<div class="acc-actions"><a class="acc-secondary" href="#/admin/task/new">+ ${tr('newTask')}</a><a class="acc-secondary" href="#/admin/task/new-letter">📧 ${tr('letterTask')}</a></div><ul class="acc-list">${list.items.map(t=>`<li><a href="#/admin/task/${esc(t.id)}"><strong>${authored(t.translations,'title')}</strong><small>${esc(tr('type_'+t.type))} · ${esc(tr(t.scope==='team'?'team':'personal'))} · ${t.xp} ${tr('xp')} · ${t.assigned} ${tr('assigned')}${t.waiting?` · ${t.waiting} ${tr('waiting')}`:''}</small></a>${statusChip(t.status)}</li>`).join('')}</ul>`);
  }
  if(tab==='task'){
   const [,presetKind,presetId]=(id||'').split('~');
@@ -386,7 +403,9 @@ async function adminView(tab='today',id){
   let mark='';
   if(t&&t.status==='published'){const targets=t.scope==='team'?(await api('GET','/api/admin/overview')).items.map(p=>({id:p.id,name:p.name})):(await api('GET','/api/admin/users')).items.map(u=>({id:u.id,name:u.displayName}));
    mark=`<form data-form="mark" data-id="${esc(t.id)}" data-scope="${esc(t.scope)}" class="acc-card"><h2>${tr('markFor')}</h2><div class="acc-checks">${targets.map(x=>`<label class="acc-check"><input type="checkbox" name="target" value="${esc(x.id)}"> ${esc(x.name)}</label>`).join('')}</div>${field('note',tr('note'),{attrs:'maxlength="500"'})}<button class="acc-primary">${tr('markDone')}</button></form>`;}
-  return adminShell('tasks',`<a class="acc-back" href="#/admin/task/">← ${tr('tasks')}</a>${status}${mark}${form}`.replace('href="#/admin/task/"','href="#/admin/tasks"'));
+  const letter=t?'':`<details class="acc-card acc-letter" ${id==='new-letter'?'open':''}><summary><strong>📧 ${tr('letterTask')}</strong></summary><p class="acc-muted">${tr('letterNote')}</p><label class="acc-field"><span>${tr('letterText')}</span><textarea id="letter-text" rows="8" maxlength="20000"></textarea></label><div class="acc-actions"><button type="button" class="acc-primary" data-act="letter-fill">${tr('letterFill')}</button></div><p class="acc-muted" id="letter-result" role="status"></p></details>`;
+  const share=t&&t.status==='published'?`<section class="acc-card"><h2>${tr('waTitle')}</h2><p class="acc-muted">${tr('waNote')}</p>${waLink(`${tr('waNewTask')}: ${tl[lang]?.title||tl.en?.title||''}${t.dueAt?`\n${tr('due')} ${date(t.dueAt,true)}`:''}\n${t.xp} ${tr('xp')}\n${siteLink('#/account/tasks')}`)}</section>`:'';
+  return adminShell('tasks',`<a class="acc-back" href="#/admin/task/">← ${tr('tasks')}</a>${status}${share}${mark}${letter}${form}`.replace('href="#/admin/task/"','href="#/admin/tasks"'));
  }
  if(tab==='claims'){
   const c=await api('GET','/api/admin/claims');
@@ -446,7 +465,7 @@ async function adminView(tab='today',id){
  if(tab==='news'){
   const n=await api('GET','/api/announcements');
   const [qs,tl,hook,rem]=await Promise.all([api('GET','/api/quests'),api('GET','/api/admin/tasks?status=published'),api('GET','/api/admin/chat-hook'),api('GET','/api/admin/reminders')]);
-  return adminShell(tab,`<form data-form="quest" class="acc-card"><h2>${tr('newQuest')}</h2>${['en','hr','ru'].map(l=>field('qt_'+l,tr('title')+' '+l.toUpperCase(),{required:l==='en',attrs:'maxlength="120"'})).join('')}${select('taskId',tr('tasks'),tl.items.map(x=>[x.id,x.translations.en.title]),'')}${field('target',tr('target'),{type:'number',value:8,attrs:'min="1" max="1000"'})}<button class="acc-secondary">${tr('save')}</button><ul class="acc-list">${qs.items.map(q=>`<li><span>${esc(pick(q.title))} · ${q.done}/${q.target}</span><button type="button" data-act="quest-close" data-id="${esc(q.id)}">${tr('close')}</button></li>`).join('')}</ul></form><form data-form="announcement" class="acc-card"><h2>${tr('newAnnouncement')}</h2>${field('title',tr('title'),{required:true,attrs:'maxlength="160"'})}${field('body',tr('answer'),{type:'textarea',required:true,attrs:'rows="4" maxlength="4000"'})}<label class="acc-check"><input type="checkbox" name="pinned"> ${tr('pinned')}</label>${hook.configured?`<label class="acc-check"><input type="checkbox" name="toChat" checked> ${tr('toChat')}</label>`:''}<button class="acc-primary">${tr('publish')}</button></form><form data-form="reminders" class="acc-card"><h2>${tr('autoReminders')} <span class="acc-chip ${rem.enabled?'is-accepted':''}">${tr(rem.enabled?'remindersOn':'remindersOff')}</span></h2><p class="acc-muted">${tr('autoRemindersNote')}</p><p class="acc-note">${tr('remindersWeek')}: ${rem.sentWeek}</p><button class="acc-secondary" name="enabled" value="${rem.enabled?'0':'1'}" ${rem.enabled?`data-confirm="${esc(tr('remindersOffConfirm'))}"`:''}>${tr(rem.enabled?'turnOff':'turnOn')}</button></form><form data-form="chat-hook" class="acc-card"><h2>${tr('chatHook')} ${hook.configured?`<span class="acc-chip is-accepted">${tr('configured')}</span>`:''}</h2><p class="acc-muted">${tr('chatHookNote')}</p><div class="acc-inline">${field('url','URL',{type:'url',attrs:'maxlength="300" autocomplete="off"'})}<button class="acc-secondary">${tr('save')}</button></div></form><ul class="acc-list">${n.items.map(x=>`<li><div><strong>${x.pinned?'📌 ':''}${esc(x.title)}</strong><p class="acc-pre">${esc(x.body)}</p><small>${date(x.created,true)} · ${x.readBy}/${x.audience} ${tr('readBy')}</small></div><button data-act="news-archive" data-id="${esc(x.id)}">${tr('archive').split(' ')[0]}</button></li>`).join('')}</ul>`);
+  return adminShell(tab,`<form data-form="quest" class="acc-card"><h2>${tr('newQuest')}</h2>${['en','hr','ru'].map(l=>field('qt_'+l,tr('title')+' '+l.toUpperCase(),{required:l==='en',attrs:'maxlength="120"'})).join('')}${select('taskId',tr('tasks'),tl.items.map(x=>[x.id,x.translations.en.title]),'')}${field('target',tr('target'),{type:'number',value:8,attrs:'min="1" max="1000"'})}<button class="acc-secondary">${tr('save')}</button><ul class="acc-list">${qs.items.map(q=>`<li><span>${esc(pick(q.title))} · ${q.done}/${q.target}</span><button type="button" data-act="quest-close" data-id="${esc(q.id)}">${tr('close')}</button></li>`).join('')}</ul></form><form data-form="announcement" class="acc-card"><h2>${tr('newAnnouncement')}</h2>${field('title',tr('title'),{required:true,attrs:'maxlength="160"'})}${field('body',tr('answer'),{type:'textarea',required:true,attrs:'rows="4" maxlength="4000"'})}<label class="acc-check"><input type="checkbox" name="pinned"> ${tr('pinned')}</label>${hook.configured?`<label class="acc-check"><input type="checkbox" name="toChat" checked> ${tr('toChat')}</label>`:''}<button class="acc-primary">${tr('publish')}</button></form><form data-form="reminders" class="acc-card"><h2>${tr('autoReminders')} <span class="acc-chip ${rem.enabled?'is-accepted':''}">${tr(rem.enabled?'remindersOn':'remindersOff')}</span></h2><p class="acc-muted">${tr('autoRemindersNote')}</p><p class="acc-note">${tr('remindersWeek')}: ${rem.sentWeek}</p><button class="acc-secondary" name="enabled" value="${rem.enabled?'0':'1'}" ${rem.enabled?`data-confirm="${esc(tr('remindersOffConfirm'))}"`:''}>${tr(rem.enabled?'turnOff':'turnOn')}</button></form><form data-form="chat-hook" class="acc-card"><h2>${tr('chatHook')} ${hook.configured?`<span class="acc-chip is-accepted">${tr('configured')}</span>`:''}</h2><p class="acc-muted">${tr('chatHookNote')}</p><div class="acc-inline">${field('url','URL',{type:'url',attrs:'maxlength="300" autocomplete="off"'})}<button class="acc-secondary">${tr('save')}</button></div></form><ul class="acc-list">${n.items.map(x=>`<li><div><strong>${x.pinned?'📌 ':''}${esc(x.title)}</strong><p class="acc-pre">${esc(x.body)}</p><small>${date(x.created,true)} · ${x.readBy}/${x.audience} ${tr('readBy')}</small></div><span class="acc-actions">${waLink(`${x.title}\n\n${x.body}\n\n${siteLink('#/account')}`)}<button data-act="news-archive" data-id="${esc(x.id)}">${tr('archive').split(' ')[0]}</button></span></li>`).join('')}</ul>`);
  }
  if(tab==='mentors'){
   const [slots,mentors,asks]=await Promise.all([api('GET','/api/office-hours'),api('GET','/api/mentors'),api('GET','/api/meeting-requests?all=1')]);
@@ -610,6 +629,7 @@ async function onClick(e){
  if(act==='toggle-password'){e.preventDefault();const input=el.previousElementSibling,show=input.type==='password';input.type=show?'text':'password';el.textContent=tr(show?'hidePassword':'showPassword');el.setAttribute('aria-pressed',String(show));input.focus();return;}
  if(act==='count'){const form=el.closest('form'),input=form.elements.count,max=Number(form.closest('.acc-task')?.querySelector('.acc-counter')?.textContent.match(/\/\s*(\d+)/)?.[1]||100);input.value=Math.max(0,Math.min(max,Number(input.value)+Number(d.d)));form.elements.countOut.value=input.value;return;}
  if(act==='office-me')return;
+ if(act==='letter-fill'){fillFromLetter();return;}
  if(act==='points-help'){root.querySelector('#acc-points')?.showModal?.();return;}
  if(act==='points-close'){root.querySelector('#acc-points')?.close?.();return;}
  if(d.confirm&&!window.confirm(d.confirm))return;
