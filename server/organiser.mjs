@@ -40,6 +40,7 @@ export function today(ctx){
   ...signals(db),waiting,overdue,help,
   unverified:db.query("SELECT count(*) n FROM attendance WHERE kind='self_reported'").get().n,
   claims:db.query("SELECT count(*) n FROM person_claims WHERE status='pending'").get().n,
+  meetings:db.query("SELECT count(*) n FROM meeting_requests WHERE status='pending'").get().n,
   lectures:db.query("SELECT id,date,time,place,title FROM lectures WHERE status='published' AND date>=? ORDER BY date LIMIT 3").all(day).map(l=>({id:l.id,date:l.date,time:l.time,place:l.place,title:JSON.parse(l.title)})),
   slots:db.query("SELECT h.id,h.mentor_name,h.starts_at,h.topic,json_extract(p.draft,'$.name') team FROM office_hours h LEFT JOIN office_hour_bookings b ON b.slot_id=h.id LEFT JOIN projects p ON p.id=b.project_id WHERE h.starts_at>=? ORDER BY h.starts_at LIMIT 3").all(now).map(s=>({id:s.id,mentor:s.mentor_name,startsAt:s.starts_at,topic:s.topic,team:s.team||''})),
  });

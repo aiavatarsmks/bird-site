@@ -231,5 +231,9 @@ CREATE INDEX IF NOT EXISTS chat_messages_group ON chat_messages(group_id,seq);
 CREATE TABLE IF NOT EXISTS chat_reports(id TEXT PRIMARY KEY,message_id TEXT NOT NULL REFERENCES chat_messages(id),reporter_id TEXT NOT NULL REFERENCES users(id),created TEXT NOT NULL,resolved_at TEXT,resolved_by TEXT,UNIQUE(message_id,reporter_id));
 ALTER TABLE users ADD COLUMN email_messages INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN email_reminders INTEGER NOT NULL DEFAULT 0;
+`}, // A team asks for a mentor meeting when no free slot fits; the price is held until an organiser arranges or declines it.
+ {id:20,name:'meeting-requests',sql:`
+CREATE TABLE IF NOT EXISTS meeting_requests(id TEXT PRIMARY KEY,mentor_id TEXT REFERENCES mentors(id),project_id TEXT NOT NULL REFERENCES projects(id),requested_by TEXT NOT NULL REFERENCES users(id),topic TEXT NOT NULL,times TEXT NOT NULL DEFAULT '',price INTEGER NOT NULL CHECK(price>=0),status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','arranged','declined','withdrawn')),slot_id TEXT REFERENCES office_hours(id),decided_by TEXT,decided_at TEXT,created TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS meeting_requests_project ON meeting_requests(project_id,status);
 `},
 ];

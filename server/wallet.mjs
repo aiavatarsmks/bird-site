@@ -22,7 +22,10 @@ export function wallet(db,projectId){
  const earned=projectXp(db,projectId)+members(db,projectId).reduce((n,id)=>n+userXp(db,id),0);
  const sessions=db.query('SELECT coalesce(sum(b.cost),0) n FROM office_hour_bookings b JOIN office_hours h ON h.id=b.slot_id WHERE b.project_id=? AND h.cancelled_at IS NULL').get(projectId).n;
  const rewards=db.query("SELECT coalesce(sum(price),0) n FROM reward_orders WHERE project_id=? AND status IN ('pending','approved')").get(projectId).n;
- return {earned,spent:sessions+rewards,balance:earned-sessions-rewards};
+ // An arranged request turns into a paid booking, so only open requests hold points here.
+ const asked=db.query("SELECT coalesce(sum(price),0) n FROM meeting_requests WHERE project_id=? AND status='pending'").get(projectId).n;
+ const spent=sessions+rewards+asked;
+ return {earned,spent,balance:earned-spent};
 }
 /** Fails when the team cannot pay; call inside the same transaction as the purchase. */
 export function charge(db,projectId,price){
@@ -36,12 +39,13 @@ export function charge(db,projectId,price){
 export function myWallets(ctx){
  const user=requireUser(ctx);
  const teams=ctx.db.query(`SELECT p.id,json_extract(p.draft,'$.name') name FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') AND p.status<>'archived' ORDER BY m.created`).all(user.id);
- return json({items:teams.map(t=>({projectId:t.id,name:t.name,...wallet(ctx.db,t.id),history:history(ctx.db,t.id)}))});
+ return json({items:teams.map(t=>({projectId:t.id,name:t.name,...wallet(ctx.db,t.id),history:history(ctx.db,t.id)})),sessionPrice:DEFAULT_SESSION_PRICE});
 }
 function history(db,projectId){
  const sessions=db.query('SELECT h.mentor_name label,b.cost amount,b.created,h.cancelled_at FROM office_hour_bookings b JOIN office_hours h ON h.id=b.slot_id WHERE b.project_id=? AND b.cost>0').all(projectId).map(r=>({kind:'session',label:r.label,amount:r.amount,created:r.created,refunded:!!r.cancelled_at}));
  const orders=db.query('SELECT r.title label,o.price amount,o.created,o.status FROM reward_orders o JOIN rewards r ON r.id=o.reward_id WHERE o.project_id=?').all(projectId).map(r=>({kind:'reward',label:r.label,amount:r.amount,created:r.created,status:r.status,refunded:r.status==='rejected'}));
- return [...sessions,...orders].sort((a,b)=>b.created.localeCompare(a.created)).slice(0,30);
+ const asks=db.query("SELECT coalesce(m.name,'') label,r.price amount,r.created,r.status FROM meeting_requests r LEFT JOIN mentors m ON m.id=r.mentor_id WHERE r.project_id=? AND r.status<>'arranged' AND r.price>0").all(projectId).map(r=>({kind:'meeting',label:r.label,amount:r.amount,created:r.created,status:r.status,refunded:r.status!=='pending'}));
+ return [...sessions,...orders,...asks].sort((a,b)=>b.created.localeCompare(a.created)).slice(0,30);
 }
 
 // Rewards organisers offer: a pitch slot, a deck review, perks.

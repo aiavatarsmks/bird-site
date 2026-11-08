@@ -110,8 +110,8 @@ pre.acc-pre{font:inherit;background:#f7f5ef;padding:10px;border-radius:6px;margi
 .acc-pass-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);min-height:34px;padding:0 12px;border:1px solid #b9bcb1;border-radius:5px;background:#f3f1ea;color:var(--ink);font:inherit;font-size:14px;cursor:pointer}
 .acc-pass-toggle:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .acc-scale{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}
-.acc-scale label{display:block}
-.acc-scale input{position:absolute;opacity:0;pointer-events:none}
+.acc-scale label{display:block;position:relative}
+.acc-scale input{position:absolute;inset:0;width:1px;height:1px;min-height:0;padding:0;opacity:0;pointer-events:none}
 .acc-scale span{display:flex;align-items:center;justify-content:center;min-height:42px;border:1px solid #b9bcb1;border-radius:6px;background:#fff;font-weight:600;cursor:pointer}
 .acc-scale input:checked+span{background:var(--ink);color:#fff;border-color:var(--ink)}
 .acc-scale input:focus-visible+span{outline:2px solid var(--ink);outline-offset:2px}
@@ -210,3 +210,12 @@ tr[hidden]{display:none}
 .acc-dm-thread .acc-dm-file{display:flex;width:fit-content;max-width:100%}
 .acc-dm-thread li>small{display:block}
 .acc-dm form[data-form$=-send]>small{display:block;margin-bottom:10px}
+/* Points: the way to a mentor meeting and the "what points buy" window. */
+.acc-points .acc-bar{margin:6px 0 4px;max-width:320px}
+.acc-mentor .acc-mentor-cta{font-weight:700;font-size:14px;justify-self:start}
+.acc-dialog{position:fixed;inset:0;margin:auto;height:fit-content;box-sizing:border-box;width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid var(--line);border-radius:12px;padding:20px;background:var(--white);color:inherit}
+.acc-dialog::backdrop{background:rgba(20,20,20,.45)}
+.acc-dialog h2{margin-top:0}
+.acc-dialog h3{margin:16px 0 4px;font-size:15px}
+.acc-offers li b{white-space:nowrap}
+.acc-dialog .acc-actions{flex-wrap:wrap}
