@@ -2,6 +2,8 @@
  * Private messages between two people and in group chats. Organisers never read conversations:
  * they see a message only when someone in it reports it. Anyone can block anyone.
  * A message may carry one file (PDF, PPTX or image) that only the people in the conversation can open.
+ * A participant without an account can be written to: the message waits and reaches their inbox when they join.
+ * Everyone with an account is in one shared chat.
  */
 import {fail,json,readJson,text,newId,rateLimit} from './http.mjs';
 import {nowIso} from './db.mjs';
@@ -13,11 +15,15 @@ import {onTeam} from './wallet.mjs';
 const PAGE=50;
 const person=(db,id)=>db.query("SELECT u.id,u.display_name name,u.role,u.status,(SELECT json_extract(p.draft,'$.name') FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=u.id AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') ORDER BY m.created LIMIT 1) team FROM users u WHERE u.id=?").get(id);
 const view=p=>({id:p.id,name:p.name,team:p.team||'',organiser:isAdmin(p)});
+// A participant on the roster who has not joined yet; their id is the person id.
+const waitingPerson=(db,id)=>db.query("SELECT p.id,p.display_name name,(SELECT t.name FROM team_people tp JOIN teams t ON t.id=tp.team_id WHERE tp.person_id=p.id LIMIT 1) team FROM people p WHERE p.id=? AND p.kind='participant' AND p.status='active' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.person_id=p.id)").get(id);
+const waitingView=p=>({id:p.id,name:p.name,team:p.team||'',organiser:false,waiting:true});
+const accountOf=(db,personId)=>db.query("SELECT id FROM users WHERE person_id=? AND status='active'").get(personId)?.id;
 const talked=(db,a,b)=>!!db.query('SELECT 1 FROM direct_messages WHERE (sender_id=?1 AND recipient_id=?2) OR (sender_id=?2 AND recipient_id=?1) LIMIT 1').get(a,b);
 const blocked=(db,a,b)=>!!db.query('SELECT 1 FROM message_blocks WHERE user_id=? AND blocked_id=?').get(a,b);
 const GROUP_MAX=50;
 const UNREAD_GROUP=`SELECT count(*) n FROM chat_messages c JOIN chat_members m ON m.group_id=c.group_id AND m.user_id=?1 AND m.left_at IS NULL WHERE c.sender_id<>?1 AND c.seq>m.last_read AND NOT EXISTS(SELECT 1 FROM message_blocks b WHERE b.user_id=?1 AND b.blocked_id=c.sender_id)`;
-export const unreadMessages=(db,userId)=>db.query('SELECT count(*) n FROM direct_messages d WHERE d.recipient_id=? AND d.read_at IS NULL AND NOT EXISTS(SELECT 1 FROM message_blocks b WHERE b.user_id=d.recipient_id AND b.blocked_id=d.sender_id)').get(userId).n
+export const unreadMessages=(db,userId)=>everyone(db,userId)??db.query('SELECT count(*) n FROM direct_messages d WHERE d.recipient_id=? AND d.read_at IS NULL AND NOT EXISTS(SELECT 1 FROM message_blocks b WHERE b.user_id=d.recipient_id AND b.blocked_id=d.sender_id)').get(userId).n
  +db.query(UNREAD_GROUP).get(userId).n;
 
 // Files: uploaded with purpose=message, then attached to one message by the person who uploaded them.
@@ -42,36 +48,44 @@ const link=(db,file,type,id,created)=>{if(file)db.query('INSERT OR IGNORE INTO f
 /** Conversations and group chats, newest first, with the unread count in each. */
 export function conversations(ctx){
  const user=requireUser(ctx);
- syncMyTeams(ctx.db,user.id);
+ syncMyTeams(ctx.db,user.id);everyone(ctx.db,user.id);
  const rows=ctx.db.query(`SELECT other,max(created) last FROM (SELECT recipient_id other,created FROM direct_messages WHERE sender_id=?1 UNION ALL SELECT sender_id other,created FROM direct_messages WHERE recipient_id=?1) GROUP BY other ORDER BY last DESC LIMIT 200`).all(user.id);
  const direct=rows.map(r=>{const p=person(ctx.db,r.other);if(!p)return null;
   const last=ctx.db.query('SELECT sender_id,body,file_id,created FROM direct_messages WHERE (sender_id=?1 AND recipient_id=?2) OR (sender_id=?2 AND recipient_id=?1) ORDER BY created DESC,rowid DESC LIMIT 1').get(user.id,r.other);
   const unread=ctx.db.query('SELECT count(*) n FROM direct_messages WHERE sender_id=? AND recipient_id=? AND read_at IS NULL').get(r.other,user.id).n;
   const off=blocked(ctx.db,user.id,r.other);
   return {kind:'dm',person:view(p),last:{mine:last.sender_id===user.id,body:preview(last.body,fileOf(ctx.db,last.file_id)),created:last.created},unread:off?0:unread,blocked:off};}).filter(Boolean);
+ const waiting=ctx.db.query('SELECT person_id,max(created) last FROM waiting_messages WHERE sender_id=? GROUP BY person_id').all(user.id).map(r=>{const p=waitingPerson(ctx.db,r.person_id);if(!p)return null;
+  const last=ctx.db.query('SELECT body,file_id,created FROM waiting_messages WHERE sender_id=? AND person_id=? ORDER BY created DESC,rowid DESC LIMIT 1').get(user.id,r.person_id);
+  return {kind:'dm',person:waitingView(p),last:{mine:true,body:preview(last.body,fileOf(ctx.db,last.file_id)),created:last.created},unread:0,blocked:false};}).filter(Boolean);
  const groups=ctx.db.query('SELECT g.*,m.last_read,m.joined FROM chat_groups g JOIN chat_members m ON m.group_id=g.id WHERE m.user_id=? AND m.left_at IS NULL').all(user.id).map(g=>{
   const last=ctx.db.query('SELECT c.sender_id,c.body,c.file_id,c.created,u.display_name name FROM chat_messages c JOIN users u ON u.id=c.sender_id WHERE c.group_id=? AND NOT EXISTS(SELECT 1 FROM message_blocks b WHERE b.user_id=? AND b.blocked_id=c.sender_id) ORDER BY c.seq DESC LIMIT 1').get(g.id,user.id);
   const unread=ctx.db.query(UNREAD_GROUP+' AND c.group_id=?2').get(user.id,g.id).n;
   return {kind:'group',group:groupView(ctx.db,g),last:last?{mine:last.sender_id===user.id,who:last.name,body:preview(last.body,fileOf(ctx.db,last.file_id)),created:last.created}:{mine:false,who:'',body:'',created:g.created},unread};});
  const teams=ctx.db.query(`SELECT p.id,json_extract(p.draft,'$.name') name FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') AND p.status<>'archived' AND NOT EXISTS(SELECT 1 FROM chat_groups g WHERE g.project_id=p.id) ORDER BY m.created`).all(user.id);
- return json({items:[...direct,...groups].sort((a,b)=>b.last.created.localeCompare(a.last.created)),teamsWithoutChat:teams,unread:unreadMessages(ctx.db,user.id)});
+ return json({items:[...direct,...waiting,...groups].sort((a,b)=>b.last.created.localeCompare(a.last.created)),teamsWithoutChat:teams,unread:unreadMessages(ctx.db,user.id)});
 }
-/** People one can write to: everyone active, found by name or team. */
+/** People one can write to: everyone active, and participants who have not joined yet, found by name or team. */
 export function directory(ctx){
  const user=requireUser(ctx),q=(ctx.url.searchParams.get('q')||'').trim().toLowerCase().slice(0,60);
  const like='%'+q.replace(/[\\%_]/g,m=>'\\'+m)+'%';
  const rows=ctx.db.query(`SELECT u.id FROM users u WHERE u.status='active' AND u.id<>?1 AND (?2='%%' OR lower(u.display_name) LIKE ?2 ESCAPE '\\' OR EXISTS(SELECT 1 FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=u.id AND m.revoked_at IS NULL AND lower(coalesce(json_extract(p.draft,'$.name'),'')) LIKE ?2 ESCAPE '\\')) ORDER BY u.display_name COLLATE NOCASE LIMIT 100`).all(user.id,like);
- return json({items:rows.map(r=>view(person(ctx.db,r.id)))});
+ const roster=ctx.db.query(`SELECT p.id FROM people p WHERE p.kind='participant' AND p.status='active' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.person_id=p.id) AND (?1='%%' OR lower(p.display_name) LIKE ?1 ESCAPE '\\' OR EXISTS(SELECT 1 FROM team_people tp JOIN teams t ON t.id=tp.team_id WHERE tp.person_id=p.id AND lower(t.name) LIKE ?1 ESCAPE '\\')) ORDER BY p.display_name COLLATE NOCASE LIMIT 100`).all(like);
+ return json({items:[...rows.map(r=>view(person(ctx.db,r.id))),...roster.map(r=>waitingView(waitingPerson(ctx.db,r.id)))].sort((a,b)=>a.name.localeCompare(b.name)).slice(0,100)});
 }
 /** The account of a person on the office map, if they have one. */
 export function forPerson(ctx,personId){
  requireUser(ctx);
- const u=ctx.db.query("SELECT id FROM users WHERE person_id=? AND status='active'").get(personId);if(!u)fail(404,'NOT_FOUND');
- return json({person:view(person(ctx.db,u.id))});
+ const id=accountOf(ctx.db,personId);if(id)return json({person:view(person(ctx.db,id))});
+ const p=waitingPerson(ctx.db,personId);if(!p)fail(404,'NOT_FOUND');
+ return json({person:waitingView(p)});
 }
 /** One conversation; opening it marks incoming messages as read. */
 export function thread(ctx,otherId){
- const user=requireUser(ctx),other=person(ctx.db,otherId);if(!other||other.id===user.id)fail(404,'NOT_FOUND');
+ const user=requireUser(ctx);
+ const joined=accountOf(ctx.db,otherId);if(joined)otherId=joined;
+ else{const p=waitingPerson(ctx.db,otherId);if(p)return waitingThread(ctx,user,p);}
+ const other=person(ctx.db,otherId);if(!other||other.id===user.id)fail(404,'NOT_FOUND');
  if(other.status!=='active'&&!talked(ctx.db,user.id,otherId))fail(404,'NOT_FOUND');
  const before=ctx.url.searchParams.get('before')||'9999';
  const rows=ctx.db.query('SELECT * FROM (SELECT rowid r,* FROM direct_messages WHERE ((sender_id=?1 AND recipient_id=?2) OR (sender_id=?2 AND recipient_id=?1)) AND created<?3 ORDER BY created DESC,rowid DESC LIMIT ?4) ORDER BY created,r').all(user.id,otherId,before,PAGE+1);
@@ -84,6 +98,8 @@ export function thread(ctx,otherId){
 }
 export async function send(ctx,otherId){
  const user=requireUser(ctx);
+ const joined=accountOf(ctx.db,otherId);if(joined)otherId=joined;
+ else{const p=waitingPerson(ctx.db,otherId);if(p)return waitingSend(ctx,user,p);}
  const other=person(ctx.db,otherId);if(!other||other.id===user.id||other.status!=='active')fail(404,'NOT_FOUND');
  // Either side's block stops the message; the sender is not told who blocked whom.
  if(blocked(ctx.db,user.id,otherId)||blocked(ctx.db,otherId,user.id))fail(403,'FORBIDDEN');
@@ -94,6 +110,31 @@ export async function send(ctx,otherId){
   link(ctx.db,file,'dm',id,created);
  })();
  return json({id,created},201);
+}
+// Only the sender sees a waiting conversation; there is nobody yet to block, report or read it.
+function waitingThread(ctx,user,p){
+ const rows=ctx.db.query('SELECT * FROM (SELECT rowid r,* FROM waiting_messages WHERE sender_id=? AND person_id=? ORDER BY created DESC,rowid DESC LIMIT ?) ORDER BY created,r').all(user.id,p.id,PAGE+1);
+ const more=rows.length>PAGE;if(more)rows.shift();
+ return json({person:waitingView(p),blocked:false,canSend:true,waiting:true,hasMore:more,items:rows.map(m=>({id:m.id,mine:true,body:m.body,file:fileOf(ctx.db,m.file_id),created:m.created,read:false,reported:false}))});
+}
+async function waitingSend(ctx,user,p){
+ const {body,file}=await readMessage(ctx,user);
+ rateLimit(ctx.db,'dm-wait:'+user.id+':'+p.id,20,86400);
+ const id=newId('dm'),created=nowIso();
+ ctx.db.transaction(()=>{
+  ctx.db.query('INSERT INTO waiting_messages(id,sender_id,person_id,body,file_id,created) VALUES(?,?,?,?,?,?)').run(id,user.id,p.id,body,file?.id||null,created);
+  link(ctx.db,file,'dm',id,created);
+ })();
+ return json({id,created,waiting:true},201);
+}
+/** Called when an account is linked to a participant: their waiting messages become ordinary unread messages. */
+export function deliverWaiting(db,personId,userId){
+ const rows=db.query('SELECT * FROM waiting_messages WHERE person_id=? ORDER BY created,rowid').all(personId);
+ for(const m of rows){
+  if(m.sender_id!==userId)db.query('INSERT OR IGNORE INTO direct_messages(id,sender_id,recipient_id,body,file_id,created) VALUES(?,?,?,?,?,?)').run(m.id,m.sender_id,userId,m.body,m.file_id,m.created);
+  db.query('DELETE FROM waiting_messages WHERE id=?').run(m.id);
+ }
+ return rows.length;
 }
 export function block(ctx,otherId,on){
  const user=requireUser(ctx),other=person(ctx.db,otherId);if(!other||otherId===user.id||(other.status!=='active'&&!talked(ctx.db,user.id,otherId)))fail(404,'NOT_FOUND');
@@ -128,7 +169,10 @@ export function resolveReport(ctx,id){
 }
 
 // Group chats. A team chat has no owner: its members are the team's members, kept in step on every visit.
-const groupView=(db,g)=>({id:g.id,title:g.title,team:!!g.project_id,members:db.query('SELECT count(*) n FROM chat_members WHERE group_id=? AND left_at IS NULL').get(g.id).n});
+// The everyone chat has no owner either: every active account is in it and nobody leaves it.
+export const EVERYONE='chat-everyone';
+const fixed=g=>!!g.project_id||g.id===EVERYONE;
+const groupView=(db,g)=>({id:g.id,title:g.title,team:!!g.project_id,everyone:g.id===EVERYONE,members:db.query('SELECT count(*) n FROM chat_members WHERE group_id=? AND left_at IS NULL').get(g.id).n});
 const activeMember=(db,groupId,userId)=>db.query('SELECT * FROM chat_members WHERE group_id=? AND user_id=? AND left_at IS NULL').get(groupId,userId);
 // Read marks are message numbers, not times, so two messages in the same millisecond are both counted.
 const lastSeq=(db,groupId)=>db.query('SELECT coalesce(max(seq),0) n FROM chat_messages WHERE group_id=?').get(groupId).n;
@@ -144,10 +188,18 @@ function syncTeam(db,g){
  for(const id of team)if(!now.has(id))addMember(db,g.id,id);
  for(const id of now)if(!team.has(id))db.query('UPDATE chat_members SET left_at=? WHERE group_id=? AND user_id=?').run(nowIso(),g.id,id);
 }
+// Someone who joins later starts with the whole history unread, so they see what was said before them.
+function everyone(db,userId){
+ db.query('INSERT OR IGNORE INTO chat_groups(id,title,created_by,created) VALUES(?,?,?,?)').run(EVERYONE,'Everyone',userId,nowIso());
+ db.query("INSERT OR IGNORE INTO chat_members(group_id,user_id,role,joined,last_read) SELECT ?1,u.id,'member',?2,0 FROM users u WHERE u.status='active'").run(EVERYONE,nowIso());
+ db.query("UPDATE chat_members SET left_at=NULL WHERE group_id=? AND left_at IS NOT NULL AND user_id IN (SELECT id FROM users WHERE status='active')").run(EVERYONE);
+ db.query("UPDATE chat_members SET left_at=? WHERE group_id=? AND left_at IS NULL AND user_id IN (SELECT id FROM users WHERE status<>'active')").run(nowIso(),EVERYONE);
+}
 function syncMyTeams(db,userId){
  for(const g of db.query("SELECT DISTINCT g.* FROM chat_groups g WHERE g.project_id IS NOT NULL AND (g.id IN (SELECT group_id FROM chat_members WHERE user_id=?1 AND left_at IS NULL) OR g.project_id IN (SELECT project_id FROM memberships WHERE user_id=?1 AND revoked_at IS NULL))").all(userId))syncTeam(db,g);
 }
 function memberGroup(db,user,groupId){
+ if(groupId===EVERYONE)everyone(db,user.id);
  const g=db.query('SELECT * FROM chat_groups WHERE id=?').get(groupId);syncTeam(db,g);
  const m=g&&activeMember(db,g.id,user.id);if(!m)fail(404,'NOT_FOUND');
  return {g,m};
@@ -189,7 +241,7 @@ export function groupThread(ctx,groupId){
  const hidden=new Set(ctx.db.query('SELECT blocked_id FROM message_blocks WHERE user_id=?').all(user.id).map(r=>r.blocked_id));
  ctx.db.query('UPDATE chat_members SET last_read=? WHERE group_id=? AND user_id=?').run(lastSeq(ctx.db,g.id),g.id,user.id);
  const members=ctx.db.query('SELECT user_id,role FROM chat_members WHERE group_id=? AND left_at IS NULL ORDER BY joined,rowid').all(g.id).map(r=>({...view(person(ctx.db,r.user_id)),owner:r.role==='owner'}));
- return json({group:groupView(ctx.db,g),owner:m.role==='owner'&&!g.project_id,members,hasMore:more,
+ return json({group:groupView(ctx.db,g),owner:m.role==='owner'&&!fixed(g),members,hasMore:more,
   // A blocked person's messages stay out of sight in shared chats too.
   items:rows.map(r=>hidden.has(r.sender_id)?{id:r.id,mine:false,hidden:true,created:r.created}:{id:r.id,mine:r.sender_id===user.id,sender:{id:r.sender_id,name:r.name},body:r.body,file:fileOf(ctx.db,r.file_id),created:r.created,reported:reported.has(r.id)})});
 }
@@ -206,13 +258,13 @@ export async function groupSend(ctx,groupId){
 }
 export async function renameGroup(ctx,groupId){
  const user=requireUser(ctx),{g,m}=memberGroup(ctx.db,user,groupId),b=await readJson(ctx.request);
- if(g.project_id||m.role!=='owner')fail(403,'FORBIDDEN');
+ if(fixed(g)||m.role!=='owner')fail(403,'FORBIDDEN');
  ctx.db.query('UPDATE chat_groups SET title=? WHERE id=?').run(text(b.title,{min:1,max:80},'title'),g.id);
  return json({ok:true});
 }
 export async function addMembers(ctx,groupId){
  const user=requireUser(ctx),{g,m}=memberGroup(ctx.db,user,groupId),b=await readJson(ctx.request);
- if(g.project_id||m.role!=='owner')fail(403,'FORBIDDEN');
+ if(fixed(g)||m.role!=='owner')fail(403,'FORBIDDEN');
  const ids=people(ctx.db,user,b.userIds);
  ctx.db.transaction(()=>{
   for(const id of ids)addMember(ctx.db,g.id,id);
@@ -223,7 +275,7 @@ export async function addMembers(ctx,groupId){
 /** The owner removes someone; anyone can leave. A team chat follows the team, so nobody leaves it by hand. */
 export function removeMember(ctx,groupId,userId){
  const user=requireUser(ctx),{g,m}=memberGroup(ctx.db,user,groupId);
- if(g.project_id)fail(409,'INVALID_STATE');
+ if(fixed(g))fail(409,'INVALID_STATE');
  if(userId!==user.id&&m.role!=='owner')fail(403,'FORBIDDEN');
  const r=ctx.db.query('UPDATE chat_members SET left_at=?,role=? WHERE group_id=? AND user_id=? AND left_at IS NULL').run(nowIso(),'member',g.id,userId);
  if(!r.changes)fail(404,'NOT_FOUND');

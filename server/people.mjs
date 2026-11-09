@@ -4,6 +4,7 @@ import {nowIso} from './db.mjs';
 import {audit,isAdmin,requireAdmin,requireProject} from './permissions.mjs';
 import {requireUser,APPEARANCES,rotateSession,publicUser} from './auth.mjs';
 import {notify} from './notifications.mjs';
+import {deliverWaiting} from './messages.mjs';
 
 const publicPerson=p=>({id:p.id,displayName:p.display_name,kind:p.kind,publicRole:p.public_role,appearance:p.kind==='visitor'?p.appearance:undefined});
 
@@ -25,6 +26,7 @@ function linkPerson(db,user,personId,actor){
  for(const {id} of db.query('SELECT p.id FROM projects p JOIN team_people t ON t.team_id=p.team_id WHERE t.person_id=?').all(personId))
   db.query("INSERT INTO memberships(project_id,user_id,role,created) VALUES(?,?,'editor',?) ON CONFLICT(project_id,user_id) DO UPDATE SET revoked_at=NULL,role='editor' WHERE revoked_at IS NOT NULL OR role='member'").run(id,user.id,now);
  db.query("UPDATE person_claims SET status='withdrawn',decided_at=? WHERE user_id=? AND status='pending' AND person_id<>?").run(now,user.id,personId);
+ deliverWaiting(db,personId,user.id);
  audit(db,actor,'person.link','person',personId,{user:user.id});
 }
 

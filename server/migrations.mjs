@@ -235,5 +235,9 @@ ALTER TABLE users ADD COLUMN email_reminders INTEGER NOT NULL DEFAULT 0;
  {id:20,name:'meeting-requests',sql:`
 CREATE TABLE IF NOT EXISTS meeting_requests(id TEXT PRIMARY KEY,mentor_id TEXT REFERENCES mentors(id),project_id TEXT NOT NULL REFERENCES projects(id),requested_by TEXT NOT NULL REFERENCES users(id),topic TEXT NOT NULL,times TEXT NOT NULL DEFAULT '',price INTEGER NOT NULL CHECK(price>=0),status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','arranged','declined','withdrawn')),slot_id TEXT REFERENCES office_hours(id),decided_by TEXT,decided_at TEXT,created TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS meeting_requests_project ON meeting_requests(project_id,status);
+`}, // Messages to a participant who has no account yet wait here and move into their inbox when they join.
+ {id:21,name:'waiting-messages',sql:`
+CREATE TABLE IF NOT EXISTS waiting_messages(id TEXT PRIMARY KEY,sender_id TEXT NOT NULL REFERENCES users(id),person_id TEXT NOT NULL REFERENCES people(id),body TEXT NOT NULL,file_id TEXT REFERENCES files(id),created TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS waiting_messages_person ON waiting_messages(person_id,created);
 `},
 ];
