@@ -14,19 +14,19 @@ export function openDatabase(path){
  return db;
 }
 
-export function pendingMigrations(db){
+export function pendingMigrations(db,migrations=MIGRATIONS){
  db.exec('CREATE TABLE IF NOT EXISTS schema_migrations(id INTEGER PRIMARY KEY,name TEXT NOT NULL,checksum TEXT NOT NULL,applied TEXT NOT NULL)');
  const applied=new Map(db.query('SELECT id,checksum FROM schema_migrations').all().map(r=>[r.id,r.checksum]));
- for(const m of MIGRATIONS)if(applied.has(m.id)&&applied.get(m.id)!==checksum(m))throw Error(`Migration ${m.id} (${m.name}) changed after it was applied`);
- return MIGRATIONS.filter(m=>!applied.has(m.id));
+ for(const m of migrations)if(applied.has(m.id)&&applied.get(m.id)!==checksum(m))throw Error(`Migration ${m.id} (${m.name}) changed after it was applied`);
+ return migrations.filter(m=>!applied.has(m.id));
 }
 
 /**
  * Applies pending migrations in one transaction each. When the database already
  * holds data, a consistent copy is written first with VACUUM INTO.
  */
-export function migrate(db,{backupDir,dryRun=false,log=()=>{}}={}){
- const pending=pendingMigrations(db);
+export function migrate(db,{backupDir,dryRun=false,log=()=>{},migrations=MIGRATIONS}={}){
+ const pending=pendingMigrations(db,migrations);
  if(dryRun||!pending.length)return {pending:pending.map(m=>m.id+':'+m.name),applied:[],backup:null};
  const hasData=db.query("SELECT count(*) n FROM sqlite_master WHERE type='table' AND name NOT IN ('schema_migrations')").get().n>0;
  const backup=hasData&&backupDir?backupDatabase(db,backupDir,'pre-migration'):null;
@@ -42,9 +42,9 @@ export function migrate(db,{backupDir,dryRun=false,log=()=>{}}={}){
  return {pending:[],applied,backup};
 }
 
-export function schemaStatus(db){
- try{const latest=db.query('SELECT max(id) id FROM schema_migrations').get()?.id||0;return {schema:latest,expected:MIGRATIONS.at(-1).id,ready:latest===MIGRATIONS.at(-1).id};}
- catch{return {schema:0,expected:MIGRATIONS.at(-1).id,ready:false};}
+export function schemaStatus(db,migrations=MIGRATIONS){
+ try{const latest=db.query('SELECT max(id) id FROM schema_migrations').get()?.id||0;return {schema:latest,expected:migrations.at(-1).id,ready:latest===migrations.at(-1).id};}
+ catch{return {schema:0,expected:migrations.at(-1).id,ready:false};}
 }
 
 /** Consistent online copy (works while WAL is active). Keeps the newest 20 copies. */

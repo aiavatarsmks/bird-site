@@ -7,6 +7,7 @@ export function audit(db,actor,action,targetType,targetId,detail={}){
 
 export const isAdmin=u=>u?.role==='program_admin'||u?.role==='platform_owner';
 export function requireAdmin(ctx){if(!ctx.user)fail(401,'UNAUTHENTICATED');if(!isAdmin(ctx.user))fail(403,'FORBIDDEN');return ctx.user;}
+export function requireOwner(ctx){if(!ctx.user)fail(401,'UNAUTHENTICATED');if(ctx.user.role!=='platform_owner')fail(403,'FORBIDDEN');return ctx.user;}
 
 export function membership(db,projectId,userId){
  if(!userId)return null;
@@ -54,6 +55,7 @@ export const PERMISSION_MATRIX=[
  ['Read assigned projects and reports','reviewer (only assigned projects), admin'],
  ['Create and publish tasks, review reports, verify attendance','program admin, platform owner'],
  ['Approve character claims, moderate','program admin, platform owner'],
- ['Grant or revoke program admin, change settings, download backups','program admin, platform owner'],
+ ['Grant or revoke program admin, change settings','program admin, platform owner'],
+ ['Download a copy of the database','platform owner'],
  ['Change the platform owner','nobody in the product, only through the code'],
 ];

@@ -23,8 +23,17 @@ const LECTURES=[
 // Confirmed from the 26/27 programme brochure and public mentor posts (migration 15 sets the same on existing data).
 const MENTOR_AREAS={'damir-first':['Go-to-market','Positioning & Distribution workshop'],'davor-anicic':['AI & Tech','AI Defensibility & What to Own workshop'],'lisa-lines':['Pitch','The Deck: hands-on clinic on your pitch deck'],'jana-klaric':['Legal & IP','Intellectual property, digital regulation, legal side of scaling'],'marijana-sarolic-robic':['Legal & IP','Startup law and AI regulation']};
 
-export function seedCurated(db,data,lectures=LECTURES){
+export function seedCurated(db,data,lectures=LECTURES,{profile='bird',programId='bird-2026',programName=''}={}){
  const now=nowIso();
+ // A new workspace starts without BIRD's people, teams, lectures and mentors: only badges and the example tasks.
+ if(profile==='blank'){
+  db.transaction(()=>{
+   db.query('INSERT INTO programs(id,name,created) VALUES(?,?,?) ON CONFLICT(id) DO NOTHING').run(programId,JSON.stringify({en:programName,hr:programName,ru:programName}),now);
+   seedBadges(db);
+   seedTasks(db,now,programId);
+  })();
+  return;
+ }
  db.transaction(()=>{
   for(const p of data.people)db.query("INSERT INTO people(id,display_name,kind,source,created,updated) VALUES(?,?,'participant','curated',?,?) ON CONFLICT(id) DO NOTHING").run(p.id,p.displayName,now,now);
   for(const [id,name] of STAFF)db.query("INSERT INTO people(id,display_name,kind,source,public_role,created,updated) VALUES(?,?,'staff','curated','BIRD',?,?) ON CONFLICT(id) DO NOTHING").run(id,name,now,now);
@@ -131,10 +140,10 @@ export const EXAMPLE_TASKS=[
    ['Paket za demo dan','Sve što trebate na pozornici, spremno tjedan ranije.','Učitajte prezentaciju i jednu stranicu u datoteke projekta, označite što je spremno i pošaljite na pregled. Organizatori to provjeravaju prije probe.','Svih pet stavki je spremno i provjereno.'],
    ['Набор к демо-дню','Всё нужное для выступления, готово за неделю.','Загрузите презентацию и one-pager в файлы проекта, отметьте готовое и отправьте на проверку. Организаторы проверят до репетиции.','Все пять пунктов готовы и проверены.'])},
 ];
-function seedTasks(db,now){
+function seedTasks(db,now,programId='bird-2026'){
  for(const task of EXAMPLE_TASKS){
   const translations=Object.fromEntries(Object.entries(task.t).map(([l,[title,goal,instructions,criteria]])=>[l,{title,goal,instructions,criteria}]));
-  db.query(`INSERT INTO task_templates(id,key,program_id,type,scope,xp,counter_target,requires_review,self_report,repeat_rule,checklist,translations,status,audience,completion_mode,pick_mode,created,updated) VALUES(?,?,'bird-2026',?,?,?,?,?,1,?,?,?,'published','all_participants',?,?,?,?) ON CONFLICT(key) DO NOTHING`)
-   .run('task-'+task.key,task.key,task.type,task.scope,task.xp,task.counterTarget||0,task.requiresReview?1:0,task.repeatRule||'once',JSON.stringify(task.checklist||[]),JSON.stringify(translations),task.completion||'participant',task.pick||'assigned',now,now);
+  db.query(`INSERT INTO task_templates(id,key,program_id,type,scope,xp,counter_target,requires_review,self_report,repeat_rule,checklist,translations,status,audience,completion_mode,pick_mode,created,updated) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,'published','all_participants',?,?,?,?) ON CONFLICT(key) DO NOTHING`)
+   .run('task-'+task.key,task.key,programId,task.type,task.scope,task.xp,task.counterTarget||0,task.requiresReview?1:0,task.repeatRule||'once',JSON.stringify(task.checklist||[]),JSON.stringify(translations),task.completion||'participant',task.pick||'assigned',now,now);
  }
 }

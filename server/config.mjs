@@ -38,10 +38,28 @@ export function loadConfig(env=process.env,overrides={}){
    pageSize:50,
   },
   mailer:env.BIRD_MAIL_TRANSPORT||'disabled',
+  // single: every address opens the default workspace (the BIRD service). multi: the address chooses the workspace.
+  platformMode:env.PLATFORM_MODE==='multi'?'multi':'single',
+  platformDbPath:join(dataDir,'platform.sqlite'),
+  platformBackupDir:join(dataDir,'platform-backups'),
+  // Daily database copies also go to this bucket when it is set (S3-compatible).
+  offsite:env.BACKUP_S3_BUCKET?{bucket:env.BACKUP_S3_BUCKET,endpoint:env.BACKUP_S3_ENDPOINT||'',accessKeyId:env.BACKUP_S3_ACCESS_KEY_ID||'',secretAccessKey:env.BACKUP_S3_SECRET_ACCESS_KEY||'',region:env.BACKUP_S3_REGION||'auto'}:null,
   testTransport:overrides.testTransport||null,
   ...overrides.extra,
  };
  return config;
+}
+
+/**
+ * Configuration of one workspace. An empty data_path is the layout that existed before
+ * workspaces (database and uploads in the volume root); every other workspace has its own directory.
+ */
+export function workspaceConfig(base,ws){
+ const own={workspace:{id:ws.id,slug:ws.slug,name:ws.name},seedProfile:ws.seed_profile};
+ if(!ws.data_path)return {...base,...own};
+ const dir=join(base.dataDir,ws.data_path);
+ // The address chooses the workspace, so the exact origin comes from the request.
+ return {...base,...own,dbPath:join(dir,'db.sqlite'),uploadDir:join(dir,'uploads'),tmpDir:join(dir,'tmp'),backupDir:join(dir,'backups'),privateDir:join(dir,'private'),publicOrigin:base.platformMode==='multi'?'':base.publicOrigin};
 }
 
 /** Checks the persistent directories before the server starts. */

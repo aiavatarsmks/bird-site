@@ -420,7 +420,7 @@ async function adminView(tab='today',id){
  if(tab==='system'){
   const s=await api('GET','/api/admin/settings'),inv=cache.newInvite;cache.newInvite=null;
   return adminShell(tab,`<section class="acc-card"><h2>${tr('adminsTitle')}</h2><p class="acc-muted">${tr('adminsNote')}</p><button data-act="admin-invite" class="acc-secondary">${tr('adminInvite')}</button>${inv?`<p class="acc-flash" role="status">${tr('inviteShow')}<br><code class="acc-code">${esc(inv)}</code></p>`:''}</section>
-  <section class="acc-card"><h2>${tr('backup')}</h2><p class="acc-muted">${tr('backupNote')}</p><a class="acc-secondary" href="/api/admin/backup.sqlite" download>${tr('backupDownload')}</a></section>
+  ${me.role==='platform_owner'?`<section class="acc-card"><h2>${tr('backup')}</h2><p class="acc-muted">${tr('backupNote')}</p><a class="acc-secondary" href="/api/admin/backup.sqlite" download>${tr('backupDownload')}</a></section>`:''}
   <section class="acc-card"><h2>${tr('limits')}</h2><p>PDF/PPTX ${s.limits.documentMB} MB · ${tr('upload')} ${s.limits.imageMB} MB · ${tr('project')} ${s.limits.projectMB} MB · ${tr('total')} ${s.limits.uploadsMB} MB</p><p>${tr('mail')}: ${s.mail==='disabled'?tr('mailOff'):esc(s.mail)}</p></section>
   <section class="acc-card"><h2>${tr('whoCanDo')}</h2><ul class="acc-list">${[0,1,2,3,4].map(i=>`<li><div><strong>${tr('perm'+i)}</strong><small>${tr('permWho'+i)}</small></div></li>`).join('')}</ul></section>`);
  }

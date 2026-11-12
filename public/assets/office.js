@@ -198,14 +198,17 @@ async function fillOrganiserCard(){
 }
 // Anyone signed in can write to a person on the map who has an account.
 async function fillMessageLink(){
- if(!viewer||!selection?.personId||!root)return;
+ if(!selection?.personId||!root)return;
  const details=root.querySelector('#office-card .office-details');if(!details||details.querySelector('.office-dm'))return;
  const key=selection.personId;details.dataset.dmKey=key;
+ const add=(label,href)=>{const a=document.createElement('a');a.className='office-secondary office-dm';a.href=href;a.textContent='✉ '+label;details.prepend(a);return a;};
+ // A guest sees where writing starts instead of a card with no way to write.
+ if(!viewer){add(orgText('Sign in to write','Prijavite se da biste pisali','Войдите, чтобы написать'),'#/account');return;}
  const r=await fetch('/api/messages/person/'+encodeURIComponent(key),{credentials:'same-origin'}).catch(()=>null);
  if(!r?.ok||details.dataset.dmKey!==key||!details.isConnected||details.querySelector('.office-dm'))return;
  const {person}=await r.json();if(person.id===viewer.id)return;
- const a=document.createElement('a');a.className='office-secondary office-dm';a.href='#/account/messages/'+encodeURIComponent(person.id);a.textContent='✉ '+orgText('Write a message','Napiši poruku','Написать');
- details.prepend(a);
+ // The chat opens beside the map; the link still leads to the full conversation if the chat script is missing.
+ add(orgText('Write a message','Napiši poruku','Написать'),'#/account/messages/'+encodeURIComponent(person.id)).addEventListener('click',e=>{if(!window.BirdOfficeChat)return;e.preventDefault();window.BirdOfficeChat.open({id:person.id,name:person.name,language});});
 }
 async function sendOrganiserNudge(form){
  const message=form.elements.message.value.trim();if(!message)return;

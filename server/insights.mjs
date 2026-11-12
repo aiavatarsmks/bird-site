@@ -6,7 +6,7 @@ import {readFileSync,unlinkSync} from 'node:fs';
 import {join} from 'node:path';
 import {fail,json,readJson,text,token} from './http.mjs';
 import {nowIso,backupDatabase} from './db.mjs';
-import {audit,requireAdmin} from './permissions.mjs';
+import {audit,requireAdmin,requireOwner} from './permissions.mjs';
 import {requireUser} from './auth.mjs';
 import {isoWeek} from './tasks.mjs';
 import {riskSignals,postToChat} from './cohort.mjs';
@@ -89,7 +89,7 @@ export async function sendDigest(ctx){
 
 /** Owner downloads a consistent copy of the whole database (contains password hashes: owner only). */
 export function downloadBackup(ctx){
- const owner=requireAdmin(ctx);
+ const owner=requireOwner(ctx);
  const file=join(ctx.config.tmpDir,`download-${token(8)}.sqlite`);
  ctx.db.query('VACUUM INTO ?').run(file);
  let bytes;try{bytes=readFileSync(file);}finally{try{unlinkSync(file);}catch{}}

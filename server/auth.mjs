@@ -201,7 +201,7 @@ export function ensureOwnerBootstrap(db,config,{force=false}={}){
   db.query("UPDATE invites SET revoked_at=? WHERE kind='platform_owner' AND used_at IS NULL AND revoked_at IS NULL").run(now);
   db.query('INSERT INTO invites(id,code_hash,kind,role,expires,created) VALUES(?,?,?,?,?,?)').run(newId('inv'),sha256(code),'platform_owner','platform_owner',Date.now()+30*86400000,now);
  })();
- writeFileSync(file,`BIRD platform owner invitation (single use, valid 30 days)\n\nCode: ${code}\n\n1. Open the site, choose Sign in -> Create account (or sign in).\n2. Open My account -> Invitation and enter the code.\nThe code stops working after one use. Delete this file afterwards.\n`,{mode:0o600});
+ writeFileSync(file,`${config.workspace?.slug&&config.workspace.slug!=='bird'?config.workspace.name:'BIRD platform'} owner invitation (single use, valid 30 days)\n\nCode: ${code}\n\n1. Open the site, choose Sign in -> Create account (or sign in).\n2. Open My account -> Invitation and enter the code.\nThe code stops working after one use. Delete this file afterwards.\n`,{mode:0o600});
  chmodSync(file,0o600);
  return {status:'created',file};
 }

@@ -36,8 +36,9 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  prepareDirectories(config);
  const db=openDatabase(config.dbPath);
  const migration=migrate(db,{backupDir:config.backupDir,log});
- data??=JSON.parse(readFileSync(new URL('../data/projects-public.json',import.meta.url),'utf8'));
- seedCurated(db,data);
+ const seedProfile=config.seedProfile||'bird';
+ data??=seedProfile==='bird'?JSON.parse(readFileSync(new URL('../data/projects-public.json',import.meta.url),'utf8')):{schemaVersion:1,revision:'',contentDate:'',projects:[],teams:[],people:[]};
+ seedCurated(db,data,undefined,{profile:seedProfile,programId:config.workspace?.id,programName:config.workspace?.name});
  // New published tasks reach existing participants too (idempotent).
  for(const u of db.query("SELECT * FROM users WHERE status='active'").all())tasks.assignForUser(db,u);
  const bootstrap=auth.ensureOwnerBootstrap(db,config);
@@ -48,7 +49,12 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  let releaseInfo={release:'dev',assets:[]};
  try{releaseInfo=JSON.parse(readFileSync(publicDir+'/release.json','utf8'));}catch{}
  const integration=createIntegration({config,db,data,publicDir,release:releaseInfo.release});
- const staticFiles=new Map([['/','index.html'],['/index.html','index.html'],['/city-harness.html','city-harness.html'],...releaseInfo.assets.map(n=>['/assets/'+n,'assets/'+n])]);
+ // A workspace from the blank template has the account pages only: BIRD's lecture notes, teams, people and office stay with BIRD.
+ const blank=seedProfile!=='bird',WORKSPACE_ASSETS=['style.css','account.css','account-i18n.js','letter.js','account.js','workspace.js'];
+ const staticFiles=blank
+  ?new Map([['/','workspace.html'],['/index.html','workspace.html'],...releaseInfo.assets.filter(n=>WORKSPACE_ASSETS.includes(n)).map(n=>['/assets/'+n,'assets/'+n])])
+  :new Map([['/','index.html'],['/index.html','index.html'],['/city-harness.html','city-harness.html'],...releaseInfo.assets.map(n=>['/assets/'+n,'assets/'+n])]);
+ const escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
  // Side effects of domain events: task assignment, rewards and badges.
  const hooks={
@@ -258,6 +264,8 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
   const ctx={db,config,request,url,storage,scanner,hooks,ip:clientIp(request,server,config)};
   try{
    if(url.pathname.startsWith('/api/integration/v1/')){
+    // The city visit shows BIRD's office; other workspaces have none.
+    if(blank)fail(404,'NOT_FOUND');
     if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':config.cityOrigins.includes(request.headers.get('origin'))?request.headers.get('origin'):'null','Access-Control-Allow-Methods':'GET','Vary':'Origin'}});
     if(request.method!=='GET')fail(405,'BAD_REQUEST');
     return integration.handle(ctx,url.pathname.slice('/api/integration/v1/'.length));
@@ -288,6 +296,7 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
   const file=staticFiles.get(url.pathname);if(!file)return new Response('Not found',{status:404});
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
   let body;try{body=await readFile(publicDir+'/'+file);}catch{return new Response('Not found',{status:404});}
+  if(file==='workspace.html')body=body.toString('utf8').replaceAll('{{name}}',escapeHtml(config.workspace?.name||''));
   const type=file.endsWith('.png')?'image/png':file.endsWith('.webp')?'image/webp':file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html';
   const headers={'Content-Type':type+(type.startsWith('image/')?'':'; charset=utf-8'),'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-BIRD-Release':releaseInfo.release,'Referrer-Policy':'same-origin'};
   // The office may be framed only by the allowed city origin (light visit); other pages not at all.

@@ -512,7 +512,7 @@ window.BIRD_ACCOUNT_TEXT={
  permWho1:{en:'every registered person',hr:'svaka registrirana osoba',ru:'каждый зарегистрированный'},
  perm2:{en:'Edit the team project, links and files',hr:'Uređivanje projekta tima, poveznica i datoteka',ru:'Редактировать проект, ссылки и файлы команды'},
  permWho2:{en:'own team, once an organiser has assigned it',hr:'vlastiti tim nakon što ga dodijeli organizator',ru:'своя команда, после назначения организатором'},
- perm3:{en:'Tasks, reviews, attendance, roles, backups',hr:'Zadaci, pregledi, prisutnost, uloge, kopije baze',ru:'Задания, проверки, посещения, роли, копии базы'},
+ perm3:{en:'Tasks, reviews, attendance, roles',hr:'Zadaci, pregledi, prisutnost, uloge',ru:'Задания, проверки, посещения, роли'},
  permWho3:{en:'organisers',hr:'organizatori',ru:'организаторы'},
  perm4:{en:'Change the platform owner',hr:'Promjena vlasnika platforme',ru:'Сменить владельца платформы'},
  permWho4:{en:'only through the code',hr:'samo kroz kod',ru:'только через код'},
