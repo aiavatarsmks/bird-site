@@ -35,7 +35,7 @@ function ownFile(db,user,fileId){
  if(!f)fail(400,'INVALID_FIELDS',{field:'fileId'});
  return f;
 }
-const preview=(body,file)=>body?body.slice(0,140):file?'📎 '+file.filename:'';
+const preview=(body,file)=>body?body.slice(0,140):file?file.filename:'';
 async function readMessage(ctx,user){
  const b=await readJson(ctx.request);
  const body=text(b.body??'',{max:2000,multiline:true},'body'),file=ownFile(ctx.db,user,b.fileId);

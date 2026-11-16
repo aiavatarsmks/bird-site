@@ -108,3 +108,42 @@ export function dailyBackup(db,dir,log=()=>{}){
   log('daily backup written');return file;
  }catch(error){log('daily backup failed: '+error.message);return null;}
 }
+
+/**
+ * Trends for the organiser's charts: the last weeks of activity, attendance per held lecture
+ * and where every assigned task stands now. Counts only, no names.
+ */
+export function buildTrends(db,{weeks:count=8}={}){
+ const day=zagrebToday(),monday=new Date(day+'T00:00:00Z');monday.setUTCDate(monday.getUTCDate()-(monday.getUTCDay()+6)%7);
+ const iso=d=>d.toISOString().slice(0,10);
+ const n=(sql,...args)=>db.query(sql).get(...args).n;
+ const weeks=[];
+ for(let i=count-1;i>=0;i--){
+  const start=new Date(monday.getTime()-i*7*86400000),end=new Date(start.getTime()+7*86400000),s=iso(start),e=iso(end);
+  weeks.push({
+   week:isoWeek(new Date(start.getTime()+3*86400000)),start:s,
+   checkins:n('SELECT count(*) n FROM checkins WHERE week=?',isoWeek(new Date(start.getTime()+3*86400000))),
+   submitted:n('SELECT count(*) n FROM submission_revisions WHERE created>=? AND created<?',s,e),
+   accepted:n("SELECT count(*) n FROM reviews WHERE decision='accepted' AND created>=? AND created<?",s,e),
+   attended:n("SELECT count(*) n FROM attendance a JOIN lectures l ON l.id=a.lecture_id WHERE l.status='published' AND l.date>=? AND l.date<?",s,e),
+  });
+ }
+ const seats=n("SELECT count(*) n FROM users WHERE status='active' AND role='member'");
+ const lectures=db.query("SELECT id,date,title FROM lectures WHERE status='published' AND date<=? ORDER BY date DESC LIMIT 12").all(day).reverse().map(l=>({
+  id:l.id,date:l.date,title:JSON.parse(l.title),seats,
+  verified:n("SELECT count(*) n FROM attendance WHERE lecture_id=? AND kind='verified_by_admin'",l.id),
+  selfReported:n("SELECT count(*) n FROM attendance WHERE lecture_id=? AND kind='self_reported'",l.id),
+ }));
+ const now=nowIso(),tasks={accepted:0,submitted:0,changes_requested:0,open:0,overdue:0};
+ for(const r of db.query("SELECT coalesce(s.status,'not_started') status,t.due_at FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id WHERE t.status IN ('published','closed') AND a.status<>'cancelled'").all()){
+  if(r.status==='accepted')tasks.accepted++;
+  else if(r.status==='submitted')tasks.submitted++;
+  else if(r.status==='changes_requested')tasks.changes_requested++;
+  else if(r.status==='rejected')continue;
+  else if(r.due_at&&r.due_at<now)tasks.overdue++;
+  else tasks.open++;
+ }
+ const teams=n("SELECT count(DISTINCT m.project_id) n FROM memberships m JOIN projects p ON p.id=m.project_id WHERE p.status<>'archived' AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member')");
+ return {weeks,lectures,tasks,teams,seats};
+}
+export function trends(ctx){requireAdmin(ctx);return json(buildTrends(ctx.db));}

@@ -23,7 +23,7 @@ import {openDatabase,migrate,backupDatabase,verifyBackup,schemaStatus,pendingMig
 import {ensureOwnerBootstrap} from './auth.mjs';
 import {collectGarbage} from './files.mjs';
 import {localStorage} from './storage.mjs';
-import {fillDemo} from './demo.mjs';
+import {fillDemo,refillDemo} from './demo.mjs';
 
 const [command,...args]=process.argv.slice(2);
 const base=loadConfig(process.env);
@@ -88,11 +88,12 @@ if(command==='migrate'){
 }else if(command==='demo-fill'){
  // Invented people must never land next to real ones: only a named workspace made from the blank profile.
  if(!flag('workspace')||config.seedProfile!=='blank')throw Error('demo-fill needs --workspace <slug> of a workspace created with the blank profile');
- const db=openDatabase(config.dbPath);out(fillDemo(db));db.close();
+ // --refresh drops the invented cohort and fills it again with dates counted from today.
+ const db=openDatabase(config.dbPath);out(process.argv.includes('--refresh')?refillDemo(db):fillDemo(db));db.close();
 }else if(command==='status'){
  const db=openDatabase(config.dbPath);
  out({workspace:config.workspace?.slug||'default',schema:schemaStatus(db),users:db.query('SELECT count(*) n FROM users').get().n,projects:db.query('SELECT count(*) n FROM projects').get().n,freeMB:Math.round(freeBytes(config.dataDir)/1048576)});db.close();
 }else{
- console.log('Commands: migrate [--dry-run] | backup | restore-check <file> | bootstrap-owner [--force] | gc-files | status | demo-fill | workspace list|create|host   (add --workspace <slug> to choose a workspace)');
+ console.log('Commands: migrate [--dry-run] | backup | restore-check <file> | bootstrap-owner [--force] | gc-files | status | demo-fill [--refresh] | workspace list|create|host   (add --workspace <slug> to choose a workspace)');
  process.exitCode=command?1:0;
 }

@@ -17,21 +17,32 @@ export function projectsOverview(ctx){
   const ids=members.map(m=>m.id),marks=ids.map(()=>'?').join(',');
   const personal=members.reduce((n,m)=>n+userXp(ctx.db,m.id),0);
   const attendance=ids.length?ctx.db.query(`SELECT kind,count(*) n FROM attendance WHERE user_id IN (${marks}) GROUP BY kind`).all(...ids):[];
-  const assignments=ctx.db.query(`SELECT a.id,a.status,t.translations,t.xp,t.due_at,coalesce(s.status,'not_started') sub FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id WHERE t.status='published' AND (a.project_id=? ${ids.length?`OR a.user_id IN (${marks})`:''})`).all(p.id,...ids);
-  const open=assignments.filter(a=>['not_started','draft','changes_requested'].includes(a.sub));
+  const assignments=ctx.db.query(`SELECT a.id,a.status,a.task_id,t.translations,t.xp,t.due_at,coalesce(s.status,'not_started') sub FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id WHERE t.status='published' AND (a.project_id=? ${ids.length?`OR a.user_id IN (${marks})`:''})`).all(p.id,...ids);
+  // Most urgent first: overdue, then the nearest deadline, then work sent back; tasks without a date last.
+  const open=assignments.filter(a=>['not_started','draft','changes_requested'].includes(a.sub)).sort(byUrgency);
   return {
    id:p.id,name:JSON.parse(p.draft).name,status:p.status,source:p.source,stage:JSON.parse(p.draft).stage,updated:p.updated,
    members:members.map(m=>m.display_name),
+   // People on the roster who have not registered yet, so the dashboard can say whom to invite.
+   noAccount:p.team_id?ctx.db.query('SELECT p.display_name n FROM team_people t JOIN people p ON p.id=t.person_id WHERE t.team_id=? AND NOT EXISTS(SELECT 1 FROM users u WHERE u.person_id=p.id) ORDER BY p.display_name').all(p.team_id).map(r=>r.n):[],
    percent:teamScore(ctx.db,p.id,ids).percent,overdue:open.filter(a=>a.due_at&&a.due_at<nowIso()).length,pitch:pitchOf(ctx.db,p.id),mentorSessions:ctx.db.query('SELECT count(*) n FROM office_hour_bookings WHERE project_id=?').get(p.id).n,
    teamXp:projectXp(ctx.db,p.id),personalXp:personal,totalXp:projectXp(ctx.db,p.id)+personal,
    attendance:{selfReported:attendance.find(a=>a.kind==='self_reported')?.n||0,verified:attendance.find(a=>a.kind==='verified_by_admin')?.n||0,lecturesHeld:lectures},
    tasks:{total:assignments.length,done:assignments.filter(a=>a.sub==='accepted').length,waitingReview:assignments.filter(a=>a.sub==='submitted').length,open:open.length},
    risk:riskSignals(ctx.db,p.id,ids),streak:streak(ctx.db,p.id),lastSeen:ids.map(id=>lastSeen(ctx.db,id)).filter(Boolean).sort().at(-1)||null,
-   todo:open.slice(0,6).map(a=>({assignmentId:a.id,title:JSON.parse(a.translations),xp:a.xp,dueAt:a.due_at,status:a.sub})),
+   todo:todoList(open),
   };
  });
  return json({items,generated:nowIso()});
 }
+
+// One line per task: a personal task open for three members is one next step with open:3.
+function todoList(open){
+ const seen=new Map();
+ for(const a of open){const t=seen.get(a.task_id);if(t){t.open++;continue;}seen.set(a.task_id,{assignmentId:a.id,title:JSON.parse(a.translations),xp:a.xp,dueAt:a.due_at,status:a.sub,overdue:!!a.due_at&&a.due_at<nowIso(),open:1});}
+ return [...seen.values()].slice(0,6);
+}
+const byUrgency=(a,b)=>(a.due_at?0:1)-(b.due_at?0:1)||String(a.due_at||'').localeCompare(String(b.due_at||''))||(b.sub==='changes_requested')-(a.sub==='changes_requested')||b.xp-a.xp;
 
 /** Deck status and pitch count from the two programme tasks. */
 export function pitchOf(db,projectId){

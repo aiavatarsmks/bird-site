@@ -1,7 +1,7 @@
 /** HTTP application: routing, session, origin/CSRF checks and static files. */
 import {readFileSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
-import {fail,json,errorResponse,checkOrigin,clientIp} from './http.mjs';
+import {fail,json,errorResponse,checkOrigin,clientIp,selfOrigin} from './http.mjs';
 import {openDatabase,migrate,schemaStatus,nowIso} from './db.mjs';
 import {prepareDirectories,freeBytes} from './config.mjs';
 import {createDirectoryHandler} from '../directory-api.mjs';
@@ -24,6 +24,9 @@ import * as organiser from './organiser.mjs';
 import * as reminders from './reminders.mjs';
 import * as messages from './messages.mjs';
 import * as wallet from './wallet.mjs';
+import * as demoVisit from './demo-visit.mjs';
+import {LANDING_ASSETS,renderLanding} from './landing.mjs';
+import {createDemoOffice} from './demo-office.mjs';
 import {seedCurated} from './seed.mjs';
 import {createIntegration,CONTRACT} from './integration.mjs';
 import {localStorage,noScanner} from './storage.mjs';
@@ -50,10 +53,12 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  try{releaseInfo=JSON.parse(readFileSync(publicDir+'/release.json','utf8'));}catch{}
  const integration=createIntegration({config,db,data,publicDir,release:releaseInfo.release});
  // A workspace from the blank template has the account pages only: BIRD's lecture notes, teams, people and office stay with BIRD.
- const blank=seedProfile!=='bird',WORKSPACE_ASSETS=['style.css','account.css','account-i18n.js','letter.js','account.js','workspace.js'];
+ const blank=seedProfile!=='bird',WORKSPACE_ASSETS=['style.css','account.css','account-i18n.js','letter.js','account.js','workspace.js','workspace.css','character-stage.js','character-stage.css','icons.js','admin-tasks.css','admin-programme.css','account-member.css'];
  const staticFiles=blank
   ?new Map([['/','workspace.html'],['/index.html','workspace.html'],...releaseInfo.assets.filter(n=>WORKSPACE_ASSETS.includes(n)).map(n=>['/assets/'+n,'assets/'+n])])
   :new Map([['/','index.html'],['/index.html','index.html'],['/city-harness.html','city-harness.html'],...releaseInfo.assets.map(n=>['/assets/'+n,'assets/'+n])]);
+ const DEMO_ASSETS=new Set(['office-scene.js','office-iso-assets.js','office-art-data.js','office-pixelfx.js','office-life.js','office-model.js','office.js','office.css','incubator-map.js','incubators-hr.js',...LANDING_ASSETS].filter(n=>releaseInfo.assets.includes(n)));
+ let demoOfficeCache=null;const demoOffice=()=>demoOfficeCache??=createDemoOffice(publicDir);
  const escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
  // Side effects of domain events: task assignment, rewards and badges.
@@ -78,6 +83,10 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  const user=true;
  // Auth
  on('POST','/api/auth/register',ctx=>auth.register(ctx));
+ // Public demo: look around as the invented manager or a team.
+ on('GET','/api/demo',ctx=>demoVisit.status(ctx));
+ on('POST','/api/demo/enter',ctx=>demoVisit.enter(ctx));
+ on('GET','/api/demo/roster',ctx=>demoVisit.roster(ctx));
  on('POST','/api/auth/login',ctx=>auth.login(ctx));
  on('POST','/api/auth/logout',ctx=>auth.logout(ctx),{auth:user});
  on('POST','/api/auth/logout-all',ctx=>auth.logout(ctx,true),{auth:user});
@@ -245,6 +254,7 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('POST','/api/lectures/:id/feedback',(ctx,p)=>insights.saveFeedback(ctx,p.id),{auth:user});
  on('GET','/api/admin/feedback',ctx=>insights.adminFeedback(ctx),{auth:user});
  on('GET','/api/admin/digest',ctx=>insights.digest(ctx),{auth:user});
+ on('GET','/api/admin/trends',ctx=>insights.trends(ctx),{auth:user});
  on('POST','/api/admin/digest/send',ctx=>insights.sendDigest(ctx),{auth:user});
  on('GET','/api/admin/backup.sqlite',ctx=>insights.downloadBackup(ctx),{auth:user});
  on('GET','/api/admin/audit',ctx=>admin.auditLog(ctx),{auth:user});
@@ -279,6 +289,8 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
    if(!route){if(routes.some(r=>r.re.test(url.pathname)))fail(405,'BAD_REQUEST');fail(404,'NOT_FOUND');}
    if(route.needs&&!ctx.user)fail(401,'UNAUTHENTICATED');
    if(MUTATING.has(request.method))auth.checkCsrf(ctx);
+   // Demo visitors share the invented accounts, so nothing they do may change them.
+   if(MUTATING.has(request.method)&&demoVisit.isDemoUser(ctx.user)&&!['/api/auth/logout','/api/demo/enter'].includes(url.pathname))fail(403,'DEMO_READ_ONLY');
    const response=await route.handler(ctx,url.pathname.match(route.re).groups||{});
    return finish(ctx,response);
   }catch(error){return finish(ctx,errorResponse(error));}
@@ -293,10 +305,20 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
   const url=new URL(request.url);
   if(url.pathname.startsWith('/api/'))return handleApi(request,server);
   if(url.pathname==='/health'){const s=schemaStatus(db);return Response.json({status:s.ready?'ok':'migrating',release:releaseInfo.release,schema:s.schema,schemaReady:s.ready,contract:CONTRACT},{status:s.ready?200:503,headers:{'Cache-Control':'no-store'}});}
-  const file=staticFiles.get(url.pathname);if(!file)return new Response('Not found',{status:404});
+  const demo=blank&&demoVisit.isDemo(db);
+  // A demo workspace opens on the public landing page; the app itself lives at /demo (hash routes as before).
+  if(demo&&url.pathname==='/demo/')return new Response(null,{status:301,headers:{Location:'/demo'}});
+  let file=demo&&['/','/index.html'].includes(url.pathname)?'landing.html':demo&&url.pathname==='/demo'?'workspace.html':staticFiles.get(url.pathname);
+  // A demo workspace also gets the office and the incubator map, with characters under invented names.
+  if(!file&&demo){
+   if(url.pathname==='/assets/office-demo-data.js')return new Response(demoOffice().script,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+   file=DEMO_ASSETS.has(url.pathname.slice(8))&&url.pathname.startsWith('/assets/')?url.pathname.slice(1):demoOffice().files.get(url.pathname);
+  }
+  if(!file)return new Response('Not found',{status:404});
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
   let body;try{body=await readFile(publicDir+'/'+file);}catch{return new Response('Not found',{status:404});}
   if(file==='workspace.html')body=body.toString('utf8').replaceAll('{{name}}',escapeHtml(config.workspace?.name||''));
+  if(file==='landing.html')body=renderLanding(body.toString("utf8"),selfOrigin(request,config));
   const type=file.endsWith('.png')?'image/png':file.endsWith('.webp')?'image/webp':file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html';
   const headers={'Content-Type':type+(type.startsWith('image/')?'':'; charset=utf-8'),'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-BIRD-Release':releaseInfo.release,'Referrer-Policy':'same-origin'};
   // The office may be framed only by the allowed city origin (light visit); other pages not at all.

@@ -50,7 +50,7 @@
   list.replaceChildren(...(data.items.length?data.items.map(m=>{
    const row=el('div','office-chat-msg'+(m.mine?' is-mine':''));
    if(m.body)row.append(el('p','',m.body));
-   if(m.file)row.append(el('p','office-chat-file','📎 '+(m.file.filename||m.file.name||'')));
+   if(m.file)row.append(el('p','office-chat-file','↳ '+(m.file.filename||m.file.name||'')));
    row.append(el('small','',time(m.created)));
    return row;
   }):[el('p','office-chat-empty',tr('empty'))]));

@@ -34,21 +34,21 @@ const TEAMS=[
   short:'Rezervacija privatnih parkirnih mjesta u centru grada.',problem:'Vozači kruže po centru dvadeset minuta, a privatna mjesta stoje prazna.',users:'Vozači koji povremeno dolaze u centar.',solution:'Vlasnici iznajmljuju mjesto po satu, vozač rezervira unaprijed.',
   done:[],weeks:[3],attended:0,seen:9},
  // A team that is on the list but has not registered yet: the organiser sees whom to invite.
- {slug:'tourloop',name:'TourLoop',members:['Karlo N.','Iva Š.'],stage:'idea',accounts:false,
+ {slug:'tourloop',name:'TourLoop',members:['Karlo N.','Ivo Š.'],stage:'idea',accounts:false,
   short:'Pješačke ture koje vode lokalni stanovnici.',problem:'Turisti dobivaju iste ture, a lokalni vodiči nemaju kanal prodaje.',users:'Posjetitelji koji ostaju tri i više dana.',solution:'Katalog kratkih tura s rezervacijom i plaćanjem na jednom mjestu.'},
 ];
 const MENTORS=[
- ['ana-kovac','Ana K.','f','Customer discovery','Pomaže timovima pripremiti i provesti prve razgovore s korisnicima.'],
- ['ivan-maric','Ivan M.','m','Pricing','Cijene i modeli naplate za B2B proizvode.'],
- ['petra-simic','Petra Š.','f','Legal & IP','Osnivanje tvrtke, ugovori i zaštita intelektualnog vlasništva.'],
- ['luka-babic','Luka B.','m','Fundraising','Priprema za razgovore s investitorima i poslovnim anđelima.'],
+ ['vesna-radic','Vesna R.','f','Customer discovery','Pomaže timovima pripremiti i provesti prve razgovore s korisnicima.'],
+ ['goran-peric','Goran P.','m','Pricing','Cijene i modeli naplate za B2B proizvode.'],
+ ['jelena-matic','Jelena M.','f','Legal & IP','Osnivanje tvrtke, ugovori i zaštita intelektualnog vlasništva.'],
+ ['boris-lovric','Boris L.','m','Fundraising','Priprema za razgovore s investitorima i poslovnim anđelima.'],
 ];
 const LECTURES=[
- [-16,'How to talk to your first users','Kako razgovarati s prvim korisnicima','Как говорить с первыми пользователями','Ana K.'],
- [-9,'Pricing for startups','Određivanje cijena za startupe','Ценообразование для стартапов','Ivan M.'],
+ [-16,'How to talk to your first users','Kako razgovarati s prvim korisnicima','Как говорить с первыми пользователями','Vesna R.'],
+ [-9,'Pricing for startups','Određivanje cijena za startupe','Ценообразование для стартапов','Goran P.'],
  [-2,'Founder-led sales','Prodaja koju vodi osnivač','Продажи силами основателя',''],
- [5,'Pitch deck clinic','Radionica: pitch deck','Разбор питч-деков','Luka B.'],
- [12,'Legal basics for founders','Pravne osnove za osnivače','Юридические основы для основателей','Petra Š.'],
+ [5,'Pitch deck clinic','Radionica: pitch deck','Разбор питч-деков','Boris L.'],
+ [12,'Legal basics for founders','Pravne osnove za osnivače','Юридические основы для основателей','Jelena M.'],
 ];
 // Days from today. Dates are set after the tasks are assigned: assignment skips tasks that are already past due.
 const DUE={'problem-users':-3,'pricing-hypotheses':-1,'user-interviews':4,'presentation':9,'demo-day-kit':20};
@@ -64,6 +64,8 @@ export function fillDemo(db){
   // Reviews and announcements need an author. Use the real organiser when there is one.
   let organiser=db.query("SELECT id FROM users WHERE role IN ('platform_owner','program_admin') AND status='active' ORDER BY created").get()?.id;
   if(!organiser){organiser='demo-user-organiser';q("INSERT INTO users(id,login,display_name,role,language,created,updated) VALUES(?,?,?,'program_admin','hr',?,?)",organiser,'demo-organiser','Demo organiser',past,past);}
+  // Visitors of the public demo look through this invented manager's eyes, read-only.
+  q("INSERT INTO users(id,login,display_name,role,language,created,updated) VALUES('demo-user-manager','demo-manager','Mia','program_admin','hr',?,?)",past,past);
 
   const past3=[];
   LECTURES.forEach(([days,en,hr,ru,speaker],i)=>{
@@ -117,7 +119,7 @@ export function fillDemo(db){
   slot('demo-slot-1',MENTORS[1],-5,10,'Cijene');slot('demo-slot-2',MENTORS[0],1,9,'Razgovori s korisnicima');slot('demo-slot-3',MENTORS[3],2,13,'Priprema za investitore');slot('demo-slot-4',MENTORS[2],6,10,'Osnivanje tvrtke');
   q('INSERT INTO office_hour_bookings(slot_id,project_id,booked_by,question,note,created) VALUES(?,?,?,?,?,?)','demo-slot-1','demo-project-greenloop',users.greenloop[0],'Kako naplatiti pilot restoranima?','Dogovoreno: mjesečna naknada po restoranu umjesto naplate po posudi. Tim testira cijenu s tri restorana.',at(-7));
   q('INSERT INTO office_hour_bookings(slot_id,project_id,booked_by,question,created) VALUES(?,?,?,?,?)','demo-slot-2','demo-project-agrobit',users.agrobit[0],'Kako doći do prvih pet poljoprivrednika za razgovor?',at(-1));
-  q("INSERT INTO meeting_requests(id,mentor_id,project_id,requested_by,topic,times,price,created) VALUES(?,?,?,?,?,?,0,?)",'demo-meeting-1','demo-mentor-petra-simic','demo-project-edunest',users.edunest[0],'Ugovor s instruktorima: što moramo imati prije prve naplate?','Utorak ili četvrtak poslijepodne',at(-1));
+  q("INSERT INTO meeting_requests(id,mentor_id,project_id,requested_by,topic,times,price,created) VALUES(?,?,?,?,?,?,0,?)",'demo-meeting-1','demo-mentor-jelena-matic','demo-project-edunest',users.edunest[0],'Ugovor s instruktorima: što moramo imati prije prve naplate?','Utorak ili četvrtak poslijepodne',at(-1));
 
   q("INSERT INTO project_updates(id,project_id,author,body,visibility,created) VALUES(?,?,?,?,'public',?)",'demo-update-1','demo-project-greenloop',users.greenloop[0],'Prvi restoran je platio pilot za idući mjesec. Krećemo s 200 posuda.',at(-2));
   q("INSERT INTO project_outcomes(id,project_id,kind,happened_on,note,author,created) VALUES(?,?,'customer',?,?,?,?)",'demo-outcome-1','demo-project-greenloop',dayOf(-2),'Prvi plaćeni pilot',organiser,at(-2));
@@ -126,4 +128,27 @@ export function fillDemo(db){
   q("INSERT INTO settings(key,value,updated) VALUES('demo_filled',?,?)",now,now);
  })();
  return {filled:true,teams:TEAMS.length,accounts:Object.values(users).flat().length,mentors:MENTORS.length,lectures:LECTURES.length};
+}
+
+/**
+ * Removes everything the filler made and fills again, so dates are fresh before a meeting.
+ * Every invented row carries a "demo-" id somewhere; the workspace owner and real accounts stay.
+ */
+export function refillDemo(db){
+ if(!db.query("SELECT 1 FROM settings WHERE key='demo_filled'").get())return fillDemo(db);
+ const real=db.query("SELECT count(*) n FROM projects WHERE id NOT LIKE 'demo-%'").get().n;
+ if(real)return {filled:false,reason:'workspace has projects that are not part of the demo'};
+ db.exec('PRAGMA foreign_keys=OFF');
+ try{
+  db.transaction(()=>{
+   for(const {name} of db.query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()){
+    const cols=db.query(`PRAGMA table_info("${name}")`).all().filter(c=>!c.type||/TEXT/i.test(c.type)).map(c=>c.name);
+    if(cols.length)db.query(`DELETE FROM "${name}" WHERE ${cols.map(c=>`"${c}" LIKE 'demo-%'`).join(' OR ')}`).run();
+   }
+   db.query("DELETE FROM settings WHERE key='demo_filled'").run();
+   // Assignment skips tasks that are already past due, so the old demo deadlines must go first.
+   for(const key of Object.keys(DUE))db.query('UPDATE task_templates SET due_at=NULL WHERE key=?').run(key);
+  })();
+ }finally{db.exec('PRAGMA foreign_keys=ON');}
+ return fillDemo(db);
 }

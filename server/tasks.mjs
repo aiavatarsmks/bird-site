@@ -86,8 +86,13 @@ export async function setTaskStatus(ctx,id){
 export function adminTasks(ctx){
  requireAdmin(ctx);const {limit,offset}=page(ctx.url,100);
  const status=ctx.url.searchParams.get('status');
- const rows=ctx.db.query(`SELECT t.*,(SELECT count(*) FROM assignments a WHERE a.task_id=t.id) assigned,(SELECT count(*) FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.task_id=t.id AND s.status='submitted') waiting FROM task_templates t WHERE (?1 IS NULL OR t.status=?1) ORDER BY t.created LIMIT ?2 OFFSET ?3`).all(status,limit+1,offset);
- return json({items:rows.slice(0,limit).map(t=>({...taskView(t),assigned:t.assigned,waiting:t.waiting})),hasMore:rows.length>limit});
+ const rows=ctx.db.query(`SELECT t.*,(SELECT count(*) FROM assignments a WHERE a.task_id=t.id) assigned,(SELECT count(*) FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.task_id=t.id AND s.status='submitted') waiting,
+  (SELECT count(*) FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.task_id=t.id AND s.status='accepted') accepted,
+  (SELECT count(*) FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.task_id=t.id AND s.status='changes_requested') changes,
+  (SELECT count(*) FROM assignments a LEFT JOIN submissions s ON s.assignment_id=a.id WHERE a.task_id=t.id AND t.due_at IS NOT NULL AND t.due_at<?4 AND coalesce(s.status,'not_started') NOT IN ('submitted','accepted')) overdue
+  FROM task_templates t WHERE (?1 IS NULL OR t.status=?1) ORDER BY t.created LIMIT ?2 OFFSET ?3`).all(status,limit+1,offset,nowIso());
+ // Counts for the organiser's progress bar: accepted, waiting for review, sent back, and late (not handed in after the due date).
+ return json({items:rows.slice(0,limit).map(t=>({...taskView(t),assigned:t.assigned,waiting:t.waiting,accepted:t.accepted,changes:t.changes,overdue:t.overdue})),hasMore:rows.length>limit});
 }
 
 // Assignment -------------------------------------------------------------------
@@ -176,6 +181,9 @@ function canReview(db,user,task,a){
 function assignmentView(db,a,task,{full=false,lang}={}){
  const s=db.query('SELECT * FROM submissions WHERE assignment_id=?').get(a.id);
  const out={id:a.id,period:a.period,projectId:a.project_id||null,projectName:a.project_id?JSON.parse(db.query('SELECT draft FROM projects WHERE id=?').get(a.project_id)?.draft||'{}').name:null,task:taskView(task),status:s?.status||'not_started',revision:s?.revision||0,updated:s?.updated||a.created};
+ // Counters and checklists show how far the saved draft got, so the quest board can draw a bar.
+ if(task.type==='counter'||task.type==='checklist'){let d={};try{d=JSON.parse(s?.draft||'{}')||{};}catch{}
+  out.progress=task.type==='counter'?{done:Math.max(0,Math.min(Number(d.count)||0,task.counter_target)),total:task.counter_target}:{done:(Array.isArray(d.checked)?d.checked:[]).filter(Boolean).length,total:JSON.parse(task.checklist).length};}
  if(full&&s){
   out.draft=JSON.parse(s.draft);
   out.revisions=db.query('SELECT r.revision,r.content,r.created,u.display_name author FROM submission_revisions r JOIN users u ON u.id=r.submitted_by WHERE r.submission_id=? ORDER BY r.revision DESC LIMIT 20').all(s.id).map(r=>({revision:r.revision,content:JSON.parse(r.content),created:r.created,author:r.author}));
