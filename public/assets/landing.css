@@ -248,7 +248,6 @@ h3{font-size:clamp(28px,4.4vw,42px);line-height:1.06;letter-spacing:-.02em}
 /* Reveal on scroll (only once the script is there). */
 .js [data-reveal]{opacity:0;transform:translateY(28px);transition:opacity .7s var(--ease),transform .7s var(--ease);transition-delay:calc(var(--i,0) * 90ms)}
 .js [data-reveal].is-in{opacity:1;transform:none}
-[data-depth]{will-change:transform}
 .hero-copy>*{animation:rise .8s var(--ease) both}
 .hero-copy>:nth-child(2){animation-delay:.08s}.hero-copy>:nth-child(3){animation-delay:.16s}.hero-copy>:nth-child(4){animation-delay:.24s}.hero-copy>:nth-child(5){animation-delay:.3s}
 .hero-art{animation:rise 1s var(--ease) .2s both}
@@ -284,10 +283,89 @@ h3{font-size:clamp(28px,4.4vw,42px);line-height:1.06;letter-spacing:-.02em}
  .faq-grid{grid-template-columns:.8fr 1.2fr;gap:64px;align-items:start}
  .act-grid{grid-template-columns:1.2fr .8fr;gap:64px}
 }
+/* Motion layer. The hero intro, the network sketch and the maps are driven by Anime.js from landing.js (html.mo);
+   these rules only hold the starting states and the CSS-only pieces. Curve for UI-sized moves: --mo-ease. */
+:root{--mo-ease:cubic-bezier(.23,1,.32,1)}
+.mo-intro .hero-copy>*,.mo-intro .hero-art,.mo .hero-copy>*,.mo .hero-art{animation:none}
+.mo-intro .hero-copy>:not(h1),.mo-intro .hero h1:not(.is-split),.mo-intro .hero-art .shot{opacity:0}
+.mo-w{display:inline-block;vertical-align:top;clip-path:inset(-.1em -.1em -.22em -.1em)}
+.mo-w>span{display:inline-block}
+.mo-intro .mo-w>span{transform:translateY(135%)}
+/* Hero depth while scrolling: native scroll-driven animation where supported (landing.js falls back to a listener). */
+@media(prefers-reduced-motion:no-preference){
+ @supports (animation-timeline:scroll()) and (animation-range:0 1px){
+  .shot-office{animation:mo-depth-a linear both;animation-timeline:scroll(root);animation-range:0 1400px}
+  .shot-dash{animation:mo-depth-b linear both;animation-timeline:scroll(root);animation-range:0 1400px}
+  @keyframes mo-depth-a{to{translate:0 56px}}
+  @keyframes mo-depth-b{to{translate:0 -98px}}
+ }
+}
+/* Screenshots slide and tilt in from the side they sit on; the small card and the risk tag land after them. */
+.js .shot-block[data-reveal],.js .shot-stack[data-reveal]{transform:translate(56px,24px) rotate(2deg) scale(.96);transition-duration:1s;transition-timing-function:var(--mo-ease)}
+.js .pain-rev .shot-stack[data-reveal]{transform:translate(-56px,24px) rotate(-2deg) scale(.96)}
+.js .netviz[data-reveal]{transform:translateY(36px) scale(.97);transition-duration:.9s;transition-timing-function:var(--mo-ease)}
+.js .shot-stack[data-reveal] .shot-pop{opacity:0;transform:translate(24px,40px) rotate(-4deg) scale(.92);transition:opacity .6s var(--mo-ease) .45s,transform .8s var(--mo-ease) .45s}
+.js .shot-stack[data-reveal].is-in .shot-pop{opacity:1;transform:none}
+.js .shot-block[data-reveal] .tag-risk{opacity:0;transform:translateX(-14px) scale(.92);transition:opacity .4s ease .7s,transform .5s var(--mo-ease) .7s}
+.js .shot-block[data-reveal].is-in .tag-risk{opacity:1;transform:none}
+/* Copy blocks: their lists follow the heading one item at a time. */
+.js .pain-copy[data-reveal] :is(.ticks,.chips) li{opacity:0;transform:translateY(12px);transition:opacity .5s ease,transform .6s var(--mo-ease)}
+.js .pain-copy[data-reveal].is-in :is(.ticks,.chips) li{opacity:1;transform:none;transition-delay:calc(var(--k,0) * 70ms + .25s)}
+.js .pain-copy[data-reveal].is-in :is(.ticks,.chips) li:hover{transition-delay:0s}
+:is(.ticks,.chips) li:nth-child(2){--k:1}:is(.ticks,.chips) li:nth-child(3){--k:2}:is(.ticks,.chips) li:nth-child(4){--k:3}
+/* Steps: the rule above each step draws itself, the big number settles. */
+.steps li::before{content:"";position:absolute;left:0;right:0;top:-2px;height:2px;background:var(--accent);transform-origin:left}
+.js .steps li[data-reveal]::before{transform:scaleX(0);transition:transform .9s var(--mo-ease) calc(var(--i,0) * 90ms + .2s)}
+.js .steps li[data-reveal].is-in::before{transform:scaleX(1)}
+.js .steps li[data-reveal] .step-n{opacity:0;transform:translateY(18px);transition:opacity .5s ease,transform .7s var(--mo-ease);transition-delay:calc(var(--i,0) * 90ms + .3s)}
+.js .steps li[data-reveal].is-in .step-n{opacity:1;transform:none}
+/* Map: links from Zagreb to every other incubator city. */
+.r-links{pointer-events:none}
+.r-link{fill:none;stroke:var(--ok-glow);stroke-width:1.3;opacity:.42}
+
 @media(prefers-reduced-motion:reduce){
  html{scroll-behavior:auto}
  *,*::before,*::after{animation:none!important;transition:none!important}
  .js [data-reveal]{opacity:1;transform:none}
+ /* Fade only: content still arrives softly, nothing moves. */
+ .js [data-reveal]:not(.is-in){opacity:0}
+ .js [data-reveal]{transition:opacity .4s ease!important}
+ .js [data-reveal] :is(.shot-pop,.tag-risk,li,.step-n){opacity:1;transform:none}
+ .steps li::before{transform:none}
  .gap-bars i{transform:none}.gap-fog,.gap-pulse{opacity:1}
- [data-depth]{transform:none!important}
+ [data-depth]{transform:none!important;translate:none!important}
 }
+.js .pain-copy[data-reveal].is-in .chips li:hover{transition:transform .15s var(--ease),box-shadow .15s var(--ease),border-color .15s}
+/* The slide-in starting positions sit outside narrow screens; clip them so the page never scrolls sideways. */
+.pains,.hero{overflow-x:clip}
+/* Pilot request form in the #contact card. Errors sit under their field; :user-invalid is only the visual echo of aria-invalid. */
+.pilot{display:grid;gap:14px;margin:0 0 4px}
+.pf-legend{margin:0;font-size:13px;color:var(--muted)}
+.pf{display:grid;gap:6px}
+.pf label{font-weight:700;font-size:15px;line-height:1.35}
+.pf-req{color:var(--accent)}
+.pf-opt{font-weight:400;color:var(--muted);font-size:13px}
+.pf input:not([type=checkbox]),.pf select,.pf textarea{width:100%;box-sizing:border-box;min-height:48px;padding:11px 12px;font:inherit;font-size:max(1rem,1em);color:var(--ink);background:var(--white);border:2px solid #6f7569;border-radius:0;transition:border-color .15s,box-shadow .15s}
+.pf textarea{min-height:96px;resize:vertical;line-height:1.5}
+.pf select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 14px) 50%;background-size:6px 6px;background-repeat:no-repeat;padding-right:40px}
+.pf input:focus-visible,.pf select:focus-visible,.pf textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-color:var(--ink)}
+.pf [aria-invalid=true]{border-color:var(--risk);background-color:var(--risk-soft)}
+.pf-err{margin:0;display:flex;gap:8px;align-items:baseline;font-size:14px;font-weight:600;color:var(--risk)}
+.pf-err::before{content:"!";flex:none;display:inline-grid;place-items:center;width:18px;height:18px;background:var(--risk);color:#fff;font:700 12px/1 var(--sans)}
+.pf-check{grid-template-columns:auto 1fr;column-gap:12px;align-items:start;padding-top:4px}
+.pf-check input{width:22px;height:22px;margin:2px 0 0;accent-color:var(--accent)}
+.pf-check label{font-weight:400;font-size:15px;cursor:pointer}
+.pf-check .pf-err{grid-column:1/-1}
+.pf-privacy{margin:0;font-size:13px;line-height:1.5;color:var(--muted)}
+.pf-fail{margin:0;padding:10px 12px;border-left:4px solid var(--risk);background:var(--risk-soft);font-size:14px;font-weight:600}
+.pilot .btn{width:100%}
+.pilot .btn:disabled{opacity:.7;cursor:progress;transform:none;box-shadow:none}
+.pf-hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+.pf-live{position:absolute;clip-path:inset(50%);overflow:hidden;width:1px;height:1px;margin:-1px;padding:0;border:0;white-space:nowrap}
+.pilot-done{padding:18px 18px 14px;border:2px solid var(--ok);background:var(--ok-soft);outline-offset:4px}
+.pilot-done p{margin:0 0 10px}
+.pilot-done strong{overflow-wrap:anywhere}
+.pilot-done-title{font:400 26px/1.2 var(--serif)}
+@media(prefers-reduced-motion:no-preference){.pilot-done:not([hidden]){animation:rise .5s var(--ease) both}}
+@media(min-width:1024px){.act-grid:has(.pilot){align-items:start}.act-grid:has(.pilot) .act-copy{position:sticky;top:96px}}
+.act-card [hidden]{display:none!important}

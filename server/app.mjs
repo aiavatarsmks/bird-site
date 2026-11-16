@@ -24,9 +24,12 @@ import * as organiser from './organiser.mjs';
 import * as reminders from './reminders.mjs';
 import * as messages from './messages.mjs';
 import * as wallet from './wallet.mjs';
+import * as report from './report.mjs';
 import * as demoVisit from './demo-visit.mjs';
+import * as leads from './leads.mjs';
 import {LANDING_ASSETS,renderLanding} from './landing.mjs';
 import {createDemoOffice} from './demo-office.mjs';
+import {startDemo,ensureDemoFiles} from './demo.mjs';
 import {seedCurated} from './seed.mjs';
 import {createIntegration,CONTRACT} from './integration.mjs';
 import {localStorage,noScanner} from './storage.mjs';
@@ -53,11 +56,19 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  try{releaseInfo=JSON.parse(readFileSync(publicDir+'/release.json','utf8'));}catch{}
  const integration=createIntegration({config,db,data,publicDir,release:releaseInfo.release});
  // A workspace from the blank template has the account pages only: BIRD's lecture notes, teams, people and office stay with BIRD.
- const blank=seedProfile!=='bird',WORKSPACE_ASSETS=['style.css','account.css','account-i18n.js','letter.js','account.js','workspace.js','workspace.css','character-stage.js','character-stage.css','icons.js','admin-tasks.css','admin-programme.css','account-member.css'];
+ const blank=seedProfile!=='bird',WORKSPACE_ASSETS=['style.css','account.css','account-i18n.js','letter.js','account.js','workspace.js','workspace.css','character-stage.js','character-stage.css','icons.js','admin-tasks.css','admin-programme.css','account-member.css','bird-motion.js','people-sheet.js','people-sheet.css','admin-report.js','admin-report.css','anime.js'];
  const staticFiles=blank
   ?new Map([['/','workspace.html'],['/index.html','workspace.html'],...releaseInfo.assets.filter(n=>WORKSPACE_ASSETS.includes(n)).map(n=>['/assets/'+n,'assets/'+n])])
   :new Map([['/','index.html'],['/index.html','index.html'],['/city-harness.html','city-harness.html'],...releaseInfo.assets.map(n=>['/assets/'+n,'assets/'+n])]);
  const DEMO_ASSETS=new Set(['office-scene.js','office-iso-assets.js','office-art-data.js','office-pixelfx.js','office-life.js','office-model.js','office.js','office.css','incubator-map.js','incubators-hr.js',...LANDING_ASSETS].filter(n=>releaseInfo.assets.includes(n)));
+ // A demo workspace refreshes an older invented cohort and keeps real accounts out of its authorship.
+ // On start and from the server's hourly timer (server-production.mjs); BIRD's own workspace never has a demo.
+ let refusedLogged=false;
+ function refreshDemo(){
+  if(blank){const r=startDemo(db);if(r){if(r.refilled?.filled||r.repaired||(r.refilled&&!refusedLogged&&(refusedLogged=true)))log('Demo workspace: '+JSON.stringify(r));ensureDemoFiles(db,storage).catch(e=>log('Demo files: '+e.message));}return r;}
+  return null;
+ }
+ refreshDemo();
  let demoOfficeCache=null;const demoOffice=()=>demoOfficeCache??=createDemoOffice(publicDir);
  const escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -191,6 +202,7 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('DELETE','/api/projects/:id/outcomes/:oid',(ctx,p)=>cohort.deleteOutcome(ctx,p.id,p.oid),{auth:user});
  on('GET','/api/admin/checkins',ctx=>cohort.adminCheckins(ctx),{auth:user});
  on('GET','/api/admin/export.csv',ctx=>cohort.exportCsv(ctx),{auth:user});
+ on('GET','/api/admin/report',ctx=>report.report(ctx),{auth:user});on('GET','/api/admin/report.csv',ctx=>report.reportCsv(ctx),{auth:user});on('GET','/api/admin/report.xlsx',ctx=>report.reportXlsx(ctx),{auth:user});on('GET','/api/admin/report/print',ctx=>report.reportPrint(ctx),{auth:user});on('POST','/api/admin/report/outcomes/:id/verify',(ctx,p)=>report.verifyOutcome(ctx,p.id),{auth:user});
  on('GET','/api/announcements',ctx=>cohort.listAnnouncements(ctx),{auth:user});
  on('POST','/api/announcements/read',ctx=>cohort.readAnnouncements(ctx),{auth:user});
  on('GET','/api/wallet',ctx=>wallet.myWallets(ctx),{auth:user});
@@ -268,6 +280,8 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('POST','/api/admin/users/:id/reset-code',(ctx,p)=>organiser.resetCode(ctx,p.id),{auth:user});
  on('GET','/api/admin/export-people.csv',ctx=>organiser.exportPeople(ctx),{auth:user});
  on('GET','/api/admin/settings',ctx=>admin.settings(ctx),{auth:user});
+ on('GET','/api/admin/pilot-requests',ctx=>leads.list(ctx),{auth:user});
+ on('DELETE','/api/admin/pilot-requests/:id',(ctx,p)=>leads.remove(ctx,p.id),{auth:user});
 
  async function handleApi(request,server){
   const url=new URL(request.url);
@@ -283,6 +297,8 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
    if(url.pathname.startsWith('/api/profiles'))return directory(request,ctx.ip);
    // Google Apps Script calls this server-to-server with its own secret; no browser cookie or Origin.
    if(url.pathname==='/api/forms/hook'&&request.method==='POST')return await imports.hook(ctx);
+   // Pilot requests from the public landing: no account, so neither the session nor the demo's read-only rule applies.
+   if(url.pathname==='/api/pilot-request'&&request.method==='POST'){checkOrigin(request,config);if(!blank)fail(404,'NOT_FOUND');return await leads.submit(ctx);}
    if(MUTATING.has(request.method))checkOrigin(request,config);
    auth.loadSession(ctx);
    const route=routes.find(r=>r.method===request.method&&r.re.test(url.pathname));
@@ -325,6 +341,6 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
   if(type==='text/html')headers['Content-Security-Policy']=`frame-ancestors 'self' ${config.cityOrigins.join(' ')}`;
   return new Response(request.method==='HEAD'?null:body,{headers});
  }
- return {fetch,db,config,migration,close:()=>db.close(),storage,integration};
+ return {fetch,db,config,migration,close:()=>db.close(),storage,integration,refreshDemo};
 }
 export {isAdmin,nowIso,freeBytes};

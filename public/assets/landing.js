@@ -9,7 +9,11 @@ const CONTACT={email:'',telegram:'',phone:''};
 const PRODUCT=document.querySelector('meta[name=product-name]')?.content||'';
 const LANGS=['hr','en','ru'],KEY='workspace-language';
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
-document.documentElement.classList.add('js');
+document.documentElement.classList.add('js','js-ok');
+// Anime.js (assets/anime.js) drives the hero, the network sketch and the maps. Without it, or with reduced motion,
+// the page keeps its CSS reveals and still pictures: everything below checks MO before moving anything.
+const A=window.anime,MO=!!(A&&A.createTimeline)&&!reduced;
+if(MO)document.documentElement.classList.add('mo');else document.documentElement.classList.remove('mo-intro');
 
 const T={
  skip:{en:'Skip to content',ru:'К содержанию'},
@@ -33,30 +37,30 @@ const T={
  p1Kicker:{en:'Management',ru:'Управление'},
  p1Title:{en:'Every team’s status on one screen.',ru:'Статус каждой команды на одном экране.'},
  p1Pain:{en:'Today the manager walks round the teams, phones them and collects spreadsheets. When a team is stuck, they find out too late.',ru:'Сегодня руководитель обходит команды, звонит им и собирает таблицы. О том, что команда застряла, он узнаёт слишком поздно.'},
- p1a:{en:'Each team’s progress against the cohort average',ru:'Прогресс каждой команды рядом со средним по набору'},
+ p1a:{en:'Each team’s progress against the cohort average',ru:'Прогресс каждой команды рядом со средним по потоку'},
  p1b:{en:'Risk signals: overdue tasks, missed lectures, who has gone quiet',ru:'Сигналы риска: просроченные задания, пропущенные лекции, кто давно не появлялся'},
  p1c:{en:'Who asked for help and what waits for your review',ru:'Кто просит помощи и что ждёт вашей проверки'},
  p1Cta:{en:'See the manager’s dashboard',ru:'Посмотреть панель руководителя'},
- altDash2:{en:'Dashboard: progress per team from 10 to 61 percent, teams by stage, cohort tasks and lecture attendance.',ru:'Панель: прогресс команд от 10 до 61 процента, команды по стадиям, задания набора и посещаемость лекций.'},
+ altDash2:{en:'Dashboard: progress per team from 10 to 61 percent, teams by stage, cohort tasks and lecture attendance.',ru:'Панель: прогресс команд от 10 до 61 процента, команды по этапам, задания потока и посещаемость лекций.'},
  tagRisk:{en:'3 tasks overdue',ru:'3 задания просрочены'},
  p2Kicker:{en:'What nobody sees',ru:'То, чего не видно'},
  p2Title:{en:'Two months of lectures. Then a year in which nobody knows what happens.',ru:'Два месяца лекций. Потом год, когда никто не знает, что происходит.'},
- p2Pain:{en:'After the programme the teams develop on their own. That is exactly when the results you must show the city, the ministry or a donor happen — and there is no data.',ru:'После программы команды развиваются сами. Именно тогда появляются результаты, которые нужно показать городу, министерству или донору, — а данных нет.'},
+ p2Pain:{en:'After the programme the teams develop on their own. That is exactly when the results you must show the city, the ministry or a donor happen — and there is no data.',ru:'После программы команды развиваются сами. Именно тогда появляются результаты, которые нужно показать городу, министерству или фонду, — а данных нет.'},
  gapBefore:{en:'Today',ru:'Сегодня'},gapAfter:{en:'With {p}',ru:'С {p}'},
  gapFog:{en:'Silence. Who gave up? Who grew?',ru:'Тишина. Кто бросил? Кто вырос?'},
  gapPulse:{en:'a signal every week',ru:'сигнал каждую неделю'},
  gapW1:{en:'week 1',ru:'1-я неделя'},gapLast:{en:'last lecture',ru:'последняя лекция'},gapW52:{en:'week 52',ru:'52-я неделя'},
- gapCap:{en:'The weekly check-in, tasks and points keep a signal coming after the lectures stop.',ru:'Еженедельная отметка, задания и баллы дают сигнал и после окончания лекций.'},
- gapNote:{en:'An illustration, not a measurement: how many teams really keep checking in is what a pilot measures.',ru:'Иллюстрация, а не измерение: сколько команд действительно отмечаются, измеряет пилот.'},
+ gapCap:{en:'The weekly check-in, tasks and points keep a signal coming after the lectures stop.',ru:'Еженедельный отчёт, задания и баллы дают сигнал и после окончания лекций.'},
+ gapNote:{en:'An illustration, not a measurement: how many teams really keep checking in is what a pilot measures.',ru:'Иллюстрация, а не измерение: сколько команд действительно отчитываются каждую неделю, покажет пилот.'},
  p3Kicker:{en:'For the teams',ru:'Для команд'},
  p3Title:{en:'For teams it is a game, not paperwork.',ru:'Для команд это игра, а не бумажная работа.'},
- p3Pain:{en:'Nobody likes writing reports. So the teams don’t write reports — they complete tasks and collect points.',ru:'Отчёты никто писать не любит. Поэтому команды не пишут отчёты — они выполняют задания и собирают баллы.'},
+ p3Pain:{en:'Nobody likes writing reports. So the teams don’t write reports — they complete tasks and collect points.',ru:'Длинные отчёты никто писать не любит. Поэтому вместо них команды выполняют задания и собирают баллы.'},
  p3Chips:{en:'Game',ru:'Игра'},
- chipPoints:{en:'Points',ru:'Баллы'},chipPointsT:{en:'for tasks, attendance and the weekly check-in',ru:'за задания, посещения и недельную отметку'},
+ chipPoints:{en:'Points',ru:'Баллы'},chipPointsT:{en:'for tasks, attendance and the weekly check-in',ru:'за задания, посещения и еженедельный отчёт'},
  chipLevels:{en:'Levels',ru:'Уровни'},chipLevelsT:{en:'and achievements',ru:'и достижения'},
  chipStreak:{en:'Streak',ru:'Серия'},chipStreakT:{en:'of weeks in a row',ru:'недель подряд'},
  chipMentor:{en:'30 points',ru:'30 баллов'},chipMentorT:{en:'= a meeting with a mentor',ru:'= встреча с ментором'},
- p3Answer:{en:'Teams spend their points on meetings with mentors. They check in because it pays, not because they must.',ru:'Баллы команда тратит на встречи с менторами. Она отмечается, потому что это выгодно, а не потому что обязана.'},
+ p3Answer:{en:'Teams spend their points on meetings with mentors. They check in because it pays, not because they must.',ru:'Баллы команда тратит на встречи с менторами. Она отчитывается, потому что ей это выгодно, а не потому что обязана.'},
  p3Cta:{en:'Enter the demo as a team',ru:'Войти в демо как команда'},
  altTasks:{en:'Participant progress: personal points, team points, team ranking with streaks and achievements.',ru:'Прогресс участника: личные баллы, баллы команды, рейтинг команд с сериями и достижения.'},
  altPoints:{en:'What points are for: team AgroBit has 90 points, a mentor meeting costs 30 points.',ru:'Зачем нужны баллы: у команды AgroBit 90 баллов, встреча с ментором стоит 30 баллов.'},
@@ -64,15 +68,15 @@ const T={
  p4Title:{en:'Global, not local.',ru:'Глобально, а не локально.'},
  p4Pain:{en:'Every incubator has its own mentors and contacts. A team that needs someone from another country is left without a connection.',ru:'У каждого инкубатора свои менторы и свои контакты. Команда, которой нужен человек из другой страны, остаётся без связи.'},
  p4Answer:{en:'We connect incubators: a team from Split will be able to reach a mentor in Belgrade or an incubator in Ljubljana, with both sides’ consent. We start with Croatia.',ru:'Мы связываем инкубаторы: команда из Сплита сможет выйти на ментора в Белграде или инкубатор в Любляне — с согласия обеих сторон. Начинаем с Хорватии.'},
- p4Honest:{en:'The network is being built. The map shows only what we have actually mapped.',ru:'Сеть строится. На карте только то, что мы действительно собрали.'},
+ p4Honest:{en:'The network is being built. The map shows only what we have actually mapped.',ru:'Сеть строится. На карте только те организации, которые мы действительно проверили.'},
  p4Cta:{en:'See the map',ru:'Посмотреть карту'},
  altNet:{en:'Network sketch: Zagreb, Split and Rijeka connected to Ljubljana, Sarajevo and Belgrade by dashed lines',ru:'Схема сети: Загреб, Сплит и Риека связаны пунктиром с Любляной, Сараево и Белградом'},
  howEyebrow:{en:'How it works',ru:'Как это работает'},howTitle:{en:'Three steps to the full picture.',ru:'Три шага к полной картине.'},
  s1Title:{en:'We set up your space',ru:'Мы настраиваем ваше пространство'},s1Text:{en:'Your name, your teams, your lecture schedule. A separate database just for your incubator.',ru:'Ваше название, ваши команды, ваше расписание лекций. Отдельная база только для вашего инкубатора.'},
- s2Title:{en:'Teams work and collect points',ru:'Команды работают и собирают баллы'},s2Text:{en:'Tasks with deadlines, a weekly check-in, meetings with mentors. Every step earns points.',ru:'Задания со сроками, недельная отметка, встречи с менторами. Каждый шаг приносит баллы.'},
+ s2Title:{en:'Teams work and collect points',ru:'Команды работают и собирают баллы'},s2Text:{en:'Tasks with deadlines, a weekly check-in, meetings with mentors. Every step earns points.',ru:'Задания со сроками, еженедельный отчёт, встречи с менторами. Каждый шаг приносит баллы.'},
  s3Title:{en:'You see everything on one dashboard',ru:'Вы видите всё на одной панели'},s3Text:{en:'Who is moving, who is stuck, who asked for help. Export the data to CSV for your report.',ru:'Кто движется, кто застрял, кто просит помощи. Данные выгружаются в CSV для отчёта.'},
  mapEyebrow:{en:'Incubator network',ru:'Сеть инкубаторов'},mapTitle:{en:'One map. More and more countries.',ru:'Одна карта. Всё больше стран.'},
- mapLead:{en:'Countries where we have mapped incubators. Hover or tap a marker.',ru:'Страны, где мы собрали инкубаторы. Наведите курсор или нажмите на метку.'},
+ mapLead:{en:'Countries where we have mapped incubators. Hover or tap a marker.',ru:'Страны, где мы составили список инкубаторов. Наведите курсор или нажмите на метку.'},
  altWorld:{en:'Dot-matrix world map; Croatia and its neighbours are highlighted',ru:'Карта мира из точек; Хорватия и соседи выделены'},
 regionTitle:{en:'Croatia and neighbouring countries',ru:'Хорватия и соседние страны'},
  stMapped:{en:'On the map',ru:'На карте'},lgMapped:{en:'Croatia · 30 organisations',ru:'Хорватия · 30 организаций'},
@@ -83,7 +87,7 @@ regionTitle:{en:'Croatia and neighbouring countries',ru:'Хорватия и с�
  faqEyebrow:{en:'Questions',ru:'Вопросы'},faqTitle:{en:'What we are asked before a pilot.',ru:'О чём спрашивают перед пилотом.'},
  q1:{en:'Whose data is it?',ru:'Чьи это данные?'},a1:{en:'Yours. Every incubator has a separate database, and the server is in the EU (Amsterdam). On request we export and delete the data.',ru:'Ваши. У каждого инкубатора отдельная база данных, сервер в ЕС (Амстердам). По запросу выгружаем и удаляем данные.'},
  q2:{en:'Does it work in Croatian?',ru:'Есть ли хорватский язык?'},a2:{en:'Yes. The interface is in Croatian, English and Russian, and every user picks their own language.',ru:'Да. Интерфейс на хорватском, английском и русском, и каждый пользователь выбирает свой язык.'},
- q3:{en:'Do teams have to use it?',ru:'Обязаны ли команды этим пользоваться?'},a3:{en:'They don’t — and that is exactly what the pilot measures. Before it starts we write down the success criteria together, for example the share of teams checking in every week and how much time you spend collecting status updates.',ru:'Нет — и именно это измеряет пилот. До старта мы вместе записываем критерии успеха, например долю команд, которые отмечаются каждую неделю, и сколько времени вы тратите на сбор статуса.'},
+ q3:{en:'Do teams have to use it?',ru:'Обязаны ли команды этим пользоваться?'},a3:{en:'They don’t — and that is exactly what the pilot measures. Before it starts we write down the success criteria together, for example the share of teams checking in every week and how much time you spend collecting status updates.',ru:'Нет — и именно это измеряет пилот. До старта мы вместе записываем критерии успеха, например долю команд, которые отчитываются каждую неделю, и сколько времени вы тратите на сбор статуса.'},
  q4:{en:'Our applications are already in Google Forms.',ru:'Заявки у нас уже в Google Forms.'},a4:{en:'We can import Google Forms answers, so teams don’t type everything again.',ru:'Ответы из Google Forms можно импортировать, и командам не придётся вводить всё заново.'},
  q5:{en:'What in the demo is real?',ru:'Что в демо настоящее?'},a5:{en:'The platform is real. The teams, people and numbers in the demo are invented, and nothing you do there is saved.',ru:'Платформа настоящая. Команды, люди и цифры в демо выдуманы, и ничего из того, что вы там делаете, не сохраняется.'},
  actEyebrow:{en:'Next step',ru:'Следующий шаг'},actTitle:{en:'See for yourself. It takes two minutes.',ru:'Посмотрите сами. Это займёт две минуты.'},
@@ -100,6 +104,33 @@ regionTitle:{en:'Croatia and neighbouring countries',ru:'Хорватия и с�
  hrText:{hr:'Inkubatori, akceleratori i tehnološki parkovi, npr.:',en:'Incubators, accelerators and technology parks, e.g.:',ru:'Инкубаторы, акселераторы и технопарки, например:'},
  incType:{hr:{incubator:'inkubator',accelerator:'akcelerator','technology-park':'tehnološki park',university:'sveučilišni program','coworking-programme':'program i coworking'},en:{incubator:'incubator',accelerator:'accelerator','technology-park':'technology park',university:'university programme','coworking-programme':'programme and coworking'},ru:{incubator:'инкубатор',accelerator:'акселератор','technology-park':'технопарк',university:'университетская программа','coworking-programme':'программа и коворкинг'}},
 };
+
+// Pilot request form (#contact). All three languages here; Croatian is also in landing.html for the first paint.
+Object.assign(T,{
+ pfRequired:{hr:'obavezno polje',en:'required field',ru:'обязательное поле'},
+ pfName:{hr:'Ime i prezime',en:'Full name',ru:'Имя и фамилия'},
+ pfOrg:{hr:'Inkubator ili akcelerator',en:'Incubator or accelerator',ru:'Инкубатор или акселератор'},
+ pfEmail:{hr:'E-pošta',en:'Email',ru:'Почта'},
+ pfPhone:{hr:'Telefon',en:'Phone',ru:'Телефон'},
+ pfOptional:{hr:'(neobavezno)',en:'(optional)',ru:'(необязательно)'},
+ pfTeams:{hr:'Timova u jednom ciklusu',en:'Teams per cohort',ru:'Команд в одном потоке'},
+ pfTeamsPick:{hr:'Odaberite',en:'Choose',ru:'Выберите'},
+ pfTeams50:{hr:'više od 50',en:'more than 50',ru:'больше 50'},
+ pfMessage:{hr:'Poruka',en:'Message',ru:'Сообщение'},
+ pfConsent:{hr:'Slažem se da me kontaktirate u vezi s pilotom.',en:'I agree to be contacted about the pilot.',ru:'Я согласен(на), чтобы со мной связались по поводу пилота.'},
+ pfPrivacy:{hr:'Podatke koristimo samo za dogovor o pilotu. Ne dijelimo ih i brišemo ih na vaš zahtjev.',en:'We use these details only to arrange the pilot. We do not share them and delete them on request.',ru:'Данные используем только чтобы договориться о пилоте. Не передаём третьим лицам и удаляем по запросу.'},
+ pfSend:{hr:'Pošalji upit',en:'Send request',ru:'Отправить заявку'},
+ pfSending:{hr:'Šaljem…',en:'Sending…',ru:'Отправляем…'},
+ pfErrName:{hr:'Upišite ime i prezime.',en:'Enter your name.',ru:'Укажите имя и фамилию.'},
+ pfErrOrg:{hr:'Upišite naziv inkubatora ili akceleratora.',en:'Enter the name of your incubator or accelerator.',ru:'Укажите название инкубатора или акселератора.'},
+ pfErrEmail:{hr:'Upišite e-poštu, npr. ime@inkubator.hr.',en:'Enter an email address, e.g. name@incubator.com.',ru:'Укажите почту, например name@incubator.com.'},
+ pfErrPhone:{hr:'Telefon smije imati brojeve, razmake i +.',en:'A phone number may contain digits, spaces and +.',ru:'В номере допустимы цифры, пробелы и +.'},
+ pfErrConsent:{hr:'Bez suglasnosti ne možemo vam odgovoriti.',en:'We need your consent to reply.',ru:'Без согласия мы не сможем ответить.'},
+ pfErrRate:{hr:'Previše upita s ove adrese. Pokušajte ponovno za sat vremena.',en:'Too many requests from this address. Please try again in an hour.',ru:'Слишком много заявок с этого адреса. Попробуйте через час.'},
+ pfErrNet:{hr:'Slanje nije uspjelo. Provjerite vezu i pokušajte ponovno.',en:'Sending failed. Check your connection and try again.',ru:'Не удалось отправить. Проверьте соединение и попробуйте снова.'},
+ pfDoneTitle:{hr:'Hvala, upit je stigao.',en:'Thank you, your request has arrived.',ru:'Спасибо, заявка получена.'},
+ pfDoneText:{hr:'Javit ćemo vam se e-poštom da dogovorimo kratak razgovor:',en:'We will email you to arrange a short call:',ru:'Мы напишем вам, чтобы договориться о коротком звонке:'},
+});
 
 let lang='hr';
 try{const s=localStorage.getItem(KEY);if(LANGS.includes(s))lang=s;}catch{}
@@ -132,10 +163,61 @@ function renderContact(){
   CONTACT.telegram&&{k:'telegram',href:'https://t.me/'+CONTACT.telegram.replace(/^@/,''),label:'@'+CONTACT.telegram.replace(/^@/,'')},
   CONTACT.phone&&{k:'phone',href:'tel:'+CONTACT.phone.replace(/[^+\d]/g,''),label:CONTACT.phone},
  ].filter(Boolean);
- box.innerHTML=items.length
-  ?`<ul class="contact-list">${items.map(i=>`<li><a href="${esc(i.href)}"${i.k==='telegram'?' target="_blank" rel="noopener"':''}>${esc(i.label)} <span>${esc(t(i.k))}</span></a></li>`).join('')}</ul>`
-  :`<a class="btn btn-big" href="/demo">${esc(t('ctaDemo'))} <span aria-hidden="true">→</span></a><p class="contact-soon">${esc(t('contactSoon'))}</p>`;
+ // Without direct contacts the pilot form above is the way in.
+ box.innerHTML=items.length?`<ul class="contact-list">${items.map(i=>`<li><a href="${esc(i.href)}"${i.k==='telegram'?' target="_blank" rel="noopener"':''}>${esc(i.label)} <span>${esc(t(i.k))}</span></a></li>`).join('')}</ul>`:'';
 }
+
+// Pilot request form. Errors show after the person leaves a field (or on submit), next to the field, and clear as soon
+// as it is fixed; an error element carries its text key in data-t, so switching language translates it too.
+(()=>{
+ const form=document.querySelector('[data-pilot]');if(!form)return;
+ const done=document.querySelector('[data-pilot-done]'),failBox=form.querySelector('[data-pilot-fail]'),send=form.querySelector('[type=submit]');
+ const PHONE=/^\+?[\d\s()./-]{6,30}$/,EMAIL=/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/;
+ const live=document.createElement('div');live.className='pf-live';live.setAttribute('aria-live','polite');document.body.append(live);
+ const problem=el=>{
+  const v=el.type==='checkbox'?el.checked:el.value.trim();
+  if(el.name==='name')return v.length<2?'pfErrName':'';
+  if(el.name==='organisation')return v.length<2?'pfErrOrg':'';
+  if(el.name==='email')return EMAIL.test(v)?'':'pfErrEmail';
+  if(el.name==='phone')return !v||PHONE.test(v)?'':'pfErrPhone';
+  if(el.name==='consent')return v?'':'pfErrConsent';
+  return '';
+ };
+ const show=(el,key,announce=false)=>{
+  const err=document.getElementById(el.dataset.error);if(!err)return;
+  const ids=(el.getAttribute('aria-describedby')||'').split(/\s+/).filter(id=>id&&id!==err.id);
+  if(key){err.dataset.t=key;err.innerHTML=esc(t(key));err.hidden=false;ids.push(err.id);}
+  else{delete err.dataset.t;err.textContent='';err.hidden=true;}
+  el.setAttribute('aria-invalid',key?'true':'false');
+  if(ids.length)el.setAttribute('aria-describedby',ids.join(' '));else el.removeAttribute('aria-describedby');
+  if(key&&announce){live.textContent='';setTimeout(()=>{live.textContent=(el.labels?.[0]?.querySelector('[data-t]')?.textContent||'')+': '+t(key);},400);}
+ };
+ const fields=[...form.querySelectorAll('[data-error]')],touched=new WeakSet();
+ fields.forEach(el=>el.setAttribute('aria-invalid','false'));
+ form.addEventListener('input',e=>{const el=e.target;if(!el.dataset?.error)return;touched.add(el);if(el.getAttribute('aria-invalid')==='true'&&!problem(el))show(el,'');});
+ form.addEventListener('change',e=>{const el=e.target;if(el.type==='checkbox')show(el,problem(el),true);});
+ form.addEventListener('focusout',e=>{const el=e.target;if(el.dataset?.error&&touched.has(el))show(el,problem(el),true);});
+ form.addEventListener('submit',async e=>{
+  e.preventDefault();
+  failBox.hidden=true;
+  const bad=fields.filter(el=>{const k=problem(el);show(el,k);return k;});
+  if(bad.length){bad[0].focus();return;}
+  const f=new FormData(form),body={name:f.get('name'),organisation:f.get('organisation'),email:f.get('email'),phone:f.get('phone')||'',teams:f.get('teams')||'',message:f.get('message')||'',consent:f.get('consent')==='on',website:f.get('website')||'',language:lang};
+  send.disabled=true;form.setAttribute('aria-busy','true');const label=send.querySelector('[data-t]');label.dataset.t='pfSending';label.textContent=t('pfSending');
+  const stop=()=>{send.disabled=false;form.removeAttribute('aria-busy');label.dataset.t='pfSend';label.textContent=t('pfSend');};
+  let r;
+  try{r=await fetch('/api/pilot-request',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(body)});}
+  catch{stop();failBox.dataset.t='pfErrNet';failBox.textContent=t('pfErrNet');failBox.hidden=false;return;}
+  stop();
+  if(r.ok){
+   done.querySelector('[data-pilot-email]').textContent=body.email.trim();
+   form.hidden=true;done.hidden=false;done.focus();return;
+  }
+  const data=await r.json().catch(()=>({})),field=data?.error?.detail?.field,el=field&&form.elements[field];
+  if(el?.dataset?.error){show(el,problem(el)||{name:'pfErrName',organisation:'pfErrOrg',email:'pfErrEmail',phone:'pfErrPhone',consent:'pfErrConsent'}[field]);el.focus();return;}
+  const key=r.status===429?'pfErrRate':'pfErrNet';failBox.dataset.t=key;failBox.textContent=t(key);failBox.hidden=false;
+ });
+})();
 
 // "Enter as a team": sign in as the invented team member, then open their tasks.
 document.querySelectorAll('[data-enter]').forEach(b=>b.addEventListener('click',async()=>{
@@ -147,8 +229,9 @@ document.querySelectorAll('[data-enter]').forEach(b=>b.addEventListener('click',
  }catch{location.href='/demo';}
 }));
 
-// Scroll reveals and count-ups, once each.
+// Scroll reveals and count-ups, once each. Numbers use the shared counter (bird-motion.js) when it is there.
 function countUp(el){
+ if(window.BirdMotion){window.BirdMotion.countUp(el);return;}
  const end=Number(el.dataset.count);if(reduced||!end){el.textContent=String(end);return;}
  const t0=performance.now(),dur=Math.min(1400,500+end*30);
  const step=now=>{const p=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-p,3);el.textContent=String(Math.round(end*e));if(p<1)requestAnimationFrame(step);};
@@ -160,7 +243,9 @@ const seen=new IntersectionObserver(entries=>entries.forEach(e=>{
  e.target.querySelectorAll?.('[data-count]').forEach(countUp);
  if(e.target.matches('[data-count]'))countUp(e.target);
 }),{threshold:.18,rootMargin:'0px 0px -6% 0px'});
-document.querySelectorAll('[data-reveal],[data-gap],[data-map]').forEach(el=>seen.observe(el));
+// With the hero intro running, the facts under it wait for their cue in the timeline (see intro()).
+document.querySelectorAll('[data-reveal],[data-gap]').forEach(el=>{if(!(MO&&el.closest('.facts')))seen.observe(el);});
+if(!MO)document.querySelectorAll('[data-map]').forEach(el=>seen.observe(el));
 
 // The gap: 52 weeks. Programme weeks are dense; afterwards activity fades into fog, or keeps a weekly pulse.
 (function gap(){
@@ -178,10 +263,91 @@ document.querySelectorAll('[data-reveal],[data-gap],[data-map]').forEach(el=>see
  before.innerHTML=a;after.innerHTML=b;
 })();
 
-// Subtle depth in the hero while scrolling.
-if(!reduced){
+// Subtle depth in the hero while scrolling: a CSS scroll-driven animation (landing.css) where the browser has one,
+// otherwise this listener. It moves the `translate` property, so the intro's `transform` composes with it.
+if(!reduced&&!(window.CSS?.supports?.('(animation-timeline: scroll()) and (animation-range: 0 1px)'))){
  const layers=[...document.querySelectorAll('[data-depth]')];let ticking=false;
- addEventListener('scroll',()=>{if(ticking)return;ticking=true;requestAnimationFrame(()=>{const y=scrollY;if(y<1400)layers.forEach(l=>{l.style.transform=`translate3d(0,${(y*Number(l.dataset.depth)).toFixed(1)}px,0)`;});ticking=false;});},{passive:true});
+ addEventListener('scroll',()=>{if(ticking)return;ticking=true;requestAnimationFrame(()=>{const y=Math.min(scrollY,1400);layers.forEach(l=>{l.style.translate=`0 ${(y*Number(l.dataset.depth)).toFixed(1)}px`;});ticking=false;});},{passive:true});
+}
+
+/* ---------- Motion (Anime.js; only called when MO) ---------- */
+function onceInView(el,fn,threshold=.25){
+ if(!el)return;if(!('IntersectionObserver' in window)){fn();return;}
+ const io=new IntersectionObserver(es=>{if(es.some(e=>e.isIntersecting)){io.disconnect();fn();}},{threshold});io.observe(el);
+}
+// Anime.js leaves its last values inline; once a piece has landed the stylesheet takes over again (hover, language switch).
+function clean(els){for(const el of els){el.style.removeProperty('opacity');el.style.removeProperty('transform');}}
+// Wrap each word of the hero title in a clip so it can rise into place. Text nodes are split where they are,
+// so <em> and the non-breaking span stay intact; spaces stay plain text, so screen readers hear the same sentence.
+function splitWords(el){
+ const words=[],walk=document.createTreeWalker(el,NodeFilter.SHOW_TEXT),nodes=[];
+ while(walk.nextNode())nodes.push(walk.currentNode);
+ for(const node of nodes){
+  const frag=document.createDocumentFragment();
+  for(const part of node.textContent.split(/(\s+)/)){
+   if(!part)continue;
+   if(/^\s+$/.test(part)&&!/\u00a0/.test(part)){frag.append(part);continue;}
+   const outer=document.createElement('span'),inner=document.createElement('span');
+   outer.className='mo-w';inner.textContent=part;outer.append(inner);frag.append(outer);words.push(inner);
+  }
+  node.replaceWith(frag);
+ }
+ return words;
+}
+function intro(){
+ const h1=document.querySelector('.hero h1'),copy=document.querySelector('.hero-copy');if(!h1||!copy)return;
+ const original=h1.innerHTML,words=splitWords(h1);h1.classList.add('is-split');
+ const rest=[...copy.children].filter(el=>el!==h1);
+ const office=document.querySelector('.shot-office'),dash=document.querySelector('.shot-dash');
+ const facts=[...document.querySelectorAll('.facts [data-reveal]')];
+ let finished=false;
+ const finish=()=>{
+  if(finished)return;finished=true;
+  document.documentElement.classList.remove('mo-intro');
+  clean([...rest,office,dash].filter(Boolean));
+  if(h1.querySelector('.mo-w'))h1.innerHTML=original; // a language switch mid-intro already replaced it
+  h1.classList.remove('is-split');
+ };
+ const tl=A.createTimeline({defaults:{ease:'out(4)'},onComplete:finish});
+ tl.add(rest[0],{opacity:[0,1],y:[14,0],duration:500},0)
+  .add(words,{y:['135%','0%'],duration:820,delay:A.stagger(42)},90)
+  .add(rest.slice(1),{opacity:[0,1],y:[18,0],duration:620,delay:A.stagger(90)},420)
+  .call(()=>{facts.forEach(el=>seen.observe(el));},900);
+ if(office)tl.add(office,{opacity:[0,1],x:[70,0],y:[24,0],rotate:[2.5,0],scale:[.94,1],duration:1150},260);
+ if(dash)tl.add(dash,{opacity:[0,1],x:[40,0],y:[90,0],rotate:[-4,0],scale:[.9,1],duration:1050,ease:'outBack(1.15)'},620);
+ // A language button pressed mid-intro jumps to the end first, so the new text is not split or hidden.
+ document.querySelectorAll('[data-lang]').forEach(b=>b.addEventListener('click',()=>{if(!finished){tl.complete();finish();}},{capture:true}));
+ setTimeout(finish,4000); // whatever happens, nothing stays hidden
+}
+// The map section: the world spreads out from Croatia, the lens and zoom wedge follow, then the region fills in:
+// country dots, country markers, every incubator by distance from Zagreb, and finally the links between cities.
+function mapIntro(){
+ const host=document.querySelector('[data-map]');if(!host)return;
+ const spread=host.querySelector('.w-spread'),lens=host.querySelector('.lens'),here=host.querySelector('.w-here');
+ const zoom=host.querySelector('[data-zoom]'),dots=[...host.querySelectorAll('[data-region] .r-dots')];
+ const marks=[...host.querySelectorAll('.mk')],labels=[...host.querySelectorAll('.mk-label')],links=[...host.querySelectorAll('.r-link')];
+ const zg=INC.find(i=>i.city==='Zagreb'),dist=i=>zg?Math.hypot(i.lat-zg.lat,i.lng-zg.lng):0;
+ const incs=[...host.querySelectorAll('.inc')].map(el=>({el,d:dist(INC.find(x=>x.id===el.dataset.inc)||{})})).sort((a,b)=>a.d-b.d).map(x=>x.el);
+ const pops=[...marks,...incs];
+ pops.forEach(el=>{el.style.transformBox='fill-box';el.style.transformOrigin='center';el.style.opacity='0';});
+ [...labels,...dots,here,zoom].filter(Boolean).forEach(el=>{el.style.opacity='0';});
+ const lensD=lens?A.svg.createDrawable(lens):[],linkD=links.length?A.svg.createDrawable(links):[];
+ if(lens)lens.style.fillOpacity='0';
+ A.animate([...lensD,...linkD],{draw:'0 0',duration:0});
+ const w=W?.world;
+ onceInView(host,()=>{
+  host.classList.add('is-in');
+  const tl=A.createTimeline({defaults:{ease:'out(3)'},onComplete:()=>{clean([...pops,...labels,...dots,here,zoom].filter(Boolean));lens?.style.removeProperty('fill-opacity');}});
+  if(spread&&w)tl.add(spread,{r:[0,Math.hypot(w.w,w.h)],duration:1700,ease:'inOut(2)'},0);
+  if(here)tl.add(here,{opacity:[0,1],duration:400},250);
+  if(lens)tl.add(lensD,{draw:['0 0','0 1'],duration:700,ease:'inOut(2)'},700).add(lens,{fillOpacity:[0,1],duration:400},1150);
+  if(zoom)tl.add(zoom,{opacity:[0,1],duration:500},1100);
+  tl.add(dots,{opacity:[0,1],duration:600,delay:A.stagger(110)},900)
+   .add(marks,{opacity:[0,1],scale:[.5,1],duration:560,delay:A.stagger(90),ease:'outBack(1.7)'},1250)
+   .add(labels,{opacity:[0,1],duration:420,delay:A.stagger(70)},1450)
+   .add(incs,{opacity:[0,1],scale:[.3,1],duration:420,delay:A.stagger(28),ease:'outBack(2)'},1500);
+  if(links.length)tl.add(linkD,{draw:['0 0','0 1'],duration:900,delay:A.stagger(45),ease:'inOut(2)'},1750);
+ },.2);
 }
 
 /* ---------- Maps ---------- */
@@ -217,14 +383,16 @@ function drawWorld(){
  const w=W.world;root.setAttribute('viewBox',`0 0 ${w.w} ${w.h}`);
  let d='';w.rows.forEach((row,j)=>row.forEach(i=>{d+=`M${(i*w.step/2).toFixed(1)} ${(j*w.step+1).toFixed(1)}h0`;}));
  const clip=svg('clipPath',{id:'w-clip'},svg('defs',{},root));
- const wipe=svg('rect',{x:0,y:-10,width:w.w,height:w.h+20,class:'w-reveal'},clip);
+ const [hx,hy]=w.centres.H;
+ // With Anime.js the world spreads out from Croatia (see mapIntro); otherwise a left-to-right wipe.
+ if(MO){svg('circle',{cx:hx,cy:hy,r:0,class:'w-spread'},clip);}
+ const wipe=MO?null:svg('rect',{x:0,y:-10,width:w.w,height:w.h+20,class:'w-reveal'},clip);
  svg('path',{d,class:'w-land','stroke-width':(w.step*.5).toFixed(2),'clip-path':'url(#w-clip)'},root);
  const [lx,ly,lw,lh]=w.lens;
  svg('rect',{x:lx-4,y:ly-3,width:lw+8,height:lh+6,class:'lens'},root);
- const [hx,hy]=w.centres.H;
- const g=svg('g',{},root);
+ const g=svg('g',{class:'w-here'},root);
  svg('circle',{cx:hx,cy:hy,r:7,class:'w-pulse-ring'},g);svg('circle',{cx:hx,cy:hy,r:3.2,class:'w-pulse'},g);
- if(!reduced){wipe.style.transform='scaleX(0)';wipe.style.transformOrigin='left';const host=root.closest('[data-map]');const go=()=>{wipe.style.transform='scaleX(1)';};new IntersectionObserver((es,o)=>{if(es.some(e=>e.isIntersecting)){requestAnimationFrame(go);o.disconnect();}},{threshold:.2}).observe(host);}
+ if(wipe&&!reduced){wipe.style.transform='scaleX(0)';wipe.style.transformOrigin='left';const host=root.closest('[data-map]');const go=()=>{wipe.style.transform='scaleX(1)';};new IntersectionObserver((es,o)=>{if(es.some(e=>e.isIntersecting)){requestAnimationFrame(go);o.disconnect();}},{threshold:.2}).observe(host);}
 }
 
 function drawRegion(){
@@ -243,6 +411,13 @@ function drawRegion(){
  }
  // Incubators: organisations in the same city sit in a small ring around it.
  const byCity={};INC.forEach(i=>(byCity[i.city]??=[]).push(i));
+ // The network: a faint arc from Zagreb to every other city with an incubator, under the markers.
+ const hub=byCity.Zagreb?.[0];
+ if(hub){
+  const [zx,zy]=proj(hub.lat,hub.lng),links=svg('g',{class:'r-links','aria-hidden':'true'});root.insertBefore(links,root.querySelector('.mk-label,.mk'));
+  for(const [city,list] of Object.entries(byCity)){if(city==='Zagreb')continue;const [x,y]=proj(list[0].lat,list[0].lng),bend=Math.hypot(x-zx,y-zy)*.18;
+   svg('path',{d:`M${zx.toFixed(1)} ${zy.toFixed(1)}Q${((zx+x)/2+bend*.4).toFixed(1)} ${((zy+y)/2-bend).toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)}`,class:'r-link'},links);}
+ }
  for(const list of Object.values(byCity)){
   const [cx,cy]=proj(list[0].lat,list[0].lng);
   list.forEach((inc,k)=>{
@@ -319,10 +494,30 @@ addEventListener('resize',()=>{if(tipFor)showTip(tipFor);});
  const style=document.createElementNS(NS,'style');
  style.textContent=`.nl{fill:none;stroke-width:2.2}.nl.on{stroke:#5cc48a}.nl.off{stroke:#e8a93c;stroke-dasharray:6 7;animation:flow 1.6s linear infinite}@keyframes flow{to{stroke-dashoffset:-26}}.nc{fill:#242a26;stroke-width:3}.nt{font:700 15px Inter,-apple-system,sans-serif;fill:#f7f5f0;paint-order:stroke;stroke:#242a26;stroke-width:5px}@media(prefers-reduced-motion:reduce){.nl.off{animation:none}}`;
  root.append(style);
- for(const [a,b,on] of links){const [x1,y1]=P(a),[x2,y2]=P(b),mx=(x1+x2)/2,my=(y1+y2)/2-Math.hypot(x2-x1,y2-y1)*.22;svg('path',{d:`M${x1} ${y1}Q${mx} ${my} ${x2} ${y2}`,class:'nl '+(on?'on':'off')},root);}
- for(const k of Object.keys(C)){const [x,y]=P(k),hr=['zg','st','ri'].includes(k);svg('circle',{cx:x,cy:y,r:k==='zg'?9:7,class:'nc',stroke:hr?'#5cc48a':'#e8a93c'},root);const tx=svg('text',{x:x+(k==='ri'||k==='lj'?-12:12),y:y+(k==='st'?22:-12),class:'nt','text-anchor':k==='ri'||k==='lj'?'end':'start'},root);tx.textContent=C[k][2];}
+ // With Anime.js each link is revealed through a mask that draws itself, so dashed lines keep their dashes while drawing.
+ const defs=MO?svg('defs',{},root):null,draw=[];
+ links.forEach(([a,b,on],n)=>{
+  const [x1,y1]=P(a),[x2,y2]=P(b),mx=(x1+x2)/2,my=(y1+y2)/2-Math.hypot(x2-x1,y2-y1)*.22,d=`M${x1} ${y1}Q${mx} ${my} ${x2} ${y2}`;
+  const line=svg('path',{d,class:'nl '+(on?'on':'off')},root);
+  if(defs){const m=svg('mask',{id:'nl-m'+n,maskUnits:'userSpaceOnUse',x:0,y:0,width:R.w,height:R.h},defs);draw.push(svg('path',{d,fill:'none',stroke:'#fff','stroke-width':8,'stroke-linecap':'round'},m));line.setAttribute('mask',`url(#nl-m${n})`);}
+ });
+ const nodes=[],labels=[];
+ for(const k of Object.keys(C)){const [x,y]=P(k),hr=['zg','st','ri'].includes(k);nodes.push(svg('circle',{cx:x,cy:y,r:k==='zg'?9:7,class:'nc',stroke:hr?'#5cc48a':'#e8a93c'},root));const tx=svg('text',{x:x+(k==='ri'||k==='lj'?-12:12),y:y+(k==='st'?22:-12),class:'nt','text-anchor':k==='ri'||k==='lj'?'end':'start'},root);tx.textContent=C[k][2];labels.push(tx);}
+ if(!MO)return;
+ // Cities appear first, then the links draw from Zagreb outwards, then the names.
+ const drawables=A.svg.createDrawable(draw);
+ nodes.forEach(n=>{n.style.transformBox='fill-box';n.style.transformOrigin='center';n.style.opacity='0';});labels.forEach(l=>{l.style.opacity='0';});
+ A.animate(drawables,{draw:'0 0',duration:0});
+ onceInView(root.closest('.netviz'),()=>{
+  const tl=A.createTimeline({defaults:{ease:'out(3)'}});
+  tl.add(nodes,{opacity:[0,1],scale:[.4,1],duration:520,delay:A.stagger(90),ease:'outBack(1.6)'},250)
+   .add(drawables,{draw:['0 0','0 1'],duration:900,delay:A.stagger(140),ease:'inOut(2)'},550)
+   .add(labels,{opacity:[0,1],translateY:[6,0],duration:420,delay:A.stagger(60)},900)
+   .call(()=>{clean(nodes);clean(labels);},2400);
+ });
 })();
 
 applyLang();labelCountries();
 document.querySelectorAll('[data-lang]').forEach(b=>b.addEventListener('click',labelCountries));
+if(MO){intro();mapIntro();}
 })();

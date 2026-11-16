@@ -27,17 +27,17 @@
   website:{en:'Website or social profile',hr:'Web ili društvena mreža',ru:'Сайт или соцсеть'},
   save:{en:'Save',hr:'Spremi',ru:'Сохранить'},
   saved:{en:'Saved',hr:'Spremljeno',ru:'Сохранено'},
-  noCharacter:{en:'Link your office character in My account → Character.',hr:'Povežite svoj lik u Moj račun → Moj lik.',ru:'Свяжите своего персонажа в кабинете → «Персонаж».'},
+  noCharacter:{en:'Link your office character in My account → Character.',hr:'Povežite svoj lik u Moj račun → Moj lik.',ru:'Привяжите персонажа: Мой кабинет → «Мой персонаж».'},
   linkedIn:{en:'LinkedIn',hr:'LinkedIn',ru:'LinkedIn'},
   messages:{en:'Messages and reminders',hr:'Poruke i podsjetnici',ru:'Сообщения и напоминания'},
   reminder:{en:'Reminder',hr:'Podsjetnik',ru:'Напоминание'},
   dmLink:{en:'Private messages',hr:'Privatne poruke',ru:'Личные сообщения'},dmNew:{en:'new',hr:'nove poruke',ru:'новые'},
   signIn:{en:'Sign in',hr:'Prijava',ru:'Войти'},
   register:{en:'Create account',hr:'Izradi račun',ru:'Создать аккаунт'},
-  guestNote:{en:'Sign in to see your tasks, points and to book mentors.',hr:'Prijavite se za zadatke, bodove i termine s mentorima.',ru:'Войдите, чтобы видеть свои задания, баллы и записываться к менторам.'},
+  guestNote:{en:'Sign in to see your tasks, points and to book mentors.',hr:'Prijavite se da biste vidjeli svoje zadatke i bodove te rezervirali termine kod mentora.',ru:'Войдите, чтобы видеть свои задания, баллы и записываться к менторам.'},
   cabinet:{en:'My account',hr:'Moj račun',ru:'Мой кабинет'},
-  admin:{en:'Admin',hr:'Administracija',ru:'Админка'},
-  points:{en:'points',hr:'bodova',ru:'баллов'},
+  admin:{en:'Admin',hr:'Administracija',ru:'Управление'},
+  points:{en:'points',hr:'bodova',ru:'баллов'},points_one:{en:'point',hr:'bod',ru:'балл'},points_few:{en:'points',hr:'boda',ru:'балла'},
   askMeeting:{en:'Ask for a meeting',hr:'Zatraži sastanak',ru:'Попросить встречу'},
   spendPoints:{en:'What can points buy?',hr:'Što mogu dobiti za bodove?',ru:'На что потратить баллы?'},
   photo:{en:'Change photo',hr:'Promijeni fotografiju',ru:'Сменить фото'},
@@ -48,8 +48,8 @@
   noTasks:{en:'Nothing left to do. Look at the task catalogue for extra points.',hr:'Sve je gotovo. U katalogu ima zadataka za dodatne bodove.',ru:'Всё сделано. В каталоге заданий есть задания на дополнительные баллы.'},
   catalog:{en:'Task catalogue',hr:'Katalog zadataka',ru:'Каталог заданий'},
   all:{en:'All',hr:'Svi',ru:'Все'},
-  next:{en:'Next free slot',hr:'Sljedeći slobodni termin',ru:'Ближайшее окно'},
-  noSlots:{en:'No free slots yet',hr:'Još nema slobodnih termina',ru:'Свободных окон пока нет'},
+  next:{en:'Next free slot',hr:'Sljedeći slobodni termin',ru:'Ближайший свободный слот'},
+  noSlots:{en:'No free slots yet',hr:'Još nema slobodnih termina',ru:'Свободных слотов пока нет'},
   book:{en:'Book',hr:'Rezerviraj',ru:'Записаться'},
   noMentors:{en:'Mentors will appear here soon.',hr:'Mentori će se uskoro pojaviti ovdje.',ru:'Скоро здесь появятся менторы.'},
   st_not_started:{en:'Not started',hr:'Nije započeto',ru:'Не начато'},
@@ -63,12 +63,14 @@
   overdue:{en:'overdue',hr:'kasni',ru:'просрочено'},
   needsHelp:{en:'asked for help',hr:'traži pomoć',ru:'просят помощи'},
   noAccounts:{en:'nobody registered',hr:'nitko nije registriran',ru:'никто не зарегистрирован'},
-  openAdmin:{en:'Admin panel',hr:'Administracija',ru:'Админ-панель'},
+  openAdmin:{en:'Admin panel',hr:'Administracija',ru:'Панель управления'},
   newProject:{en:'Add a project',hr:'Dodaj projekt',ru:'Добавить проект'},
  };
  const OPEN=new Set(['not_started','draft','changes_requested']);
  let lang='en',open=null,area='',highlight=null,data=null,loading=null,host=null,error='',loadedAt=0,photoVersion=0,linksNote='',context={};
  const t=k=>T[k]?.[lang]||T[k]?.en||k;
+ // After a number: the form for that count (k_one / k_few) when there is one.
+ const tp=(k,n)=>{const f=k+'_'+(window.BirdPlural?.(lang,n)||'many');return T[f]?t(f):t(k);};
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const title=tr=>tr?.[lang]?.title||tr?.en?.title||'';
  const when=iso=>new Intl.DateTimeFormat({en:'en-GB',hr:'hr-HR',ru:'ru-RU'}[lang],{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Zagreb'}).format(new Date(iso));
@@ -121,10 +123,10 @@
   const me=data.me,p=data.profile;if(!me)return guest();
   const character=p?.character&&context.member?.(p.character.personId);
   const earned=p?p.badges.filter(b=>b.earned):[];
-  return `<div class="hud-profile">${character?sprite(character.img,'hud-sprite-lg'):''}<div class="hud-profile-main"><label class="hud-photo">${face(me,56)}<input type="file" accept="image/*" data-hud-photo hidden><span>${t(me.hasAvatar?'photo':'addPhoto')}</span></label><div><strong>${esc(me.displayName)}</strong>${p?`<small>${p.xp} ${t('points')}</small>`:''}</div></div></div>
+  return `<div class="hud-profile">${character?sprite(character.img,'hud-sprite-lg'):''}<div class="hud-profile-main"><label class="hud-photo">${face(me,56)}<input type="file" accept="image/*" data-hud-photo hidden><span>${t(me.hasAvatar?'photo':'addPhoto')}</span></label><div><strong>${esc(me.displayName)}</strong>${p?`<small>${p.xp} ${tp('points',p.xp)}</small>`:''}</div></div></div>
    <a class="hud-link hud-dm" href="#/account/messages">✉ ${t('dmLink')}${data.dm?` · <b>${t('dmNew')}: ${data.dm}</b>`:''}</a>
    ${data.messages.length?`<ul class="hud-list hud-messages">${data.messages.map(n=>n.kind==='reminder'?`<li class="hud-reminder"><strong>${window.BirdIcon?.('bell')||''} ${t('reminder')}</strong><p>${n.payload.link?`<a href="${esc(n.payload.link)}">${esc(n.payload.text?.[lang]||n.payload.text?.en||'')}</a>`:esc(n.payload.text?.[lang]||n.payload.text?.en||'')}</p></li>`:`<li><strong>${esc(n.payload.from)}</strong><p>${esc(n.payload.message)}</p></li>`).join('')}</ul>`:''}
-   ${p?`<div class="hud-stats"><div><b>${p.xp}</b><small>${t('points')}</small></div><div><b>${p.lectures.verified+p.lectures.selfReported}/${p.lectures.held}</b><small>${t('lecturesAttended')}</small></div><div><b>${p.tasks.done}</b><small>${t('tasksDone')}</small></div></div><a class="hud-link" href="#/account/mentors">${window.BirdIcon?.('gift')||''} ${t('spendPoints')}</a>
+   ${p?`<div class="hud-stats"><div><b>${p.xp}</b><small>${tp('points',p.xp)}</small></div><div><b>${p.lectures.verified+p.lectures.selfReported}/${p.lectures.held}</b><small>${t('lecturesAttended')}</small></div><div><b>${p.tasks.done}</b><small>${t('tasksDone')}</small></div></div><a class="hud-link" href="#/account/mentors">${window.BirdIcon?.('gift')||''} ${t('spendPoints')}</a>
    <h3>${t('badges')} · ${earned.length}/${p.badges.length}</h3><ul class="hud-badges">${p.badges.map(b=>`<li class="${b.earned?'is-earned':''}" title="${esc(b.title[lang]||b.title.en)}"><span aria-hidden="true">${b.earned?'★':'☆'}</span>${esc(b.title[lang]||b.title.en)}</li>`).join('')}</ul>
    ${p.projects.length?`<h3>${t('myProject')}</h3><div class="hud-actions">${p.projects.map(x=>`<a class="hud-secondary" href="#/account/project/${esc(x.id)}">${esc(x.name)}</a>${x.published&&context.hasProject?.(x.id)?`<button class="hud-link" data-hud-team="${esc(x.id)}">${t('showInOffice')}</button>`:''}`).join('')}</div>`:''}
    <h3>${t('links')}</h3><form class="hud-links" data-hud-links><label><span>${t('linkedin')}</span><input name="linkedin" type="url" inputmode="url" placeholder="https://www.linkedin.com/in/…" value="${esc(p.links.linkedin)}" maxlength="300"></label><label><span>${t('website')}</span><input name="website" type="url" inputmode="url" placeholder="https://" value="${esc(p.links.website)}" maxlength="300"></label><button class="hud-secondary">${t('save')}</button>${linksNote?`<small role="status">${esc(linksNote)}</small>`:''}</form>`:''}
@@ -149,7 +151,7 @@
  function panel(){
   if(!open||!data)return '';
   const me=data.me;
-  const body=open==='attention'?attentionPanel():open==='profile'?profilePanel():open==='tasks'?(me?(data.tasks.length?`<ul class="hud-list">${data.tasks.slice(0,8).map(x=>`<li><a href="#/account/task/${esc(x.id)}"><strong>${esc(title(x.task.translations))}</strong><small>${x.task.xp} ${t('points')} · ${t('st_'+x.status)}</small></a></li>`).join('')}</ul>`:`<p>${t('noTasks')}</p>`)+`<div class="hud-actions"><a class="hud-primary" href="#/account/tasks">${t('allTasks')}</a></div>`:guest()):open==='teams'?teamsPanel():open==='lectures'?lecturesPanel():mentorsPanel();
+  const body=open==='attention'?attentionPanel():open==='profile'?profilePanel():open==='tasks'?(me?(data.tasks.length?`<ul class="hud-list">${data.tasks.slice(0,8).map(x=>`<li><a href="#/account/task/${esc(x.id)}"><strong>${esc(title(x.task.translations))}</strong><small>${x.task.xp} ${tp('points',x.task.xp)} · ${t('st_'+x.status)}</small></a></li>`).join('')}</ul>`:`<p>${t('noTasks')}</p>`)+`<div class="hud-actions"><a class="hud-primary" href="#/account/tasks">${t('allTasks')}</a></div>`:guest()):open==='teams'?teamsPanel():open==='lectures'?lecturesPanel():mentorsPanel();
   return `<section class="hud-panel" role="dialog" aria-label="${t(open)}"><header><h2>${t(open)}</h2><button data-hud-close aria-label="${t('close')}">×</button></header><div class="hud-body">${body}</div></section>`;
  }
  function paint(){

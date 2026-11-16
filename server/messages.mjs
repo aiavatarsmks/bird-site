@@ -11,6 +11,7 @@ import {audit,isAdmin,requireAdmin} from './permissions.mjs';
 import {requireUser} from './auth.mjs';
 import {notify} from './notifications.mjs';
 import {onTeam} from './wallet.mjs';
+import {onlyDemoPeople} from './demo-visit.mjs';
 
 const PAGE=50;
 const person=(db,id)=>db.query("SELECT u.id,u.display_name name,u.role,u.status,(SELECT json_extract(p.draft,'$.name') FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=u.id AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') ORDER BY m.created LIMIT 1) team FROM users u WHERE u.id=?").get(id);
@@ -61,7 +62,7 @@ export function conversations(ctx){
  const groups=ctx.db.query('SELECT g.*,m.last_read,m.joined FROM chat_groups g JOIN chat_members m ON m.group_id=g.id WHERE m.user_id=? AND m.left_at IS NULL').all(user.id).map(g=>{
   const last=ctx.db.query('SELECT c.sender_id,c.body,c.file_id,c.created,u.display_name name FROM chat_messages c JOIN users u ON u.id=c.sender_id WHERE c.group_id=? AND NOT EXISTS(SELECT 1 FROM message_blocks b WHERE b.user_id=? AND b.blocked_id=c.sender_id) ORDER BY c.seq DESC LIMIT 1').get(g.id,user.id);
   const unread=ctx.db.query(UNREAD_GROUP+' AND c.group_id=?2').get(user.id,g.id).n;
-  return {kind:'group',group:groupView(ctx.db,g),last:last?{mine:last.sender_id===user.id,who:last.name,body:preview(last.body,fileOf(ctx.db,last.file_id)),created:last.created}:{mine:false,who:'',body:'',created:g.created},unread};});
+  return {kind:'group',group:groupView(ctx.db,g,onlyDemoPeople(ctx)),last:last?{mine:last.sender_id===user.id,who:last.name,body:preview(last.body,fileOf(ctx.db,last.file_id)),created:last.created}:{mine:false,who:'',body:'',created:g.created},unread};});
  const teams=ctx.db.query(`SELECT p.id,json_extract(p.draft,'$.name') name FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') AND p.status<>'archived' AND NOT EXISTS(SELECT 1 FROM chat_groups g WHERE g.project_id=p.id) ORDER BY m.created`).all(user.id);
  return json({items:[...direct,...waiting,...groups].sort((a,b)=>b.last.created.localeCompare(a.last.created)),teamsWithoutChat:teams,unread:unreadMessages(ctx.db,user.id)});
 }
@@ -69,7 +70,7 @@ export function conversations(ctx){
 export function directory(ctx){
  const user=requireUser(ctx),q=(ctx.url.searchParams.get('q')||'').trim().toLowerCase().slice(0,60);
  const like='%'+q.replace(/[\\%_]/g,m=>'\\'+m)+'%';
- const rows=ctx.db.query(`SELECT u.id FROM users u WHERE u.status='active' AND u.id<>?1 AND (?2='%%' OR lower(u.display_name) LIKE ?2 ESCAPE '\\' OR EXISTS(SELECT 1 FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=u.id AND m.revoked_at IS NULL AND lower(coalesce(json_extract(p.draft,'$.name'),'')) LIKE ?2 ESCAPE '\\')) ORDER BY u.display_name COLLATE NOCASE LIMIT 100`).all(user.id,like);
+ const rows=ctx.db.query(`SELECT u.id FROM users u WHERE u.status='active' AND u.id<>?1 AND (?3=0 OR u.id LIKE 'demo-user-%') AND (?2='%%' OR lower(u.display_name) LIKE ?2 ESCAPE '\\' OR EXISTS(SELECT 1 FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=u.id AND m.revoked_at IS NULL AND lower(coalesce(json_extract(p.draft,'$.name'),'')) LIKE ?2 ESCAPE '\\')) ORDER BY u.display_name COLLATE NOCASE LIMIT 100`).all(user.id,like,onlyDemoPeople(ctx)?1:0);
  const roster=ctx.db.query(`SELECT p.id FROM people p WHERE p.kind='participant' AND p.status='active' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.person_id=p.id) AND (?1='%%' OR lower(p.display_name) LIKE ?1 ESCAPE '\\' OR EXISTS(SELECT 1 FROM team_people tp JOIN teams t ON t.id=tp.team_id WHERE tp.person_id=p.id AND lower(t.name) LIKE ?1 ESCAPE '\\')) ORDER BY p.display_name COLLATE NOCASE LIMIT 100`).all(like);
  return json({items:[...rows.map(r=>view(person(ctx.db,r.id))),...roster.map(r=>waitingView(waitingPerson(ctx.db,r.id)))].sort((a,b)=>a.name.localeCompare(b.name)).slice(0,100)});
 }
@@ -172,7 +173,8 @@ export function resolveReport(ctx,id){
 // The everyone chat has no owner either: every active account is in it and nobody leaves it.
 export const EVERYONE='chat-everyone';
 const fixed=g=>!!g.project_id||g.id===EVERYONE;
-const groupView=(db,g)=>({id:g.id,title:g.title,team:!!g.project_id,everyone:g.id===EVERYONE,members:db.query('SELECT count(*) n FROM chat_members WHERE group_id=? AND left_at IS NULL').get(g.id).n});
+// demoOnly: a demo visitor counts the invented people only, never the real accounts that opened the chat.
+const groupView=(db,g,demoOnly=false)=>({id:g.id,title:g.title,team:!!g.project_id,everyone:g.id===EVERYONE,members:db.query("SELECT count(*) n FROM chat_members WHERE group_id=? AND left_at IS NULL AND (?=0 OR user_id LIKE 'demo-user-%')").get(g.id,demoOnly?1:0).n});
 const activeMember=(db,groupId,userId)=>db.query('SELECT * FROM chat_members WHERE group_id=? AND user_id=? AND left_at IS NULL').get(groupId,userId);
 // Read marks are message numbers, not times, so two messages in the same millisecond are both counted.
 const lastSeq=(db,groupId)=>db.query('SELECT coalesce(max(seq),0) n FROM chat_messages WHERE group_id=?').get(groupId).n;
@@ -240,8 +242,8 @@ export function groupThread(ctx,groupId){
  const reported=new Set(ctx.db.query('SELECT message_id FROM chat_reports WHERE reporter_id=?').all(user.id).map(r=>r.message_id));
  const hidden=new Set(ctx.db.query('SELECT blocked_id FROM message_blocks WHERE user_id=?').all(user.id).map(r=>r.blocked_id));
  ctx.db.query('UPDATE chat_members SET last_read=? WHERE group_id=? AND user_id=?').run(lastSeq(ctx.db,g.id),g.id,user.id);
- const members=ctx.db.query('SELECT user_id,role FROM chat_members WHERE group_id=? AND left_at IS NULL ORDER BY joined,rowid').all(g.id).map(r=>({...view(person(ctx.db,r.user_id)),owner:r.role==='owner'}));
- return json({group:groupView(ctx.db,g),owner:m.role==='owner'&&!fixed(g),members,hasMore:more,
+ const members=ctx.db.query('SELECT user_id,role FROM chat_members WHERE group_id=? AND left_at IS NULL ORDER BY joined,rowid').all(g.id).filter(r=>!onlyDemoPeople(ctx)||r.user_id.startsWith('demo-user-')).map(r=>({...view(person(ctx.db,r.user_id)),owner:r.role==='owner'}));
+ return json({group:groupView(ctx.db,g,onlyDemoPeople(ctx)),owner:m.role==='owner'&&!fixed(g),members,hasMore:more,
   // A blocked person's messages stay out of sight in shared chats too.
   items:rows.map(r=>hidden.has(r.sender_id)?{id:r.id,mine:false,hidden:true,created:r.created}:{id:r.id,mine:r.sender_id===user.id,sender:{id:r.sender_id,name:r.name},body:r.body,file:fileOf(ctx.db,r.file_id),created:r.created,reported:reported.has(r.id)})});
 }

@@ -23,3 +23,5 @@ setInterval(backup,60*60*1000);
 const remind=()=>platform.forEach((app,ws)=>{const n=runReminders(app.db);if(n)console.log(`[${ws.slug}] Reminders created:`,n);});
 remind();
 setInterval(remind,15*60*1000);
+// A demo workspace keeps its invented cohort around today: refilled once a Zagreb day (see startDemo), checked hourly.
+setInterval(()=>platform.forEach(app=>app.refreshDemo()),60*60*1000);

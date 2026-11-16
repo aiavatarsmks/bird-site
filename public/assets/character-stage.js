@@ -1,9 +1,10 @@
 'use strict';
 /* Living characters for profile and team pages: each one breathes, now and then turns, works with its hands,
-   walks a few steps and back. Hover makes it hop, a click spins it round.
+   walks a few steps and back. Hover or a click makes it hop; it never spins, a flat sprite turned round looks flat.
    Artwork: assets/<id>.webp (3 poses), and when published BIRD_OFFICE_ACTIVITIES / BIRD_OFFICE_WALK for that id.
 
-   BirdCharacter.html(people,{size})  -> markup; people: [{id,name,src?}] (src defaults to assets/<id>.webp)
+   BirdCharacter.html(people,{size})  -> markup; people: [{id,name,src?,attrs?,label?}] (src defaults to assets/<id>.webp)
+                                         size: sm | md | lg | xl | fit (fit: as tall as the stage width allows, people-sheet.css)
    BirdCharacter.start(root)          -> starts the behaviour of every character inside root; returns stop()   */
 (()=>{
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -11,12 +12,15 @@ const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 const rand=(a,b)=>a+Math.random()*(b-a);
 const initials=name=>String(name||'?').split(/\s+/).map(n=>n[0]).slice(0,2).join('').toUpperCase();
 
+// People who registered themselves ("visitor-…") have no drawn character: initials straight away, no request for artwork.
+const noArt=p=>!p.src&&String(p.id||'').startsWith('visitor-');
 function html(people,{size='lg'}={}){
  return `<div class="cs-stage cs-${esc(size)}" data-cs-stage>${people.map((p,i)=>{
   const src=p.src||`assets/${p.id}.webp`,act=window.BIRD_OFFICE_ACTIVITIES?.[p.id];
-  return `<figure class="cs-char" data-cs-id="${esc(p.id)}" style="--i:${i}" tabindex="0" role="img" aria-label="${esc(p.name||'')}">
+  // p.attrs (escaped by the caller) turns the character into a control, e.g. one that opens that person.
+  return `<figure class="cs-char${noArt(p)?' cs-missing':''}" data-cs-id="${esc(p.id)}" style="--i:${i}" tabindex="0" ${p.attrs?`${p.attrs} role="button"`:'role="img"'} aria-label="${esc(p.label||p.name||'')}">
    <div class="cs-mover"><div class="cs-flip">
-    <span class="cs-body cs-idle" style="background-image:url('${esc(src)}');--beat:-${(i*3.7)%11}s;--breath:-${(i*.9)%3}s"></span>
+    <span class="cs-body cs-idle" style="${noArt(p)?'':`background-image:url('${esc(src)}');`}--beat:-${(i*3.7)%11}s;--breath:-${(i*.9)%3}s"></span>
     ${act?`<span class="cs-body cs-act" style="background-image:url('${esc(act.asset)}')"></span>`:''}
     <span class="cs-body cs-walk"></span>
     <span class="cs-fallback">${esc(initials(p.name))}</span>
@@ -32,12 +36,14 @@ function start(root){
  for(const el of chars){
   const id=el.dataset.csId,idle=el.querySelector('.cs-idle');
   // Missing artwork: show initials instead of an empty box.
-  const probe=new Image();probe.onerror=()=>el.classList.add('cs-missing');probe.src=idle.style.backgroundImage.slice(5,-2);
-  el.addEventListener('click',()=>{el.classList.remove('cs-spin');void el.offsetWidth;el.classList.add('cs-spin');});
+  const art=idle.style.backgroundImage.slice(5,-2);
+  if(art){const probe=new Image();probe.onerror=()=>el.classList.add('cs-missing');probe.src=art;}
+  el.addEventListener('click',()=>{el.classList.remove('cs-hop');void el.offsetWidth;el.classList.add('cs-hop');});
   if(reduced())continue;
   const walk=window.BIRD_OFFICE_WALK?.[id],act=el.querySelector('.cs-act');
   const mode=m=>{el.dataset.mode=m;};
-  function doActivity(){mode('act');let f=0;const step=()=>{if(el.dataset.mode!=='act')return;act.style.backgroundPosition=`${(f++%3)*50}% 0`;later(step,rand(260,420));};step();later(next,rand(2400,4200));}
+  // Activity sheets are sit / step / coffee. There is no chair on a card, so only the coffee pose is used here.
+  function doActivity(){mode('act');act.style.backgroundPosition='100% 0';later(next,rand(2400,4200));}
   function doWalk(){
    const body=el.querySelector('.cs-walk'),cell=walk.cell,cols=walk.columns,n=walk.framesPerDirection,w=walk.width,h=walk.height;
    const scale=el.querySelector('.cs-mover').offsetHeight/walk.renderHeight||1;

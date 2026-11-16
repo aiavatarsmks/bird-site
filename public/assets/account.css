@@ -621,3 +621,16 @@ tr[hidden]{display:none}
 }
 @keyframes acc-sheet{from{transform:translateY(100%)}to{transform:none}}
 @media(prefers-reduced-motion:reduce){.acc-dialog[open]{animation:none}}
+
+/* Motion layer (bird-motion.js). Shared curve, steady digits while counting, the "+N" points moment, tab underline slide.
+   Reduced motion keeps a short fade for entrances and drops every movement. */
+:root{--mo-ease:cubic-bezier(.23,1,.32,1)}
+[data-count],[data-tk-n],[data-pg-count],[data-ps-count]{font-variant-numeric:tabular-nums}
+.is-counting{display:inline-block}
+.mo-gain{position:absolute;left:0;top:-4px;z-index:3;pointer-events:none;font:800 15px/1 Inter,-apple-system,sans-serif;color:#2b7a4b;background:#dcefe1;border:2px solid #2b7a4b;padding:3px 7px;opacity:0;white-space:nowrap}
+.mo-spark{position:absolute;left:18px;top:8px;z-index:2;width:7px;height:7px;background:#e0a526;pointer-events:none;opacity:0}
+.mo-spark:nth-of-type(3n){background:var(--accent,#a63c15)}.mo-spark:nth-of-type(3n+1){width:5px;height:5px;background:#2b7a4b}
+@keyframes mo-fade{from{opacity:0}}
+@media(prefers-reduced-motion:reduce){
+ .is-io [data-in].is-in{animation:mo-fade .3s ease both!important}
+}

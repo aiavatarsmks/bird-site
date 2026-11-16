@@ -124,6 +124,16 @@ export function teamScore(db,projectId,memberIds){
  return {earned:Math.round(earned),available:Math.round(available),percent:Math.round(START_SCORE+(100-START_SCORE)*share)};
 }
 
+/**
+ * The team's percentage, or null for a team on the list whose people have no accounts while others already work:
+ * there is nothing to measure yet, and "10 %" next to "0/0 tasks" reads like a bug. Before anyone has an account
+ * every team shows the same starting 10.
+ */
+export function teamPercent(db,projectId,memberIds){
+ if(!memberIds.length&&db.query("SELECT 1 FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.revoked_at IS NULL AND m.role IN ('owner','editor','member') AND p.status<>'archived' LIMIT 1").get())return null;
+ return teamScore(db,projectId,memberIds).percent;
+}
+
 /** Team ranking by fair percentage. Personal tasks and private metrics stay out. */
 export function teamRanking(ctx){
  const week=isoWeek(),since=new Date(Date.now()-7*86400000).toISOString();
@@ -131,8 +141,8 @@ export function teamRanking(ctx){
  const items=rows.filter(r=>r.id).map(p=>{
   const members=ctx.db.query("SELECT user_id FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").all(p.id).map(m=>m.user_id);
   const team=projectXp(ctx.db,p.id),weekGain=ctx.db.query("SELECT coalesce(sum(amount),0) n FROM xp_ledger WHERE beneficiary_type='project' AND beneficiary_id=? AND created>=?").get(p.id,since).n;
-  return {projectId:p.id,name:p.name,percent:teamScore(ctx.db,p.id,members).percent,teamXp:team,weekGain,streak:streak(ctx.db,p.id),members:members.length};
- }).sort((a,b)=>b.percent-a.percent||b.teamXp-a.teamXp||b.weekGain-a.weekGain||a.name.localeCompare(b.name));
+  return {projectId:p.id,name:p.name,percent:teamPercent(ctx.db,p.id,members),teamXp:team,weekGain,streak:streak(ctx.db,p.id),members:members.length};
+ }).sort((a,b)=>(b.percent??-1)-(a.percent??-1)||b.teamXp-a.teamXp||b.weekGain-a.weekGain||a.name.localeCompare(b.name));
  return json({week,items,rules:{checkinXp:CHECKIN_XP}});
 }
 
@@ -169,16 +179,41 @@ export function exportCsv(ctx){
   const last=ctx.db.query('SELECT week FROM checkins WHERE project_id=? ORDER BY week DESC LIMIT 1').get(p.id)?.week||'';
   lines.push([c.name,p.status,c.stage,members.length,projectXp(ctx.db,p.id),members.reduce((n,u)=>n+userXp(ctx.db,u),0),tasks.filter(t=>t.st==='accepted').length,tasks.length,att.find(a=>a.kind==='verified_by_admin')?.n||0,att.find(a=>a.kind==='self_reported')?.n||0,ctx.db.query('SELECT count(*) n FROM checkins WHERE project_id=?').get(p.id).n,streak(ctx.db,p.id),last,sum('funding','grant'),sum('funding','equity'),sum('funding','loan'),sum('funding','prize'),sum('funding','other'),sum('revenue'),count('hire'),count('customer'),ctx.db.query("SELECT 1 FROM project_outcomes WHERE project_id=? AND kind='company'").get(p.id)?'yes':'no',riskSignals(ctx.db,p.id,members).level].map(csvCell).join(','));
  }
- return new Response('﻿'+lines.join('\r\n')+'\r\n',{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="bird-report-${nowIso().slice(0,10)}.csv"`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+ return new Response('﻿'+lines.join('\r\n')+'\r\n',{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="${brandSlug(ctx.config)}-report-${nowIso().slice(0,10)}.csv"`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 }
 
-/** Public calendar feed of lectures (subscribe in Google Calendar / Apple Calendar). */
+/** The incubator's own name for feeds and file names: the workspace name, BIRD for the original single service. */
+export const brandName=config=>(config?.workspace?.name||'BIRD').trim()||'BIRD';
+export const brandSlug=config=>brandName(config).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'report';
+
+// Lectures without their own end time last an hour and a half.
+const LECTURE_MIN=90;
+// Central European time with its daylight-saving rule, so calendars place 17:00 at 17:00 in Zagreb.
+const ZAGREB=['BEGIN:VTIMEZONE','TZID:Europe/Zagreb','BEGIN:DAYLIGHT','TZOFFSETFROM:+0100','TZOFFSETTO:+0200','TZNAME:CEST','DTSTART:19700329T020000','RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU','END:DAYLIGHT','BEGIN:STANDARD','TZOFFSETFROM:+0200','TZOFFSETTO:+0100','TZNAME:CET','DTSTART:19701025T030000','RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU','END:STANDARD','END:VTIMEZONE'];
+
+/** Public calendar feed of lectures (subscribe in Google Calendar / Apple Calendar). ?lang=hr|ru picks the title language. */
 export function calendar(ctx){
  const esc=s=>String(s).replace(/[\\;,]/g,m=>'\\'+m).replace(/\n/g,'\\n');
+ const lang=['en','hr','ru'].find(l=>l===ctx.url?.searchParams.get('lang'))||'en';
+ // Event titles carry the name without the cohort year: "BIRD Incubator: Pricing", not "BIRD Incubator 2026: Pricing".
+ const name=brandName(ctx.config),short=name.replace(/\s+(19|20)\d\d$/,'')||name,host=brandSlug(ctx.config);
  const stamp=nowIso().replace(/[-:]/g,'').slice(0,15)+'Z';
- const events=ctx.db.query("SELECT * FROM lectures WHERE status='published' ORDER BY date").all().map(l=>{const t=JSON.parse(l.title),d=l.date.replace(/-/g,'');const next=new Date(Date.parse(l.date+'T00:00:00Z')+86400000).toISOString().slice(0,10).replace(/-/g,'');
-  return ['BEGIN:VEVENT',`UID:${l.id}@bird-notes`,`DTSTAMP:${stamp}`,`DTSTART;VALUE=DATE:${d}`,`DTEND;VALUE=DATE:${next}`,`SUMMARY:${esc('BIRD: '+(t.en||l.id))}`,...(l.speaker?[`DESCRIPTION:${esc(l.speaker)}`]:[]),'END:VEVENT'].join('\r\n');});
- return new Response(['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//BIRD study notes//EN','X-WR-CALNAME:BIRD lectures','X-WR-TIMEZONE:Europe/Zagreb',...events,'END:VCALENDAR',''].join('\r\n'),{headers:{'Content-Type':'text/calendar; charset=utf-8','Cache-Control':'public, max-age=900'}});
+ const compact=d=>d.replace(/-/g,'');
+ const events=ctx.db.query("SELECT * FROM lectures WHERE status='published' ORDER BY date").all().map(l=>{
+  const t=JSON.parse(l.title),title=t[lang]||t.en||t.hr||l.id;
+  let when;
+  if(/^\d{2}:\d{2}$/.test(l.time||'')){
+   // Wall-clock time in Zagreb; the end may cross midnight only in theory, so it is computed on the clock.
+   const [h,m]=l.time.split(':').map(Number),end=h*60+m+LECTURE_MIN;
+   const endDate=end>=1440?new Date(Date.parse(l.date+'T00:00:00Z')+86400000).toISOString().slice(0,10):l.date,e=end%1440;
+   when=[`DTSTART;TZID=Europe/Zagreb:${compact(l.date)}T${String(h).padStart(2,'0')}${String(m).padStart(2,'0')}00`,`DTEND;TZID=Europe/Zagreb:${compact(endDate)}T${String(Math.floor(e/60)).padStart(2,'0')}${String(e%60).padStart(2,'0')}00`];
+  }else{
+   const next=new Date(Date.parse(l.date+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+   when=[`DTSTART;VALUE=DATE:${compact(l.date)}`,`DTEND;VALUE=DATE:${compact(next)}`];
+  }
+  return ['BEGIN:VEVENT',`UID:${l.id}@${host}`,`DTSTAMP:${stamp}`,...when,`SUMMARY:${esc(short+': '+title)}`,...(l.place?[`LOCATION:${esc(l.place)}`]:[]),...(l.speaker?[`DESCRIPTION:${esc(l.speaker)}`]:[]),'END:VEVENT'].join('\r\n');
+ });
+ return new Response(['BEGIN:VCALENDAR','VERSION:2.0',`PRODID:-//${esc(name)}//Lectures//EN`,`X-WR-CALNAME:${esc(name)}`,'X-WR-TIMEZONE:Europe/Zagreb',...ZAGREB,...events,'END:VCALENDAR',''].join('\r\n'),{headers:{'Content-Type':'text/calendar; charset=utf-8','Cache-Control':'public, max-age=900'}});
 }
 
 // Cohort quest: one shared goal for all teams, counted from accepted results of a task.

@@ -5,7 +5,8 @@ import {audit,requireAdmin,PERMISSION_MATRIX} from './permissions.mjs';
 import {publicUser} from './auth.mjs';
 import {projectXp,userXp} from './progress.mjs';
 import {notify} from './notifications.mjs';
-import {riskSignals,streak,teamScore} from './cohort.mjs';
+import {riskSignals,streak,teamPercent} from './cohort.mjs';
+import {onlyDemoPeople} from './demo-visit.mjs';
 
 /** One row per project: status, team and personal points, attendance, open and waiting tasks. */
 export function projectsOverview(ctx){
@@ -25,7 +26,7 @@ export function projectsOverview(ctx){
    members:members.map(m=>m.display_name),
    // People on the roster who have not registered yet, so the dashboard can say whom to invite.
    noAccount:p.team_id?ctx.db.query('SELECT p.display_name n FROM team_people t JOIN people p ON p.id=t.person_id WHERE t.team_id=? AND NOT EXISTS(SELECT 1 FROM users u WHERE u.person_id=p.id) ORDER BY p.display_name').all(p.team_id).map(r=>r.n):[],
-   percent:teamScore(ctx.db,p.id,ids).percent,overdue:open.filter(a=>a.due_at&&a.due_at<nowIso()).length,pitch:pitchOf(ctx.db,p.id),mentorSessions:ctx.db.query('SELECT count(*) n FROM office_hour_bookings WHERE project_id=?').get(p.id).n,
+   percent:teamPercent(ctx.db,p.id,ids),overdue:open.filter(a=>a.due_at&&a.due_at<nowIso()).length,pitch:pitchOf(ctx.db,p.id),mentorSessions:ctx.db.query('SELECT count(*) n FROM office_hour_bookings WHERE project_id=?').get(p.id).n,
    teamXp:projectXp(ctx.db,p.id),personalXp:personal,totalXp:projectXp(ctx.db,p.id)+personal,
    attendance:{selfReported:attendance.find(a=>a.kind==='self_reported')?.n||0,verified:attendance.find(a=>a.kind==='verified_by_admin')?.n||0,lecturesHeld:lectures},
    tasks:{total:assignments.length,done:assignments.filter(a=>a.sub==='accepted').length,waitingReview:assignments.filter(a=>a.sub==='submitted').length,open:open.length},
@@ -68,7 +69,7 @@ export async function nudge(ctx){
 
 export function listUsers(ctx){
  requireAdmin(ctx);const {limit,offset}=page(ctx.url,100);const q=(ctx.url.searchParams.get('q')||'').slice(0,60).toLowerCase();
- const rows=ctx.db.query("SELECT * FROM users WHERE (?1='' OR lower(login) LIKE ?2 OR lower(display_name) LIKE ?2) ORDER BY created DESC LIMIT ?3 OFFSET ?4").all(q,'%'+q+'%',limit+1,offset);
+ const rows=ctx.db.query("SELECT * FROM users WHERE (?1='' OR lower(login) LIKE ?2 OR lower(display_name) LIKE ?2) AND (?5=0 OR id LIKE 'demo-user-%') ORDER BY created DESC LIMIT ?3 OFFSET ?4").all(q,'%'+q+'%',limit+1,offset,onlyDemoPeople(ctx)?1:0);
  return json({items:rows.slice(0,limit).map(u=>({...publicUser(u),email:undefined,status:u.status,created:u.created,lastSeen:lastSeen(ctx.db,u.id),xp:userXp(ctx.db,u.id),lectures:ctx.db.query('SELECT count(*) n FROM attendance WHERE user_id=?').get(u.id).n,tasksDone:ctx.db.query("SELECT count(*) n FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.user_id=? AND s.status='accepted'").get(u.id).n,projects:ctx.db.query("SELECT json_extract(p.draft,'$.name') name FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL").all(u.id).map(r=>r.name)})),hasMore:rows.length>limit});
 }
 /** Organisers change program roles, the platform owner stays as it is. The changed user's sessions are revoked. */
@@ -99,7 +100,7 @@ export async function setUserStatus(ctx,userId){
 const TARGET_NAME={user:"SELECT display_name n FROM users WHERE id=?",project:"SELECT json_extract(draft,'$.name') n FROM projects WHERE id=?",task:"SELECT json_extract(translations,'$.en.title') n FROM task_templates WHERE id=?",lecture:"SELECT json_extract(title,'$.en') n FROM lectures WHERE id=?",person:"SELECT display_name n FROM people WHERE id=?"};
 export function auditLog(ctx){
  requireAdmin(ctx);const {limit,offset}=page(ctx.url,100);const prefix=(ctx.url.searchParams.get('prefix')||'').slice(0,30);
- const rows=ctx.db.query("SELECT a.*,u.display_name actor_name FROM audit_log a LEFT JOIN users u ON u.id=a.actor WHERE (?1='' OR a.action LIKE ?1||'.%') ORDER BY a.id DESC LIMIT ?2 OFFSET ?3").all(prefix,limit+1,offset);
+ const rows=ctx.db.query("SELECT a.*,u.display_name actor_name FROM audit_log a LEFT JOIN users u ON u.id=a.actor WHERE (?1='' OR a.action LIKE ?1||'.%') AND (?4=0 OR a.actor LIKE 'demo-user-%') ORDER BY a.id DESC LIMIT ?2 OFFSET ?3").all(prefix,limit+1,offset,onlyDemoPeople(ctx)?1:0);
  const name=r=>TARGET_NAME[r.target_type]?ctx.db.query(TARGET_NAME[r.target_type]).get(r.target_id)?.n:null;
  return json({items:rows.slice(0,limit).map(r=>({id:r.id,actor:r.actor_name||'',action:r.action,targetType:r.target_type,targetId:r.target_id,targetName:name(r)||'',detail:JSON.parse(r.detail),created:r.created})),hasMore:rows.length>limit});
 }

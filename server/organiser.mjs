@@ -5,17 +5,18 @@ import {audit,requireAdmin} from './permissions.mjs';
 import {addRecoveryCode} from './auth.mjs';
 import {award,projectXp,userXp} from './progress.mjs';
 import {notify} from './notifications.mjs';
-import {riskSignals,streak,teamScore,csvCell} from './cohort.mjs';
+import {riskSignals,streak,teamScore,teamPercent,csvCell,brandSlug} from './cohort.mjs';
 import {lastSeen,pitchOf} from './admin.mjs';
 import {assignForUser} from './tasks.mjs';
 import {wallet} from './wallet.mjs';
+import {onlyDemoPeople} from './demo-visit.mjs';
 
 const TEAM_ROLES="('owner','editor','member')";
 const nameOf=project=>JSON.parse(project.draft||'{}').name||project.id;
 const zagrebToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Zagreb',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const memberRows=(db,projectId)=>db.query(`SELECT u.id,u.display_name,u.status,u.person_id,m.role FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.project_id=? AND m.revoked_at IS NULL AND m.role IN ${TEAM_ROLES} ORDER BY u.display_name`).all(projectId);
 const memberIds=(db,projectId)=>memberRows(db,projectId).map(m=>m.id);
-const taskTitle=t=>JSON.parse(t).en?.title||'';
+const taskTitle=(t,lang='en')=>{const x=JSON.parse(t);return x[lang]?.title||x.en?.title||'';};
 const notesFor=(db,type,id)=>db.query('SELECT n.id,n.body,n.created,u.display_name author FROM organiser_notes n LEFT JOIN users u ON u.id=n.author WHERE n.target_type=? AND n.target_id=? ORDER BY n.created DESC LIMIT 30').all(type,id);
 const lastNudge=(db,ids)=>ids.length?db.query(`SELECT max(created) t FROM notifications WHERE kind='nudge' AND user_id IN (${ids.map(()=>'?').join(',')})`).get(...ids).t:null;
 const OPEN="('not_started','draft','changes_requested')";
@@ -31,9 +32,11 @@ function attendanceOf(db,userId){
 
 /** The one place to start the day: only what needs a decision. */
 export function today(ctx){
- requireAdmin(ctx);const db=ctx.db,now=nowIso();
+ const admin=requireAdmin(ctx),db=ctx.db,now=nowIso();
+ // Titles in the organiser's language; the screen asks with ?lang= when the interface language differs from the account's.
+ const lang=['en','hr','ru'].find(l=>l===ctx.url.searchParams.get('lang'))||admin.language||'en';
  const waiting=db.query("SELECT count(*) n FROM submissions WHERE status='submitted'").get().n;
- const overdue=db.query(`SELECT a.user_id,a.project_id,t.id task_id,t.translations,t.due_at,u.display_name who,json_extract(p.draft,'$.name') team FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id LEFT JOIN users u ON u.id=a.user_id LEFT JOIN projects p ON p.id=a.project_id WHERE t.status='published' AND t.pick_mode<>'catalog' AND t.due_at IS NOT NULL AND t.due_at<? AND coalesce(s.status,'not_started') IN ${OPEN} ORDER BY t.due_at LIMIT 40`).all(now).map(r=>({taskId:r.task_id,title:taskTitle(r.translations),dueAt:r.due_at,who:r.who||r.team||'',userId:r.user_id||null,projectId:r.project_id||null}));
+ const overdue=db.query(`SELECT a.user_id,a.project_id,t.id task_id,t.translations,t.due_at,u.display_name who,json_extract(p.draft,'$.name') team FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id LEFT JOIN users u ON u.id=a.user_id LEFT JOIN projects p ON p.id=a.project_id WHERE t.status='published' AND t.pick_mode<>'catalog' AND t.due_at IS NOT NULL AND t.due_at<? AND coalesce(s.status,'not_started') IN ${OPEN} ORDER BY t.due_at LIMIT 40`).all(now).map(r=>({taskId:r.task_id,title:taskTitle(r.translations,lang),dueAt:r.due_at,who:r.who||r.team||'',userId:r.user_id||null,projectId:r.project_id||null}));
  const help=db.query("SELECT c.project_id,c.blocker,json_extract(p.draft,'$.name') name FROM checkins c JOIN projects p ON p.id=c.project_id WHERE c.needs_help=1 ORDER BY c.created DESC LIMIT 8").all().map(r=>({projectId:r.project_id,name:r.name,blocker:r.blocker}));
  const day=zagrebToday();
  return json({
@@ -52,8 +55,8 @@ function signals(db){
   const ids=memberIds(db,p.id),risk=riskSignals(db,p.id,ids);
   const seen=ids.map(id=>lastSeen(db,id)).filter(Boolean).sort().at(-1)||null;
   const waiting=db.query(`SELECT count(*) n FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE s.status='submitted' AND (a.project_id=? ${ids.length?`OR a.user_id IN (${ids.map(()=>'?').join(',')})`:''})`).get(p.id,...ids).n;
-  return {id:p.id,name:nameOf(p),level:risk.level,signals:risk.signals,percent:teamScore(db,p.id,ids).percent,members:ids.length,waiting,lastSeen:seen,inactive:!!ids.length&&(!seen||Date.parse(now)-Date.parse(seen)>7*86400000)};
- }).sort((a,b)=>({risk:0,watch:1,ok:2}[a.level]-{risk:0,watch:1,ok:2}[b.level])||a.percent-b.percent);
+  return {id:p.id,name:nameOf(p),level:risk.level,signals:risk.signals,percent:teamPercent(db,p.id,ids),members:ids.length,waiting,lastSeen:seen,inactive:!!ids.length&&(!seen||Date.parse(now)-Date.parse(seen)>7*86400000)};
+ }).sort((a,b)=>({risk:0,watch:1,ok:2}[a.level]-{risk:0,watch:1,ok:2}[b.level])||(a.percent??-1)-(b.percent??-1));
  return {teams};
 }
 /** Admin-only overlay for the office: never mixed into public office data. */
@@ -71,7 +74,7 @@ export function teamRecord(ctx,id){
  const held=db.query("SELECT count(*) n FROM lectures WHERE status='published' AND date<=?").get(zagrebToday()).n;
  const ledger=db.query(`SELECT beneficiary_type type,amount,reason,created FROM xp_ledger WHERE (beneficiary_type='project' AND beneficiary_id=?) ${ids.length?`OR (beneficiary_type='user' AND beneficiary_id IN (${marks}))`:''} ORDER BY id DESC LIMIT 30`).all(id,...ids);
  return json({
-  id,name:nameOf(p),status:p.status,score:teamScore(db,id,ids),wallet:wallet(db,id),risk:riskSignals(db,id,ids),streak:streak(db,id),teamXp:projectXp(db,id),pitch:pitchOf(db,id),lectures:held,
+  id,name:nameOf(p),status:p.status,score:{...teamScore(db,id,ids),percent:teamPercent(db,id,ids)},wallet:wallet(db,id),risk:riskSignals(db,id,ids),streak:streak(db,id),teamXp:projectXp(db,id),pitch:pitchOf(db,id),lectures:held,
   members:members.map(m=>({id:m.id,personId:m.person_id||null,name:m.display_name,role:m.role,status:m.status,lastSeen:lastSeen(db,m.id),xp:userXp(db,m.id),attended:db.query('SELECT count(*) n FROM attendance WHERE user_id=?').get(m.id).n,lastNudge:lastNudge(db,[m.id])})),
   noAccount:roster.filter(r=>!r.linked).map(r=>({id:r.id,name:r.display_name})),
   tasks:assignmentList(db,`(a.project_id=? ${ids.length?`OR a.user_id IN (${marks})`:''})`,id,...ids),
@@ -86,6 +89,7 @@ export function teamRecord(ctx,id){
 export function personRecord(ctx,id){
  requireAdmin(ctx);const db=ctx.db;
  const user=db.query('SELECT * FROM users WHERE id=?').get(id)||db.query('SELECT * FROM users WHERE person_id=?').get(id);
+ if(user&&onlyDemoPeople(ctx)&&!user.id.startsWith('demo-user-'))fail(404,'NOT_FOUND');
  if(!user){
   const person=db.query('SELECT id,display_name,kind FROM people WHERE id=?').get(id);if(!person)fail(404,'NOT_FOUND');
   const team=db.query("SELECT p.id,p.draft FROM team_people t JOIN projects p ON p.team_id=t.team_id WHERE t.person_id=?").get(id);
@@ -158,11 +162,11 @@ export function resetCode(ctx,userId){
 export function exportPeople(ctx){
  requireAdmin(ctx);const db=ctx.db;
  const lines=[['name','login','email','team','points','tasks_done','lectures','last_seen'].join(',')];
- for(const u of db.query("SELECT * FROM users WHERE status='active' AND role='member' ORDER BY display_name").all()){
+ for(const u of db.query("SELECT * FROM users WHERE status='active' AND role='member' AND (?=0 OR id LIKE 'demo-user-%') ORDER BY display_name").all(onlyDemoPeople(ctx)?1:0)){
   const team=db.query(`SELECT json_extract(p.draft,'$.name') n FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL AND m.role IN ${TEAM_ROLES}`).get(u.id)?.n||'';
   const done=db.query("SELECT count(*) n FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.user_id=? AND s.status='accepted'").get(u.id).n;
   const lectures=db.query('SELECT count(*) n FROM attendance WHERE user_id=?').get(u.id).n;
   lines.push([u.display_name,u.login,u.email||'',team,userXp(db,u.id),done,lectures,lastSeen(db,u.id)||''].map(csvCell).join(','));
  }
- return new Response('﻿'+lines.join('\r\n')+'\r\n',{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="bird-people-${nowIso().slice(0,10)}.csv"`,'Cache-Control':'no-store'}});
+ return new Response('﻿'+lines.join('\r\n')+'\r\n',{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="${brandSlug(ctx.config)}-people-${nowIso().slice(0,10)}.csv"`,'Cache-Control':'no-store'}});
 }

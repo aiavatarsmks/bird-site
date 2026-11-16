@@ -9,7 +9,7 @@ import {nowIso,backupDatabase} from './db.mjs';
 import {audit,requireAdmin,requireOwner} from './permissions.mjs';
 import {requireUser} from './auth.mjs';
 import {isoWeek} from './tasks.mjs';
-import {riskSignals,postToChat} from './cohort.mjs';
+import {riskSignals,postToChat,brandName,brandSlug} from './cohort.mjs';
 
 const FEEDBACK_DAYS=14;
 const zagrebToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Zagreb',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -82,7 +82,7 @@ export function digestText(d){
 export async function sendDigest(ctx){
  const admin=requireAdmin(ctx);
  if(!ctx.db.query("SELECT 1 FROM settings WHERE key='chat_webhook' AND value<>''").get())fail(409,'INVALID_STATE');
- await postToChat(ctx.db,'BIRD weekly digest',digestText(buildDigest(ctx.db)),ctx.config.publicOrigin||new URL(ctx.request.url).origin);
+ await postToChat(ctx.db,brandName(ctx.config)+' · weekly digest',digestText(buildDigest(ctx.db)),ctx.config.publicOrigin||new URL(ctx.request.url).origin);
  audit(ctx.db,admin.id,'digest.send','settings','chat_webhook',{});
  return json({ok:true});
 }
@@ -94,7 +94,7 @@ export function downloadBackup(ctx){
  ctx.db.query('VACUUM INTO ?').run(file);
  let bytes;try{bytes=readFileSync(file);}finally{try{unlinkSync(file);}catch{}}
  audit(ctx.db,owner.id,'backup.download','database','profiles',{bytes:bytes.length});
- return new Response(bytes,{headers:{'Content-Type':'application/vnd.sqlite3','Content-Disposition':`attachment; filename="bird-${zagrebToday()}.sqlite"`,'Cache-Control':'no-store'}});
+ return new Response(bytes,{headers:{'Content-Type':'application/vnd.sqlite3','Content-Disposition':`attachment; filename="${brandSlug(ctx.config)}-${zagrebToday()}.sqlite"`,'Cache-Control':'no-store'}});
 }
 
 /** Daily copy on the data volume, kept with the other rotated backups. */

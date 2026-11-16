@@ -9,6 +9,8 @@ const ENTRIES={manager:'demo-user-manager',team:'demo-user-agrobit-1'};
 export const isDemo=db=>Boolean(db.query("SELECT 1 FROM settings WHERE key='demo_filled'").get());
 // Every account the demo filler made has an id that starts like this; real accounts never do.
 export const isDemoUser=user=>Boolean(user?.id?.startsWith('demo-user-'));
+// A visitor of the public demo sees only the invented cohort: the real accounts that run the workspace stay out of every list.
+export const onlyDemoPeople=ctx=>isDemoUser(ctx.user)&&isDemo(ctx.db);
 
 export function status(ctx){
  const demo=isDemo(ctx.db);

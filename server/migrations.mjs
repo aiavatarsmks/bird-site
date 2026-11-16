@@ -239,5 +239,9 @@ CREATE INDEX IF NOT EXISTS meeting_requests_project ON meeting_requests(project_
  {id:21,name:'waiting-messages',sql:`
 CREATE TABLE IF NOT EXISTS waiting_messages(id TEXT PRIMARY KEY,sender_id TEXT NOT NULL REFERENCES users(id),person_id TEXT NOT NULL REFERENCES people(id),body TEXT NOT NULL,file_id TEXT REFERENCES files(id),created TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS waiting_messages_person ON waiting_messages(person_id,created);
+`}, // Pilot requests from the public landing of a demo workspace; the platform owner reads them in Admin.
+ {id:22,name:'pilot-requests',sql:`
+CREATE TABLE IF NOT EXISTS pilot_requests(id TEXT PRIMARY KEY,name TEXT NOT NULL,organisation TEXT NOT NULL,email TEXT NOT NULL,phone TEXT NOT NULL DEFAULT '',teams TEXT NOT NULL DEFAULT '',message TEXT NOT NULL DEFAULT '',language TEXT NOT NULL DEFAULT 'hr',consent_at TEXT NOT NULL,created TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS pilot_requests_created ON pilot_requests(created);
 `},
 ];

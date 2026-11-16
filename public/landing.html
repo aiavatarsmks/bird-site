@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="hr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f5f0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='13' width='5' height='8' fill='%23b5371a'/%3E%3Crect x='10' y='8' width='5' height='13' fill='%239a6200'/%3E%3Crect x='17' y='3' width='5' height='18' fill='%232b7a4b'/%3E%3C/svg%3E">
 <meta name="product-name" content="{{product}}">
 <title>{{product}} · znate što rade svi vaši timovi</title>
 <meta name="description" content="Platforma za inkubatore i akceleratore: timovi skupljaju bodove za stvarni napredak, a voditelj programa na jednoj ploči vidi tko napreduje, tko je zapeo i kome treba pomoć. Demo bez registracije.">
@@ -11,8 +12,10 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preload" as="image" href="assets/landing-office.webp" type="image/webp">
 <link rel="stylesheet" href="assets/landing.css">
-<script src="assets/landing-world.js" defer></script><script src="assets/incubators-hr.js" defer></script><script src="assets/landing.js" defer></script>
-<meta name="bird-release" content="bird-20d727c25e8a0438"></head><body>
+<script>/* Before first paint: hide what landing.js reveals, and the hero until its intro starts. If landing.js has not
+   started within 4 s, show everything as it is. Reduced motion: no hidden hero. */(()=>{const h=document.documentElement;h.classList.add('js');if(!matchMedia('(prefers-reduced-motion: reduce)').matches)h.classList.add('mo-intro');setTimeout(()=>{h.classList.remove('mo-intro');if(!h.classList.contains('js-ok'))h.classList.remove('js');},4000);})();</script>
+<script src="assets/anime.js" defer></script><script src="assets/bird-motion.js" defer></script><script src="assets/landing-world.js" defer></script><script src="assets/incubators-hr.js" defer></script><script src="assets/landing.js" defer></script>
+<meta name="bird-release" content="bird-b70813f1996579a0"></head><body>
 <a class="skip" href="#main" data-t="skip">Preskoči na sadržaj</a>
 <header class="top" id="top"><div class="wrap top-in">
  <a class="logo" href="#top" aria-label="{{product}}"><span class="logo-mark" aria-hidden="true"><i></i><i></i><i></i></span><b data-product>{{product}}</b></a>
@@ -66,7 +69,7 @@
   <div class="pain-copy" data-reveal>
    <p class="kicker"><b>01</b><span data-t="p1Kicker">Upravljanje</span></p>
    <h3 data-t="p1Title">Status svakog tima na jednom ekranu.</h3>
-   <p class="pain-q" data-t="p1Pain">Danas voditelj obilazi timove, zove ih i skuplja tablice. Da je tim zapeo, sazna kad je već kasno.</p>
+   <p class="pain-q" data-t="p1Pain">Danas voditelj obilazi timove, zove ih i skuplja tablice. Da je tim zapeo, sazna tek kad je već kasno.</p>
    <ul class="ticks">
     <li data-t="p1a">Napredak svakog tima uz prosjek generacije</li>
     <li data-t="p1b">Signali rizika: zadaci koji kasne, propuštena predavanja, tko se dugo nije javio</li>
@@ -98,7 +101,7 @@
     <p class="gap-pulse" aria-hidden="true" data-t="gapPulse">signal svaki tjedan</p>
    </div>
    <div class="gap-axis" aria-hidden="true"><span data-t="gapW1">1. tjedan</span><span class="gap-axis-cut" data-t="gapLast">zadnje predavanje</span><span data-t="gapW52">52. tjedan</span></div>
-   <figcaption id="gap-cap"><span data-t="gapCap">Tjedna provjera, zadaci i bodovi daju signal i kad predavanja prestanu.</span> <small data-t="gapNote">Ilustracija, ne mjerenje: koliko se timova zaista javlja, mjeri pilot.</small></figcaption>
+   <figcaption id="gap-cap"><span data-t="gapCap">Tjedno javljanje, zadaci i bodovi daju signal i kad predavanja prestanu.</span> <small data-t="gapNote">Ilustracija, ne mjerenje: koliko se timova zaista javlja, mjeri pilot.</small></figcaption>
   </figure>
   <div class="pain-foot" data-reveal><a class="btn" href="#contact" data-t="ctaPilot">Dogovori pilot</a></div>
  </article>
@@ -107,9 +110,9 @@
   <div class="pain-copy" data-reveal>
    <p class="kicker"><b>03</b><span data-t="p3Kicker">Za timove</span></p>
    <h3 data-t="p3Title">Za timove je to igra, a ne papirologija.</h3>
-   <p class="pain-q" data-t="p3Pain">Izvještaj nitko ne voli pisati. Zato timovi ne pišu izvještaje — rješavaju zadatke i skupljaju bodove.</p>
+   <p class="pain-q" data-t="p3Pain">Izvješća nitko ne voli pisati. Zato timovi ne pišu izvješća — rješavaju zadatke i skupljaju bodove.</p>
    <ul class="chips" aria-label="Igra" data-t-aria="p3Chips">
-    <li><b data-t="chipPoints">Bodovi</b><span data-t="chipPointsT">za zadatke, dolaske i tjednu provjeru</span></li>
+    <li><b data-t="chipPoints">Bodovi</b><span data-t="chipPointsT">za zadatke, dolaske i tjedno javljanje</span></li>
     <li><b data-t="chipLevels">Razine</b><span data-t="chipLevelsT">i postignuća</span></li>
     <li><b data-t="chipStreak">Niz</b><span data-t="chipStreakT">tjedana zaredom</span></li>
     <li class="is-key"><b data-t="chipMentor">30 bodova</b><span data-t="chipMentorT">= sastanak s mentorom</span></li>
@@ -141,8 +144,8 @@
  <div class="sec-head" data-reveal><p class="eyebrow" data-t="howEyebrow">Kako radi</p><h2 id="how-title" data-t="howTitle">Tri koraka do pune slike.</h2></div>
  <ol class="steps">
   <li data-reveal><span class="step-n">1</span><h3 data-t="s1Title">Postavimo vaš prostor</h3><p data-t="s1Text">Vaše ime, vaši timovi, vaš raspored predavanja. Zasebna baza samo za vaš inkubator.</p></li>
-  <li data-reveal style="--i:1"><span class="step-n">2</span><h3 data-t="s2Title">Timovi rade i skupljaju bodove</h3><p data-t="s2Text">Zadaci s rokovima, tjedna provjera, sastanci s mentorima. Svaki korak donosi bodove.</p></li>
-  <li data-reveal style="--i:2"><span class="step-n">3</span><h3 data-t="s3Title">Vi vidite sve na jednoj ploči</h3><p data-t="s3Text">Tko napreduje, tko je zapeo, tko traži pomoć. Podatke izvezete u CSV za izvještaj.</p></li>
+  <li data-reveal style="--i:1"><span class="step-n">2</span><h3 data-t="s2Title">Timovi rade i skupljaju bodove</h3><p data-t="s2Text">Zadaci s rokovima, tjedno javljanje, sastanci s mentorima. Svaki korak donosi bodove.</p></li>
+  <li data-reveal style="--i:2"><span class="step-n">3</span><h3 data-t="s3Title">Vi vidite sve na jednoj ploči</h3><p data-t="s3Text">Tko napreduje, tko je zapeo, tko traži pomoć. Podatke izvezete u CSV za izvješće.</p></li>
  </ol>
  <div class="how-cta" data-reveal><a class="btn btn-big" href="/demo"><span data-t="ctaDemo">Otvori demo</span> <span aria-hidden="true">→</span></a></div>
 </div></section>
@@ -179,7 +182,7 @@
   <details data-reveal style="--i:1"><summary data-t="q2">Radi li na hrvatskom?</summary><p data-t="a2">Da. Sučelje je na hrvatskom, engleskom i ruskom, a svaki korisnik bira svoj jezik.</p></details>
   <details data-reveal style="--i:2"><summary data-t="q3">Moraju li timovi to koristiti?</summary><p data-t="a3">Ne moraju — i upravo to pilot mjeri. Prije početka zajedno zapišemo kriterije uspjeha, na primjer koliki se udio timova javlja svaki tjedan i koliko vremena trošite na prikupljanje statusa.</p></details>
   <details data-reveal style="--i:3"><summary data-t="q4">Prijave već imamo u Google Formsu.</summary><p data-t="a4">Odgovore iz Google Formsa možemo uvesti, pa timovi ne upisuju sve ispočetka.</p></details>
-  <details data-reveal style="--i:4"><summary data-t="q5">Što je u demu stvarno?</summary><p data-t="a5">Platforma je stvarna. Timovi, osobe i brojke u demu su izmišljeni, a ništa što u njemu napravite se ne sprema.</p></details>
+  <details data-reveal style="--i:4"><summary data-t="q5">Što je u demu stvarno?</summary><p data-t="a5">Platforma je stvarna. Timovi, osobe i brojke u demu su izmišljeni, a ništa što u njemu napravite neće se spremiti.</p></details>
  </div>
 </div></section>
 
@@ -187,12 +190,62 @@
 <section class="act" id="contact" aria-labelledby="act-title"><div class="wrap act-grid">
  <div class="act-copy" data-reveal>
   <p class="eyebrow" data-t="actEyebrow">Sljedeći korak</p>
-  <h2 id="act-title" data-t="actTitle">Pogledajte sami. Treba vam dvije minute.</h2>
+  <h2 id="act-title" data-t="actTitle">Pogledajte sami. Trebaju vam samo dvije minute.</h2>
   <a class="btn btn-big btn-paper" href="/demo"><span data-t="ctaDemo">Otvori demo</span> <span aria-hidden="true">→</span></a>
  </div>
  <div class="act-card" data-reveal style="--i:1">
-  <h3 data-t="pilotTitle">Dogovori pilot</h3>
+  <h3 id="pilot-title" data-t="pilotTitle">Dogovori pilot</h3>
   <p data-t="pilotText">Pilot traje jedan ciklus programa. Postavimo vaš prostor s vašim timovima, a kriterije uspjeha zapišemo prije početka.</p>
+  <!-- Pilot request: landing.js sends it to /api/pilot-request; errors appear under each field. -->
+  <form class="pilot" data-pilot action="/api/pilot-request" method="post" novalidate aria-labelledby="pilot-title">
+   <p class="pf-legend"><span aria-hidden="true">*</span> <span data-t="pfRequired">obavezno polje</span></p>
+   <div class="pf">
+    <label for="pf-name"><span data-t="pfName">Ime i prezime</span>&nbsp;<span class="pf-req" aria-hidden="true">*</span></label>
+    <input id="pf-name" name="name" autocomplete="name" required minlength="2" maxlength="120" enterkeyhint="next" data-error="pf-name-err">
+    <p class="pf-err" id="pf-name-err" hidden></p>
+   </div>
+   <div class="pf">
+    <label for="pf-org"><span data-t="pfOrg">Inkubator ili akcelerator</span>&nbsp;<span class="pf-req" aria-hidden="true">*</span></label>
+    <input id="pf-org" name="organisation" autocomplete="organization" required minlength="2" maxlength="160" enterkeyhint="next" data-error="pf-org-err">
+    <p class="pf-err" id="pf-org-err" hidden></p>
+   </div>
+   <div class="pf">
+    <label for="pf-email"><span data-t="pfEmail">E-pošta</span>&nbsp;<span class="pf-req" aria-hidden="true">*</span></label>
+    <input id="pf-email" name="email" type="email" autocomplete="email" required maxlength="200" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" data-error="pf-email-err">
+    <p class="pf-err" id="pf-email-err" hidden></p>
+   </div>
+   <div class="pf">
+    <label for="pf-phone"><span data-t="pfPhone">Telefon</span> <span class="pf-opt" data-t="pfOptional">(neobavezno)</span></label>
+    <input id="pf-phone" name="phone" type="tel" autocomplete="tel" maxlength="30" enterkeyhint="next" data-error="pf-phone-err">
+    <p class="pf-err" id="pf-phone-err" hidden></p>
+   </div>
+   <div class="pf">
+    <label for="pf-teams"><span data-t="pfTeams">Timova u jednom ciklusu</span> <span class="pf-opt" data-t="pfOptional">(neobavezno)</span></label>
+    <select id="pf-teams" name="teams">
+     <option value="" data-t="pfTeamsPick">Odaberite</option>
+     <option value="1-5">1–5</option><option value="6-10">6–10</option><option value="11-20">11–20</option><option value="21-50">21–50</option>
+     <option value="50+" data-t="pfTeams50">više od 50</option>
+    </select>
+   </div>
+   <div class="pf">
+    <label for="pf-message"><span data-t="pfMessage">Poruka</span> <span class="pf-opt" data-t="pfOptional">(neobavezno)</span></label>
+    <textarea id="pf-message" name="message" rows="3" maxlength="2000"></textarea>
+   </div>
+   <div class="pf-hp" aria-hidden="true"><label for="pf-website">Website</label><input id="pf-website" name="website" tabindex="-1" autocomplete="off"></div>
+   <div class="pf pf-check">
+    <input id="pf-consent" name="consent" type="checkbox" required data-error="pf-consent-err">
+    <label for="pf-consent"><span data-t="pfConsent">Slažem se da me kontaktirate u vezi s pilotom.</span>&nbsp;<span class="pf-req" aria-hidden="true">*</span></label>
+    <p class="pf-err" id="pf-consent-err" hidden></p>
+   </div>
+   <p class="pf-privacy" data-t="pfPrivacy">Podatke koristimo samo za dogovor o pilotu. Ne dijelimo ih i brišemo ih na vaš zahtjev.</p>
+   <p class="pf-fail" data-pilot-fail role="alert" hidden></p>
+   <button class="btn btn-big" type="submit"><span data-t="pfSend">Pošalji upit</span> <span aria-hidden="true">→</span></button>
+  </form>
+  <div class="pilot-done" data-pilot-done tabindex="-1" hidden>
+   <p class="pilot-done-title" data-t="pfDoneTitle">Hvala, upit je stigao.</p>
+   <p><span data-t="pfDoneText">Javit ćemo vam se e-poštom da dogovorimo kratak razgovor:</span> <strong data-pilot-email></strong></p>
+   <a class="link-cta" href="/demo"><span data-t="ctaDemo">Otvori demo</span> <span aria-hidden="true">→</span></a>
+  </div>
   <div data-contact></div>
  </div>
 </div></section>

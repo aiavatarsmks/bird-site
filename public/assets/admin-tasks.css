@@ -364,3 +364,7 @@ details[open]>summary.tk-group::after{content:"−"}
  .tk-pts small,.tk-who i{font-size:10.5px}
  .acc .tk-filters button,.acc .tk-filters a{min-height:44px}
 }
+/* Reduced motion: the first-visit entrance stays as a short fade, without movement or growing bars. */
+@media(prefers-reduced-motion:reduce){
+ .tk-first .tk-row,.tk-first .tk-kpi{animation:mo-fade .3s ease both!important}
+}

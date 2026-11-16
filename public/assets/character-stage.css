@@ -4,7 +4,8 @@
 .cs-char:focus-visible figcaption{outline:2px solid var(--ink);outline-offset:2px}
 .cs-mover{position:relative;transition:transform .1s linear;z-index:1}
 .cs-flip{position:relative;width:var(--w);height:var(--h)}
-.cs-lg{--h:176px}.cs-md{--h:120px}.cs-sm{--h:84px}
+.cs-xl{--h:clamp(190px,30vh,280px)}.cs-lg{--h:176px}.cs-md{--h:120px}.cs-sm{--h:84px}
+.cs-char[role=button]{cursor:pointer}
 .cs-stage{--w:calc(var(--h)*384/352)}
 .cs-body{position:absolute;inset:0;background-repeat:no-repeat;background-size:300% 100%;background-position:0 0;image-rendering:pixelated;transform-origin:50% 100%}
 .cs-idle{animation:cs-breathe 3.2s ease-in-out infinite var(--breath,0s),cs-pose 11s step-end infinite var(--beat,0s)}
@@ -18,11 +19,10 @@
 .cs-fallback{display:none;position:absolute;inset:auto 0 0;margin:auto;width:60%;aspect-ratio:1;align-items:center;justify-content:center;background:var(--ink);color:#fff;font-weight:700;font-size:calc(var(--h)*.18)}
 .cs-missing .cs-body{display:none}.cs-missing .cs-fallback{display:flex}
 .cs-char:hover .cs-mover{animation:cs-hop .45s ease-out}
-.cs-spin .cs-flip{animation:cs-spin .7s ease-in-out}
+.cs-hop .cs-mover{animation:cs-hop .45s ease-out}
 .cs-char{animation:cs-enter .5s ease-out both;animation-delay:calc(var(--i)*90ms)}
 @keyframes cs-breathe{0%,100%{transform:scale(1,1)}50%{transform:scale(1.012,1.035)}}
 @keyframes cs-pose{0%{background-position:0 0}64%{background-position:100% 0}72%{background-position:0 0}86%{background-position:50% 0}94%{background-position:0 0}}
 @keyframes cs-hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-14px)}70%{transform:translateY(0)}85%{transform:translateY(-4px)}}
-@keyframes cs-spin{0%{transform:scaleX(1)}25%{transform:scaleX(-1)}50%{transform:scaleX(1)}75%{transform:scaleX(-1)}100%{transform:scaleX(1)}}
 @keyframes cs-enter{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.cs-idle,.cs-char,.cs-char:hover .cs-mover,.cs-spin .cs-flip{animation:none}}
+@media (prefers-reduced-motion:reduce){.cs-idle,.cs-char,.cs-char:hover .cs-mover,.cs-hop .cs-mover{animation:none}}

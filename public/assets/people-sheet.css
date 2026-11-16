@@ -1,0 +1,166 @@
+/* People sheet (people-sheet.js): a person or a team standing full height, the card below.
+   Used by the office panel (#office-card) and by the drawer on the account and admin pages.
+   Tokens from style.css and account.css; sharp boxes, rings stay round. */
+.ps{--team:var(--ink);display:flex;flex-direction:column;min-height:100%;background:var(--white,#fffefa);color:var(--ink);font-variant-numeric:tabular-nums;border-top:5px solid var(--team)}
+.ps-top{position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 8px 8px 16px;background:var(--white,#fffefa);border-bottom:1px solid var(--line)}
+.ps-crumb{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:6px 12px;border:1px solid var(--line);border-radius:0;background:#fff;color:var(--ink);font:600 13px/1.2 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer;max-width:calc(100% - 56px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:transform .12s var(--ease),box-shadow .12s var(--ease),border-color .15s}
+.ps-crumb i{flex:none;width:10px;height:10px;background:var(--team)}
+.ps-crumb:not(.is-here):hover{transform:translate(-2px,-2px);box-shadow:2px 2px 0 var(--rise);border-color:var(--ink)}
+.ps-crumb.is-here{cursor:default;border-color:transparent;padding-left:0;text-transform:uppercase;letter-spacing:1px;font-size:11px;color:var(--muted)}
+.ps-close{flex:none;width:44px;height:44px;border:1px solid var(--line);border-radius:0;background:#fff;color:var(--ink);font-size:24px;line-height:1;cursor:pointer}
+.ps-close:hover{border-color:var(--ink)}
+.ps-close:focus-visible,.ps-crumb:focus-visible,.ps button:focus-visible,.ps a:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+/* The stage: a floor, a soft shadow, and the characters as tall as the panel allows. */
+.ps-stage{position:relative;container-type:inline-size;background:linear-gradient(to bottom,#f3efe5 0 78%,#e6e1d3 78% 100%);border-bottom:1px solid var(--line);overflow:hidden}
+.ps-stage::after{content:"";position:absolute;left:0;right:0;bottom:22%;height:1px;background:rgba(36,42,38,.12)}
+.ps-stage .cs-stage{background:none;padding:22px 12px 14px;gap:6px 10px;z-index:1}
+.ps-stage .cs-stage.cs-fit{--h:min(220px,calc((100cqw - 24px - 10px * (var(--n) - 1)) / var(--n) * .9));flex-wrap:wrap}
+.ps-stage .cs-stage.cs-fit .cs-char{flex:0 0 auto}
+.ps-stage figcaption{font-size:13px;font-weight:650;padding:2px 6px;background:var(--white,#fffefa);border:1px solid var(--line);max-width:calc(var(--w) + 10px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ps-stage .cs-char[role=button]:hover figcaption{border-color:var(--ink);box-shadow:2px 2px 0 var(--rise)}
+.ps-stage .cs-char[role=button]:focus-visible figcaption{outline:2px solid var(--ink);outline-offset:2px}
+
+.ps-id{padding:16px 18px 6px}
+.ps-id h2{margin:0;font-family:Georgia,"Times New Roman",serif;font-weight:500;font-size:30px;line-height:1.1;letter-spacing:-.5px}
+.ps-role{margin:6px 0 0;font-size:14px;font-weight:600;color:var(--ink-soft)}
+.ps-desc{margin:8px 0 0;font-size:14px;line-height:1.55;color:var(--muted)}
+.ps-away{margin:6px 0 0;font-size:12.5px;color:var(--muted)}
+.ps-body{padding:6px 18px 22px;display:grid;gap:14px}
+.ps-wait{margin:8px 0;color:var(--muted);font-size:13px}
+.ps-actions:empty{display:none}
+.ps-actions{display:flex;flex-wrap:wrap;gap:8px}
+
+.ps-card{position:relative;display:grid;gap:12px;padding:14px;border:1px solid var(--line);background:#fff}
+.ps-mgmt{border-color:var(--ink);box-shadow:3px 3px 0 var(--rise)}
+.ps-tag{position:absolute;top:-9px;left:10px;padding:1px 7px;background:var(--ink);color:#fff;font-size:10px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase}
+.ps-hero{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}
+.ps-ring{--c:var(--team);width:92px;height:92px}
+.ps-ring b{font-size:24px;display:grid;justify-items:center;line-height:1}
+.ps-ring b small{display:block;font-size:9.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:0 0 2px}
+.ps-mgmt .ps-ring{--c:var(--ok)}
+.ps-facts{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:10px 14px}
+.ps-facts>div{min-width:0}
+.ps-facts dt{font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);line-height:1.3}
+.ps-facts dt b{color:var(--ink);font-variant-numeric:tabular-nums}
+.ps-facts dd{margin:3px 0 0;font-weight:650;font-size:14px;overflow-wrap:anywhere}
+.ps-facts dd.ui-num{font-size:30px;letter-spacing:-1px}
+.ps-facts .ps-wide{grid-column:1/-1}
+.ps-facts .ps-wide dd{display:grid;gap:6px}
+.ps-sub{display:block;margin-top:4px;font-size:12px;color:var(--muted)}
+.ps-flame{display:inline-flex;align-items:center;gap:4px}
+.ps-flame svg{width:18px;height:18px;color:var(--accent)}
+.ps-late{color:var(--risk)}
+.ps-units>i{width:10px;height:10px;background:var(--track)}
+.ps-signal{margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.ps-sig{font-size:12px;padding:2px 7px;border:1px solid var(--line);background:var(--paper)}
+.ps-next{display:grid;gap:3px;padding:10px 12px;border-left:4px solid var(--info);background:var(--info-soft)}
+.ps-next b{font-size:15px;line-height:1.35}
+.ps-next small{font-size:12px;color:var(--ink-soft)}
+.ps-next.is-late{border-color:var(--risk);background:var(--risk-soft)}
+.ps-next.is-calm{border-color:var(--ok);background:var(--ok-soft)}
+.ps-seen{margin:0;font-size:13px;color:var(--ink-soft)}
+.ps-seen.is-idle b{color:var(--watch)}
+.ps-note{margin:0;font-size:13px;line-height:1.55;color:var(--muted)}
+.ps-links{display:flex;flex-wrap:wrap;gap:8px}
+.ps .acc-primary,.ps .acc-secondary{min-height:40px;padding:8px 13px;font-size:13.5px;font-weight:600}
+.ps .acc-primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.ps .acc-primary:hover,.ps .acc-secondary:hover{transform:translate(-2px,-2px);box-shadow:2px 2px 0 var(--rise);border-color:var(--ink)}
+.ps-more{display:grid;gap:10px}
+.ps-h{margin:6px 0 0;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted)}
+.ps-h span{color:var(--ink)}
+.ps-list{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.ps-list li{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.ps-list li small{color:var(--muted);white-space:nowrap}
+.ps-list li.is-late small{color:var(--risk);font-weight:650}
+.ps-people li{padding:0}
+.ps-people button{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:9px 4px;cursor:pointer}
+.ps-people button:hover span{text-decoration:underline}
+.ps-people button:focus-visible{outline:2px solid var(--ink)}
+.ps-nudge{display:grid;gap:6px}
+.ps-nudge textarea{width:100%;box-sizing:border-box;border:1px solid #b9bcb1;border-radius:0;padding:8px;font:inherit;font-size:14px;resize:vertical}
+.ps-nudge button{justify-self:start}
+.ps .office-secondary.office-dm{display:inline-flex;align-items:center;min-height:40px;padding:8px 13px;border:1px solid var(--ink);border-radius:0;background:#fff;color:var(--ink);font-weight:600;font-size:13.5px;text-decoration:none}
+
+/* First showing only (people-sheet.js adds .ps-anim): rings and bars fill, chips pop, the card rises. */
+@keyframes ps-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes ps-pop{0%{opacity:0;transform:scale(.5)}70%{transform:scale(1.12)}100%{opacity:1;transform:none}}
+@keyframes ps-in-right{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+@keyframes ps-in-up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.ps-anim .ps-card,.ps-anim .ps-more{animation:ps-rise .5s var(--ease) backwards .12s}
+.ps-anim .ps-more{animation-delay:.24s}
+.ps-anim .ring-v{animation:ui-ring 1.2s var(--ease) backwards .25s}
+.ps-anim .ui-bar>i{animation:ui-fill .9s var(--ease) backwards .35s}
+.ps-anim .ps-units>i{animation:ps-pop .35s var(--ease) backwards;animation-delay:calc(.45s + var(--j,0)*40ms)}
+.ps-anim .ui-dot,.ps-anim .ps-sig,.ps-anim .ps-tag{animation:ps-pop .4s var(--ease) backwards .5s}
+
+/* Drawer on the account and admin pages; a bottom sheet on phones. */
+.ps-drawer{position:fixed;inset:0;z-index:2100;display:flex;justify-content:flex-end}
+.ps-scrim{position:absolute;inset:0;background:rgba(36,42,38,.32)}
+.ps-panel{position:relative;width:min(440px,100%);height:100%;overflow-y:auto;overscroll-behavior:contain;background:var(--white,#fffefa);border-left:2px solid var(--ink);box-shadow:-6px 0 0 rgba(36,42,38,.18);animation:ps-in-right .28s var(--ease)}
+.ps-panel:focus{outline:none}
+.ps-drawer.is-closing .ps-panel{animation:ps-in-right .2s var(--ease) reverse forwards}
+.ps-drawer.is-closing .ps-scrim{opacity:0;transition:opacity .2s}
+html.ps-locked{overflow:hidden}
+
+/* Office panel: full height on the right of the map. #bird-office wins over office.css's many layers. */
+#bird-office .office-grid{display:block;position:relative}
+#bird-office .office-side{display:none}
+#bird-office .office-side.has-selection.ps-host{display:block;position:absolute;z-index:40;top:0;right:0;bottom:0;left:auto;width:clamp(330px,30vw,430px);max-width:100%;max-height:none;height:auto;margin:0;padding:0;overflow-y:auto;overscroll-behavior:contain;border:0;border-left:2px solid var(--ink);border-radius:0;box-shadow:-6px 0 0 rgba(36,42,38,.18);background:var(--white,#fffefa);animation:ps-in-right .28s var(--ease)}
+#bird-office .office-side.ps-host.is-quiet{animation:none}
+#bird-office .office-side.ps-host .ps{min-height:100%}
+#bird-office .office-grid:has(.office-side.has-selection) .office-minimap{display:none}
+#bird-office .office-grid:has(.office-side.ps-host) .office-quest{right:calc(clamp(330px,30vw,430px) + 12px);left:auto;transform:none}
+@media(min-width:721px){
+ .office-page #bird-office .office-grid:has(.office-side.ps-host) .office-toolbar{right:calc(clamp(330px,30vw,430px) + 12px)}
+ .office-page #bird-office .office-grid:has(.office-side.ps-host) .office-intro{display:none}
+}
+
+@media(max-width:720px){
+ .ps-drawer{align-items:flex-end}
+ .ps-panel{width:100%;height:auto;max-height:86dvh;border-left:0;border-top:2px solid var(--ink);box-shadow:0 -6px 0 rgba(36,42,38,.18);animation:ps-in-up .3s var(--ease)}
+ .ps-drawer.is-closing .ps-panel{animation:ps-in-up .2s var(--ease) reverse forwards}
+ /* In the office the panel becomes a bottom sheet over the map. */
+ #bird-office .office-side.has-selection.ps-host{position:fixed;z-index:1600;top:auto;left:0;right:0;bottom:0;width:100%;max-height:78dvh;border-left:0;border-top:2px solid var(--ink);box-shadow:0 -6px 0 rgba(36,42,38,.18);animation:ps-in-up .3s var(--ease)}
+ #bird-office .office-side.ps-host .ps{min-height:0}
+ #bird-office .office-grid:has(.office-side.ps-host) .office-quest{right:auto;left:50%;transform:translateX(-50%)}
+ .ps-top::before{content:"";position:absolute;left:50%;top:3px;width:40px;height:4px;margin-left:-20px;background:var(--line)}
+ .cs-xl{--h:min(200px,26dvh)}
+ .ps-stage .cs-stage.cs-fit{--h:min(160px,calc((100cqw - 24px - 10px * (var(--n) - 1)) / var(--n) * .9))}
+ .ps-id h2{font-size:25px}
+ .ps-ring{width:80px;height:80px}
+}
+@media(prefers-reduced-motion:reduce){
+ .ps-panel,.ps-drawer.is-closing .ps-panel,#bird-office .office-side.ps-host{animation:none!important}
+ .ps-anim *{animation:none!important}
+}
+
+/* Openers on the account and admin pages: people and teams open the sheet. */
+.acc button.dash-people{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;cursor:pointer;min-height:36px;padding:2px;border:1px solid transparent}
+.acc button.dash-people:hover{border-color:var(--ink);box-shadow:2px 2px 0 var(--rise);transform:translate(-1px,-1px)}
+.acc button.dash-people:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.rec-hero{display:grid;justify-items:center;gap:8px}
+.acc button.rec-team-chip{min-height:36px;padding:6px 12px;font-size:13px;font-weight:650}
+.acc button.m-rank-open{all:unset;cursor:pointer;font:inherit;font-weight:inherit;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.acc button.m-rank-open:hover{text-decoration-color:var(--ink)}
+.acc button.m-rank-open:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+/* Rings fill everywhere a view opens for the first time, not only on the admin dashboard. */
+.m-anim .ring-v,.tk-first .ring-v,.pg.is-first .ring-v{animation:ui-ring 1.2s var(--ease) backwards .2s}
+.is-io .is-in .acc-light,.is-io .is-in .ui-chip{animation:ps-pop .4s var(--ease) backwards .35s}
+@media(prefers-reduced-motion:reduce){.m-anim .ring-v,.tk-first .ring-v,.pg.is-first .ring-v,.is-io .is-in .acc-light,.is-io .is-in .ui-chip{animation:none}}
+
+/* Drawer motion: the scrim fades in with the panel, the panel follows a drawer curve, the phone sheet rises from the bottom
+   edge. Reduced motion keeps only the fade. */
+@keyframes ps-scrim-in{from{opacity:0}}
+@keyframes mo-fade{from{opacity:0}}
+@keyframes ps-sheet-up{from{transform:translateY(100%)}to{transform:none}}
+.ps-scrim{animation:ps-scrim-in .28s ease}
+.ps-panel{animation:ps-in-right .34s cubic-bezier(.32,.72,0,1)}
+@media(max-width:720px){
+ .ps-panel{animation:ps-sheet-up .4s cubic-bezier(.32,.72,0,1)}
+ .ps-drawer.is-closing .ps-panel{animation:ps-sheet-up .22s cubic-bezier(.32,.72,0,1) reverse forwards}
+}
+@media(prefers-reduced-motion:reduce){
+ .ps-panel,.ps-scrim{animation:mo-fade .2s ease both!important}
+ .ps-drawer.is-closing .ps-panel{animation:none!important;opacity:0}
+}

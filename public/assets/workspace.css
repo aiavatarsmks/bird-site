@@ -80,27 +80,40 @@
 @media (max-width:560px){.imap-cityname.is-alt{display:inline}.imap-cityname.is-boxed,.imap-org,.imap-callout,.imap-leader,.imap-place.is-minor .imap-cityname,.imap-country,.imap-seaname{display:none}.imap-cityname{font-size:22px;stroke-width:5px}.imap-dot{stroke-width:1.2}.imap-place .imap-dot{transform:scale(1.7)}.imap-place.is-hot .imap-dot,.imap-pin:hover .imap-dot{transform:scale(2)}}
 .office-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .office-wrap .office-intro>.office-primary{display:none}
-/* The living office on top of the demo manager's dashboard. */
-.demo-office-hero{margin:20px 0 4px;overflow:hidden}
-.demo-office-hero .incubator{padding:0}
-.demo-office-hero .office-intro{display:none}
-.demo-office-hero .office-viewport-wrap{height:min(58vh,540px)}
 .demo-switch{display:inline-flex;align-items:center;gap:6px}
 .demo-switch button{border:1px solid var(--ink);background:transparent;padding:4px 10px;font:inherit;cursor:pointer;border-radius:0}
 .demo-switch button[aria-pressed="true"]{background:var(--ink);color:#fff}
-.demo-office-hero .office-area-nav,.demo-office-hero .office-placement-note{display:none}
-.demo-office-hero .office-grid{gap:0;border:1px solid var(--ink)}
-.demo-office-hero .office-board{border:0}
-.demo-office-hero .office-side{border:0;border-left:1px solid var(--ink)}
 /* Phones: the demo bar is one short note plus a two-part switch that fills the row; the office hero leaves room for the dashboard below. */
 @media (max-width:600px){
  .demo-bar{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;padding:8px 16px;font-size:12.5px;text-align:center}
  .demo-switch{display:flex;gap:0;font-size:0}
  .demo-switch button{flex:1 1 0;min-width:0;font-size:14px;line-height:1.2;min-height:40px;padding:6px 8px}
  .demo-switch button+button{border-left:0}
- .demo-office-hero{margin-top:12px}
  .demo-office-hero .office-toolbar .camera-tools{display:grid;grid-template-columns:minmax(0,1fr) repeat(4,auto);width:100%;gap:4px}
- .demo-office-hero .office-viewport-wrap{height:max(300px,min(50svh,420px))}
- .demo-office-hero.office-wrap .office-canvas{height:100%;min-height:0}
  .demo-office-hero .office-toolbar .camera-tools button{min-width:44px;min-height:44px;padding:4px 8px;margin:0;line-height:1.15}
 }
+/* The living office on top of the demo manager's dashboard: as big as BIRD's office on a desktop
+   (the whole screen under the header), the dashboard scrolls below. #/admin/dashboard is the dashboard alone. */
+.demo-office-hero{position:relative;width:100%;height:calc(100svh - var(--demo-top,136px));min-height:520px;margin:0;padding:0;overflow:hidden;border-bottom:2px solid var(--ink);background:#263c34}
+.demo-office-hero #bird-office,.demo-office-hero .incubator,.demo-office-hero .office-grid,.demo-office-hero .office-grid>div{height:100%;width:100%;min-height:0;margin:0;padding:0;max-width:none}
+.demo-office-hero .office-intro,.demo-office-hero .office-area-nav,.demo-office-hero .office-placement-note,.demo-office-hero .office-board-footer{display:none}
+.demo-office-hero .office-board{display:flex;flex-direction:column;height:100%;border:0;border-radius:0}
+.demo-office-hero .office-viewport-wrap{flex:1;min-height:0;height:auto}
+.demo-office-hero.office-wrap .office-canvas{height:100%;min-height:0;max-height:none}
+.demo-hero-bar{position:absolute;z-index:30;left:12px;bottom:12px;display:flex;gap:6px}
+.demo-hero-bar.demo-hero-top{top:var(--demo-bar-top,84px);bottom:auto;left:auto;right:12px}
+.demo-hero-bar a{display:inline-flex;align-items:center;min-height:40px;padding:8px 14px;background:var(--white,#fffefa);color:var(--ink);border:1px solid var(--ink);font-weight:600;font-size:14px;text-decoration:none;box-shadow:2px 2px 0 var(--ink)}
+.demo-hero-bar a:first-child{background:var(--ink);color:#fff}
+.demo-hero-bar a:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+.demo-view-switch{margin:16px 0 0;font-size:14px}
+.demo-view-switch a{color:var(--ink);font-weight:600}
+@media (max-width:720px){
+ .demo-office-hero{height:auto;min-height:0}
+ .demo-office-hero #bird-office,.demo-office-hero .incubator,.demo-office-hero .office-grid,.demo-office-hero .office-grid>div,.demo-office-hero .office-board{height:auto}
+ .demo-office-hero .office-viewport-wrap{flex:none;height:max(300px,min(50svh,420px))}
+ .demo-hero-bar{left:8px;bottom:8px}
+ /* The phone office is short, so the bottom copy is already in view and the top one would cover the goal. */
+ .demo-hero-top{display:none}
+ .demo-hero-bar a{min-height:36px;padding:6px 10px;font-size:13px}
+}
+@media (min-width:721px){.demo-office-hero .office-grid:has(.office-side.ps-host) .office-toolbar{margin-right:clamp(330px,30vw,430px)}}

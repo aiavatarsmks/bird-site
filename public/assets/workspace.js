@@ -27,6 +27,7 @@ const W={
  seeMap:{en:'Open the map',hr:'Otvori kartu',ru:'Открыть карту'},
  seeMapText:{en:'Incubators and accelerators in Croatia, with their next programmes.',hr:'Inkubatori i akceleratori u Hrvatskoj i njihovi sljedeći programi.',ru:'Инкубаторы и акселераторы Хорватии и их ближайшие программы.'},
  invented:{en:'Teams, people and numbers in this demo are invented.',hr:'Timovi, osobe i brojke u ovom demu su izmišljeni.',ru:'Команды, люди и цифры в этом демо выдуманы.'},
+ toDash:{en:'Dashboard',hr:'Nadzorna ploča',ru:'Панель'},toToday:{en:'Today: morning briefing',hr:'Danas: jutarnji pregled',ru:'Сегодня: утренняя сводка'},teamsOnly:{en:'Teams only',hr:'Samo timovi',ru:'Только команды'},withOffice:{en:'Dashboard with the office',hr:'Nadzorna ploča s uredom',ru:'Панель с офисом'},
  loading:{en:'Loading…',hr:'Učitavanje…',ru:'Загрузка…'},failed:{en:'Could not load. Reload the page.',hr:'Nije učitano. Osvježite stranicu.',ru:'Не загрузилось. Обновите страницу.'},
 };
 const w=key=>W[key][lang]||W[key].en;
@@ -120,10 +121,20 @@ function render(){
  const main=document.getElementById('content');
  if(account)window.BirdAccount.mount(document.getElementById('bird-account'),lang);
  // In the demo the manager's first screen is the living office above the dashboard.
- if(account&&demo&&isAdmin()&&/^#\/admin(\/dashboard)?\/?$/.test(location.hash)){
-  main.insertAdjacentHTML('afterbegin','<section class="demo-office-hero office-wrap" aria-label="Office"><div id="bird-office"></div></section>');
-  officeAssets().then(()=>{const el=document.getElementById('bird-office');if(el&&!el.childElementCount)window.IncubatorOffice.mount(el,{language:lang,embedded:true});}).catch(()=>{});
+ // #/admin opens on the office as big as the screen with the dashboard below; #/admin/dashboard is the dashboard alone.
+ if(account&&demo&&isAdmin()&&/^#\/admin\/?$/.test(location.hash)){
+  main.insertAdjacentHTML('beforebegin',`<section class="demo-office-hero office-wrap" aria-label="${esc(w('office'))}"><div id="bird-office"></div><nav class="demo-hero-bar demo-hero-top" aria-label="${esc(w('office'))}"><a href="#/admin/today" class="demo-hero-today">${esc(w('toToday'))} →</a><a href="#demo-dashboard" data-demo-down>↓ ${esc(w('toDash'))}</a><a href="#/admin/dashboard">${esc(w('teamsOnly'))}</a></nav><nav class="demo-hero-bar demo-hero-bottom" aria-label="${esc(w('office'))}"><a href="#/admin/today" class="demo-hero-today">${esc(w('toToday'))} →</a><a href="#demo-dashboard" data-demo-down>↓ ${esc(w('toDash'))}</a><a href="#/admin/dashboard">${esc(w('teamsOnly'))}</a></nav></section><span id="demo-dashboard"></span>`);
+  // The way to the dashboard is shown twice, at the top and the bottom of the office.
+  document.querySelectorAll('[data-demo-down]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();main.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}));
+  const top=()=>{const h=document.querySelector('.demo-office-hero');if(h)document.documentElement.style.setProperty('--demo-top',Math.round(h.getBoundingClientRect().top+scrollY)+'px');};
+  top();addEventListener('resize',top,{passive:true});
+  officeAssets().then(()=>{const el=document.getElementById('bird-office');if(el&&!el.childElementCount)window.IncubatorOffice.mount(el,{language:lang,embedded:true});
+   // The top copy of the dashboard links sits just under the office toolbar, whose height changes on phones.
+   const hero=document.querySelector('.demo-office-hero'),bar=hero?.querySelector('.office-toolbar');
+   if(bar)new ResizeObserver(()=>hero.style.setProperty('--demo-bar-top',Math.round(bar.getBoundingClientRect().bottom-hero.getBoundingClientRect().top+10)+'px')).observe(bar);
+  }).catch(()=>{});
  }
+ else if(account&&demo&&isAdmin()&&/^#\/admin\/dashboard\/?$/.test(location.hash))main.insertAdjacentHTML('afterbegin',`<p class="demo-view-switch"><a href="#/admin">← ${esc(w('withOffice'))}</a></p>`);
  else if(office)officeView(main);
  else if(r==='map')mapView(main);
  document.querySelectorAll('[data-lang]').forEach(b=>b.addEventListener('click',()=>{lang=b.dataset.lang;try{localStorage.setItem(KEY,lang);}catch{}render();}));
