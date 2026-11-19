@@ -71,6 +71,161 @@ export async function decideClaim(ctx,id){
  return json({ok:true,status:decision});
 }
 
+// "This is me" and organiser linking -----------------------------------------------
+// Names compare without case, accents, punctuation or word order: "Maksim Ilin", "ILIN, Maksím" and "Ilin Maksim" match.
+export const foldName=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đ]/gi,'d').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+export const nameKey=s=>foldName(s).split(' ').filter(Boolean).sort().join(' ');
+const isLinked=(db,user)=>db.query('SELECT kind FROM people WHERE id=?').get(user.person_id)?.kind==='participant';
+const mail=v=>String(v||'').trim().toLowerCase();
+/** How a person card relates to the signed-in user: theirs, someone else's, or free. */
+export function personStatus(ctx,personId){
+ const user=requireUser(ctx);
+ const person=ctx.db.query("SELECT id FROM people WHERE id=? AND kind='participant' AND status='active'").get(personId);if(!person)fail(404,'NOT_FOUND');
+ const owner=ctx.db.query('SELECT id FROM users WHERE person_id=?').get(personId);
+ const pending=!!ctx.db.query("SELECT 1 FROM person_claims WHERE user_id=? AND person_id=? AND status='pending'").get(user.id,personId);
+ return json({mine:owner?.id===user.id,linked:!!owner,canClaim:!owner&&!isLinked(ctx.db,user),direct:isAdmin(user),pending});
+}
+/** An organiser who is on the roster links their own card without a claim; the role stays as it is. */
+export function linkSelf(ctx,personId){
+ const user=requireAdmin(ctx);
+ if(!ctx.db.query("SELECT 1 FROM people WHERE id=? AND kind='participant' AND status='active'").get(personId))fail(404,'NOT_FOUND');
+ if(isLinked(ctx.db,user)&&user.person_id!==personId)fail(409,'ALREADY_DONE');
+ const delivered=linkByAdmin(ctx.db,user,personId,user,'person.self_link');
+ ctx.user=ctx.db.query('SELECT * FROM users WHERE id=?').get(user.id);
+ ctx.hooks?.onUserReady?.(ctx,ctx.user);
+ return json({ok:true,delivered,user:publicUser(ctx.user)});
+}
+// One transaction per link: waiting messages arrive, the user's other pending claims close, the audit names who did it.
+function linkByAdmin(db,admin,personId,user,action){
+ let delivered=0;
+ db.transaction(()=>{
+  delivered=db.query('SELECT count(*) n FROM waiting_messages WHERE person_id=? AND sender_id<>?').get(personId,user.id).n;
+  linkPerson(db,user,personId,admin.id);
+  db.query("UPDATE person_claims SET status='withdrawn',decided_at=? WHERE user_id=? AND status='pending'").run(nowIso(),user.id);
+  audit(db,admin.id,action,'person',personId,{user:user.id,role:user.role,delivered});
+ })();
+ return delivered;
+}
+// Accounts not linked to any participant card yet: the only ones a card can be linked to.
+const freeUsers=db=>db.query("SELECT u.id,u.login,u.display_name name,u.email,u.role FROM users u LEFT JOIN people p ON p.id=u.person_id WHERE u.status='active' AND u.id NOT LIKE 'demo-user-%' AND coalesce(p.kind,'')<>'participant'").all();
+function matchFor(person,free){
+ const e=mail(person.email),byMail=e?free.filter(u=>mail(u.email)===e):[];
+ if(byMail.length===1)return {...byMail[0],by:'email'};
+ const k=nameKey(person.name),byName=free.filter(u=>nameKey(u.name)===k);
+ return byName.length===1?{...byName[0],by:'name'}:null;
+}
+const userView=u=>u&&{id:u.id,login:u.login,name:u.name,email:u.email||'',role:u.role};
+/** Admin: every participant card with its email, the account linked to it, and the account that looks like theirs. */
+export function adminLinks(ctx){
+ requireAdmin(ctx);
+ const people=ctx.db.query("SELECT p.id,p.display_name name,p.email,(SELECT t.name FROM team_people tp JOIN teams t ON t.id=tp.team_id WHERE tp.person_id=p.id LIMIT 1) team,u.id uid,u.login,u.display_name uname,u.email uemail,u.role FROM people p LEFT JOIN users u ON u.person_id=p.id WHERE p.kind='participant' AND p.status='active' AND p.id NOT LIKE 'demo-%' ORDER BY p.display_name COLLATE NOCASE").all();
+ const free=freeUsers(ctx.db);
+ return json({items:people.map(p=>({id:p.id,name:p.name,team:p.team||'',email:p.email||'',
+  linked:p.uid?userView({id:p.uid,login:p.login,name:p.uname,email:p.uemail,role:p.role}):null,
+  match:p.uid?null:(m=>m&&{...userView(m),by:m.by})(matchFor(p,free))})),
+  accounts:free.map(userView)});
+}
+export async function setPersonEmail(ctx,personId){
+ const admin=requireAdmin(ctx),body=await readJson(ctx.request);
+ const email=text(body.email,{max:200,optional:true},'email');
+ if(email&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))fail(400,'INVALID_FIELDS',{field:'email'});
+ const r=ctx.db.query("UPDATE people SET email=?,updated=? WHERE id=? AND kind='participant'").run(email||null,nowIso(),personId);
+ if(!r.changes)fail(404,'NOT_FOUND');
+ audit(ctx.db,admin.id,'person.email','person',personId,{});
+ return json({ok:true,email:email||''});
+}
+export async function adminLink(ctx,personId){
+ const admin=requireAdmin(ctx),body=await readJson(ctx.request);
+ if(!ctx.db.query("SELECT 1 FROM people WHERE id=? AND kind='participant' AND status='active'").get(personId))fail(404,'NOT_FOUND');
+ const user=ctx.db.query("SELECT * FROM users WHERE id=? AND status='active'").get(String(body.userId||''));if(!user)fail(404,'NOT_FOUND');
+ if(isLinked(ctx.db,user)&&user.person_id!==personId)fail(409,'ALREADY_DONE');
+ if(ctx.db.query('SELECT id FROM users WHERE person_id=? AND id<>?').get(personId,user.id))fail(409,'INVALID_STATE');
+ const delivered=linkByAdmin(ctx.db,admin,personId,user,'person.admin_link');
+ notify(ctx.db,user.id,'person.linked',{personId});
+ return json({ok:true,delivered});
+}
+/** Links every card whose email belongs to exactly one free account. Names alone never link in bulk. */
+export function adminLinkByEmail(ctx){
+ const admin=requireAdmin(ctx),linked=[];
+ const people=ctx.db.query("SELECT p.id,p.display_name name,p.email FROM people p WHERE p.kind='participant' AND p.status='active' AND p.email IS NOT NULL AND p.email<>'' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.person_id=p.id)").all();
+ for(const p of people){
+  const m=matchFor(p,freeUsers(ctx.db));if(m?.by!=='email')continue;
+  const user=ctx.db.query('SELECT * FROM users WHERE id=?').get(m.id);
+  linkByAdmin(ctx.db,admin,p.id,user,'person.admin_link');notify(ctx.db,user.id,'person.linked',{personId:p.id});
+  linked.push({personId:p.id,userId:user.id});
+ }
+ return json({ok:true,linked});
+}
+// Roster built by the organiser: a team and the people on it, before anyone has an account ----------
+const autoLinkOn=db=>db.query("SELECT value FROM settings WHERE key='auto_link_email'").get()?.value==='1';
+/** Admin: a new team (its project starts as a draft with no members; people join by linking their card). */
+export async function adminCreateTeam(ctx){
+ const admin=requireAdmin(ctx),body=await readJson(ctx.request);
+ const name=text(body.name,{min:1,max:100},'name'),short=text(body.description??'',{max:280,multiline:true},'description');
+ const key=foldName(name);
+ if(ctx.db.query("SELECT json_extract(draft,'$.name') n FROM projects WHERE status<>'archived'").all().some(r=>foldName(r.n)===key))fail(409,'CONFLICT',{field:'name'});
+ const now=nowIso(),teamId=newId('team'),projectId=newId('project');
+ const content={name,short,problem:'',users:'',solution:'',value:'',ask:'',nextSteps:'',details:'',stage:'idea',links:[]};
+ ctx.db.transaction(()=>{
+  ctx.db.query('INSERT INTO teams(id,name,created) VALUES(?,?,?)').run(teamId,name,now);
+  ctx.db.query("INSERT INTO projects(id,team_id,source,status,created_by,draft,draft_version,created,updated) VALUES(?,?,'user','draft',?,?,1,?,?)").run(projectId,teamId,admin.id,JSON.stringify(content),now,now);
+  ctx.db.query("INSERT INTO project_revisions(project_id,version,kind,content,author,created) VALUES(?,1,'draft',?,?,?)").run(projectId,JSON.stringify(content),admin.id,now);
+  audit(ctx.db,admin.id,'team.create','project',projectId,{name});
+ })();
+ return json({projectId,teamId,name},201);
+}
+/** Admin: a participant card with the email the person will sign up with, optionally on a team. */
+export async function adminCreatePerson(ctx){
+ const admin=requireAdmin(ctx),body=await readJson(ctx.request);
+ const name=text(body.name,{min:1,max:80},'name'),email=mail(text(body.email??'',{max:200},'email'));
+ if(email&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))fail(400,'INVALID_FIELDS',{field:'email'});
+ // One card per email, so signing up with it can only ever match one person.
+ if(email&&ctx.db.query("SELECT 1 FROM people WHERE kind='participant' AND status='active' AND lower(email)=?").get(email))fail(409,'CONFLICT',{field:'email'});
+ const projectId=body.projectId?text(body.projectId,{max:80},'projectId'):'';
+ const project=projectId?ctx.db.query("SELECT id,team_id FROM projects WHERE id=? AND status<>'archived'").get(projectId):null;
+ if(projectId&&!project)fail(404,'NOT_FOUND');
+ const now=nowIso(),id=newId('person');let linked=null;
+ ctx.db.transaction(()=>{
+  ctx.db.query("INSERT INTO people(id,display_name,kind,source,email,created,updated) VALUES(?,?,'participant','curated',?,?,?)").run(id,name,email||null,now,now);
+  if(project)ctx.db.query('INSERT OR IGNORE INTO team_people(team_id,person_id) VALUES(?,?)').run(project.team_id,id);
+  audit(ctx.db,admin.id,'person.create','person',id,{project:projectId||null});
+  // Someone who already signed up with this email is linked at once when the organiser asked for that.
+  if(email&&autoLinkOn(ctx.db)){const free=freeUsers(ctx.db).filter(u=>mail(u.email)===email);if(free.length===1){const u=ctx.db.query('SELECT * FROM users WHERE id=?').get(free[0].id);linkPerson(ctx.db,u,id,admin.id);notify(ctx.db,u.id,'person.linked',{personId:id});linked=u.id;}}
+ })();
+ return json({id,name,email,projectId:projectId||null,linkedUserId:linked},201);
+}
+export function autoLinkStatus(ctx){requireAdmin(ctx);return json({on:autoLinkOn(ctx.db)});}
+export async function setAutoLink(ctx){
+ const admin=requireAdmin(ctx),body=await readJson(ctx.request),on=!!body.on;
+ ctx.db.query("INSERT INTO settings(key,value,updated) VALUES('auto_link_email',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated=excluded.updated").run(on?'1':'0',nowIso());
+ audit(ctx.db,admin.id,'settings.auto_link_email','settings','auto_link_email',{on});
+ return json({on});
+}
+/**
+ * After sign-up or an email change: when the organiser turned "Link automatically by email" on and exactly one
+ * free participant card carries this email, the account becomes that card. Off by default (emails are not verified).
+ */
+export function autoLinkByEmail(db,user){
+ if(!user?.email||!autoLinkOn(db)||isLinked(db,user)||user.id.startsWith('demo-'))return false;
+ const cards=db.query("SELECT p.id FROM people p WHERE p.kind='participant' AND p.status='active' AND lower(p.email)=? AND NOT EXISTS(SELECT 1 FROM users u WHERE u.person_id=p.id)").all(mail(user.email));
+ if(cards.length!==1)return false;
+ db.transaction(()=>{linkPerson(db,user,cards[0].id,user.id);audit(db,user.id,'person.auto_link','person',cards[0].id,{user:user.id});notify(db,user.id,'person.linked',{personId:cards[0].id});})();
+ return true;
+}
+
+/** The account goes back to a plain visitor character; the card waits for the right person again. */
+export function adminUnlink(ctx,personId){
+ const admin=requireAdmin(ctx);
+ const user=ctx.db.query('SELECT * FROM users WHERE person_id=?').get(personId);if(!user)fail(404,'NOT_FOUND');
+ ctx.db.transaction(()=>{
+  const now=nowIso(),visitor=newId('visitor');
+  ctx.db.query("INSERT INTO people(id,display_name,kind,source,created,updated) VALUES(?,?,'visitor','user',?,?)").run(visitor,user.display_name,now,now);
+  ctx.db.query('UPDATE users SET person_id=?,updated=? WHERE id=?').run(visitor,now,user.id);
+  audit(ctx.db,admin.id,'person.unlink','person',personId,{user:user.id});
+ })();
+ return json({ok:true});
+}
+
 // Invitations --------------------------------------------------------------
 export async function createInvite(ctx){
  const user=requireUser(ctx),body=await readJson(ctx.request);

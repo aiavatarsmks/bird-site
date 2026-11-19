@@ -3,6 +3,7 @@ import {fail,json,readJson,text,newId,page,httpUrl} from './http.mjs';
 import {nowIso} from './db.mjs';
 import {audit,requireAdmin} from './permissions.mjs';
 import {requireUser} from './auth.mjs';
+import {personSince} from './cohort.mjs';
 
 const zagrebToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Zagreb',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 
@@ -11,7 +12,9 @@ const lectureView=(l,mine)=>({id:l.id,date:l.date,time:l.time||'',place:l.place|
 export function listLectures(ctx){
  const rows=ctx.db.query("SELECT * FROM lectures WHERE status='published' ORDER BY date").all();
  const mine=ctx.user?new Map(ctx.db.query('SELECT * FROM attendance WHERE user_id=?').all(ctx.user.id).map(a=>[a.lecture_id,a])):null;
- return json({items:rows.map(l=>lectureView(l,mine?mine.get(l.id)||null:undefined)),today:zagrebToday()});
+ // since: the day the participant joined; earlier lectures are not "missed".
+ const since=ctx.user?new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Zagreb'}).format(new Date(personSince(ctx.db,ctx.user.id))):null;
+ return json({items:rows.map(l=>lectureView(l,mine?mine.get(l.id)||null:undefined)),today:zagrebToday(),...(since?{since}:{})});
 }
 
 /** Self-report of one real, already held lecture. Never upgrades itself to verified. */

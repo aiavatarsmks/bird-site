@@ -9,6 +9,15 @@ import {freeBytes} from './config.mjs';
 const TYPES={
  pdf:{mime:'application/pdf',purpose:'document'},
  pptx:{mime:'application/vnd.openxmlformats-officedocument.presentationml.presentation',purpose:'document'},
+ // Spreadsheets and text documents handed in as proof. Macro-enabled formats (xlsm, docm) stay refused.
+ xlsx:{mime:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',purpose:'document'},
+ docx:{mime:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',purpose:'document'},
+ xls:{mime:'application/vnd.ms-excel',purpose:'document',also:['application/excel','application/x-msexcel','application/x-excel']},
+ doc:{mime:'application/msword',purpose:'document',also:['application/vnd.ms-word','application/x-msword']},
+ ods:{mime:'application/vnd.oasis.opendocument.spreadsheet',purpose:'document'},
+ odt:{mime:'application/vnd.oasis.opendocument.text',purpose:'document'},
+ // Browsers name a CSV in several ways (Windows calls it an Excel file).
+ csv:{mime:'text/csv',purpose:'document',also:['application/vnd.ms-excel','text/plain','application/csv','text/comma-separated-values','text/x-csv']},
  png:{mime:'image/png',purpose:'image'},
  jpg:{mime:'image/jpeg',purpose:'image'},
  jpeg:{mime:'image/jpeg',purpose:'image'},
@@ -36,14 +45,33 @@ function sniff(bytes){
  if(startsWith(bytes,[0xff,0xd8,0xff]))return 'jpg';
  if(startsWith(bytes,[0x52,0x49,0x46,0x46])&&startsWith(bytes,[0x57,0x45,0x42,0x50],8))return 'webp';
  if(startsWith(bytes,[0x50,0x4b,0x03,0x04]))return 'zip';
+ if(startsWith(bytes,[0xd0,0xcf,0x11,0xe0,0xa1,0xb1,0x1a,0xe1]))return 'ole';
  return null;
+}
+// Which container each extension must be, and which parts a real file of that kind has.
+const SIGNATURE={jpeg:'jpg',pptx:'zip',xlsx:'zip',docx:'zip',ods:'zip',odt:'zip',xls:'ole',doc:'ole'};
+const ZIP_PARTS={pptx:['[Content_Types].xml','ppt/presentation.xml'],xlsx:['[Content_Types].xml','xl/workbook.xml'],docx:['[Content_Types].xml','word/document.xml'],ods:['mimetype','content.xml'],odt:['mimetype','content.xml']};
+
+/** Old Office files (xls, doc): refuse the ones that carry a macro project. Best effort; downloads stay attachments. */
+export function inspectOle(bytes){
+ const text=new TextDecoder('utf-16le').decode(bytes.subarray(0,Math.min(bytes.length,32*1024*1024)&~1));
+ // Office keeps VBA in a storage named _VBA_PROJECT (Excel: _VBA_PROJECT_CUR; Word: Macros/VBA).
+ if(text.includes('_VBA_PROJECT'))fail(400,'UNSUPPORTED_FILE',{reason:'macro'});
+}
+/** CSV is plain text: no binary bytes and no markup a browser could mistake for a page. */
+export function inspectCsv(bytes){
+ const head=bytes.subarray(0,Math.min(bytes.length,64*1024));
+ if(head.includes(0))fail(400,'UNSUPPORTED_FILE',{reason:'binary'});
+ const text=new TextDecoder('latin1').decode(head).replace(/^\ufeff|^\xef\xbb\xbf/,'').trimStart().toLowerCase();
+ if(/^<|<script|<html|<svg|<!doctype/.test(text))fail(400,'UNSUPPORTED_FILE',{reason:'markup'});
 }
 
 /**
- * Reads only the ZIP central directory (no decompression) and checks a PPTX:
- * entry count, declared unpacked size, path safety, presentation part, no macros.
+ * Reads only the ZIP central directory (no decompression) and checks an Office or OpenDocument file:
+ * entry count, declared unpacked size, path safety, the parts its kind must have, no macros.
  */
-export function inspectPptx(bytes,limits){
+export function inspectPptx(bytes,limits){return inspectZip(bytes,limits,'pptx');}
+export function inspectZip(bytes,limits,ext){
  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
  let eocd=-1;
  for(let i=bytes.length-22;i>=Math.max(0,bytes.length-65557);i--)if(view.getUint32(i,true)===0x06054b50){eocd=i;break;}
@@ -60,12 +88,14 @@ export function inspectPptx(bytes,limits){
   const name=decoder.decode(bytes.subarray(p+46,p+46+nameLen));
   if(flags&1)fail(400,'UNSUPPORTED_FILE',{reason:'encrypted'});
   if(name.includes('..')||name.startsWith('/')||name.includes('\\'))fail(400,'UNSUPPORTED_FILE',{reason:'path'});
-  if(/vbaProject\.bin$/i.test(name)||/\.(bin|exe|dll|js|vbs)$/i.test(name)&&!/^ppt\/(embeddings|printerSettings)\//.test(name))fail(400,'UNSUPPORTED_FILE',{reason:'macro'});
+  if(/vbaProject\.bin$/i.test(name)||/\.(bin|exe|dll|js|vbs)$/i.test(name)&&!/^(ppt|xl|word)\/(embeddings|printerSettings)\//.test(name))fail(400,'UNSUPPORTED_FILE',{reason:'macro'});
+  // OpenDocument keeps macros in Basic/ and scripts in Scripts/.
+  if((ext==='ods'||ext==='odt')&&/^(Basic|Scripts)\//i.test(name))fail(400,'UNSUPPORTED_FILE',{reason:'macro'});
   if(compressed>0&&unpacked/compressed>200)fail(400,'UNSUPPORTED_FILE',{reason:'ratio'});
   total+=unpacked;if(total>limits.zipUnpackedBytes)fail(400,'UNSUPPORTED_FILE',{reason:'unpacked'});
   names.add(name);p+=46+nameLen+extra+comment;
  }
- if(!names.has('[Content_Types].xml')||!names.has('ppt/presentation.xml'))fail(400,'UNSUPPORTED_FILE',{reason:'not-pptx'});
+ if(!ZIP_PARTS[ext].every(n=>names.has(n)))fail(400,'UNSUPPORTED_FILE',{reason:'not-'+ext});
  return {entries:count,unpacked:total};
 }
 
@@ -86,13 +116,20 @@ const IN_CONVERSATION=`SELECT 1 FROM file_links l WHERE l.file_id=?1 AND (
  (l.target_type='dm' AND EXISTS(SELECT 1 FROM direct_messages d WHERE d.id=l.target_id AND (d.sender_id=?2 OR d.recipient_id=?2 OR (?3 AND EXISTS(SELECT 1 FROM message_reports r WHERE r.message_id=d.id)))))
  OR (l.target_type='chat' AND EXISTS(SELECT 1 FROM chat_messages c WHERE c.id=l.target_id AND (EXISTS(SELECT 1 FROM chat_members m WHERE m.group_id=c.group_id AND m.user_id=?2 AND m.left_at IS NULL) OR (?3 AND EXISTS(SELECT 1 FROM chat_reports r WHERE r.message_id=c.id))))))`;
 
+// A file handed in with a task opens for everyone who may review that submission and for the team (or person) it belongs to,
+// whatever its own visibility says: a reviewer must be able to open the proof.
+const IN_SUBMISSION=`SELECT 1 FROM file_links l JOIN submissions s ON substr(l.target_id,1,length(s.id)+1)=s.id||':' JOIN assignments a ON a.id=s.assignment_id JOIN task_templates t ON t.id=a.task_id
+ WHERE l.file_id=?1 AND l.target_type='submission' AND (?3=1 OR t.reviewer_user_id=?2 OR a.user_id=?2
+ OR EXISTS(SELECT 1 FROM memberships m WHERE m.project_id=a.project_id AND m.user_id=?2 AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member','reviewer')))`;
+
 export function upload(ctx){
  const user=requireUser(ctx);
  const asked=oneOf(ctx.url.searchParams.get('purpose')||'document',['document','image','reference','message'],'purpose');
  // A message file belongs to no project; it opens only for the people in the conversation it is sent to.
  const loose=asked==='reference'||asked==='message';
  const projectId=loose?null:ctx.url.searchParams.get('projectId');
- if(!loose){if(!projectId)fail(400,'INVALID_FIELDS',{field:'projectId'});requireProject(ctx.db,user,projectId,'edit');}
+ // Every team member may add a file: proof for a team task is handed in by whoever did the work.
+ if(!loose){if(!projectId)fail(400,'INVALID_FIELDS',{field:'projectId'});const {project,access}=requireProject(ctx.db,user,projectId,'team');if(project.status==='archived'&&!access.edit)fail(409,'INVALID_STATE');}
  rateLimit(ctx.db,'upload:'+user.id,60,3600);
  const {name,ext}=checkFilename(ctx.request.headers.get('x-filename'));
  const type=TYPES[ext];
@@ -119,19 +156,21 @@ export function upload(ctx){
    const bytes=new Uint8Array(await ctx.request.arrayBuffer());
    if(bytes.length>max||bytes.length!==declared)fail(413,'TOO_LARGE');
    const kind=sniff(bytes);
-   const expected=ext==='jpeg'?'jpg':ext==='pptx'?'zip':ext;
-   if(kind!==expected)fail(400,'UNSUPPORTED_FILE',{reason:'signature'});
+   // CSV has no signature: it must not look like any binary format either.
+   if(ext==='csv'?kind!==null:kind!==(SIGNATURE[ext]||ext))fail(400,'UNSUPPORTED_FILE',{reason:'signature'});
    const claimed=(ctx.request.headers.get('content-type')||'').split(';')[0].trim().toLowerCase();
-   if(claimed&&claimed!=='application/octet-stream'&&claimed!==type.mime)fail(400,'UNSUPPORTED_FILE',{reason:'mime'});
+   if(claimed&&claimed!=='application/octet-stream'&&claimed!==type.mime&&!type.also?.includes(claimed))fail(400,'UNSUPPORTED_FILE',{reason:'mime'});
    // Best effort: names may hide letters as #xx escapes. Compressed streams are not inflated, so the download
    // headers (attachment + sandbox CSP) remain the real protection.
    if(ext==='pdf'&&/\/(JavaScript|JS|Launch|EmbeddedFile|OpenAction|AA)\b/.test(new TextDecoder('latin1').decode(bytes.subarray(0,Math.min(bytes.length,8*1024*1024))).replace(/#([0-9a-f]{2})/gi,(_,h)=>String.fromCharCode(parseInt(h,16)))))fail(400,'UNSUPPORTED_FILE',{reason:'active-content'});
-   if(ext==='pptx')inspectPptx(bytes,ctx.config.limits);
+   if(ZIP_PARTS[ext])inspectZip(bytes,ctx.config.limits,ext);
+   if(kind==='ole')inspectOle(bytes);
+   if(ext==='csv')inspectCsv(bytes);
    const key=ctx.storage.newKey(),id=newId('file'),now=nowIso(),hash=createHash('sha256').update(bytes).digest('hex');
    await ctx.storage.put(key,bytes);
    const scan=await ctx.scanner.scan(ctx.storage.file(key));
    try{
-    ctx.db.query('INSERT INTO files(id,project_id,owner_user_id,purpose,storage_key,filename,mime,size,sha256,visibility,scan_status,idem_key,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,projectId,user.id,purpose,key,name,type.mime,bytes.length,hash,'private',scan,idem||null,now);
+    ctx.db.query('INSERT INTO files(id,project_id,owner_user_id,purpose,storage_key,filename,mime,size,sha256,visibility,scan_status,idem_key,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,projectId,user.id,purpose,key,name,type.mime,bytes.length,hash,projectId?'reviewer':'private',scan,idem||null,now);
    }catch(e){await ctx.storage.remove(key);if(idem&&String(e.message).includes('UNIQUE')){const prior=ctx.db.query('SELECT * FROM files WHERE owner_user_id=? AND idem_key=?').get(user.id,idem);return json({file:fileView(prior),replayed:true});}throw e;}
    audit(ctx.db,user.id,'file.upload','file',id,{project:projectId,size:bytes.length,purpose});
    const file=ctx.db.query('SELECT * FROM files WHERE id=?').get(id);
@@ -148,6 +187,7 @@ export function canReadFile(db,user,file){
  if(file.status!=='active')return false;
  if(user&&file.owner_user_id===user.id)return true;
  if(file.purpose==='reference')return isAdmin(user);
+ if(user&&db.query(IN_SUBMISSION).get(file.id,user.id,isAdmin(user)?1:0))return true;
  if(!file.project_id)return !!user&&!!db.query(IN_CONVERSATION).get(file.id,user.id,isAdmin(user)?1:0);
  const project=db.query('SELECT * FROM projects WHERE id=?').get(file.project_id);if(!project)return false;
  const access=projectAccess(db,user,project);

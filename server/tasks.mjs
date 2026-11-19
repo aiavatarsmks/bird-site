@@ -20,18 +20,26 @@ export function isoWeek(date=new Date()){
  return `${local.getUTCFullYear()}-W${String(week).padStart(2,'0')}`;
 }
 
+/** The text of a task in the reader's language, else in any language the organiser filled (EN, HR, RU). */
+export function localText(translations,lang,field='title'){
+ let t=translations;if(typeof t==='string'){try{t=JSON.parse(t);}catch{t={};}}
+ for(const l of [lang,'en','hr','ru'])if(t?.[l]?.[field])return t[l][field];
+ return '';
+}
+// Any one language is enough (a Croatian programme writes in Croatian): it needs a title and instructions.
 function cleanTranslations(input){
  const out={};
  for(const l of LANGS){
   const t=input?.[l]||{};
-  const required=l==='en';
-  out[l]={title:text(t.title??'',{min:required?1:0,max:160},`translations.${l}.title`),goal:text(t.goal??'',{max:600,multiline:true},`translations.${l}.goal`),instructions:text(t.instructions??'',{min:required?1:0,max:4000,multiline:true},`translations.${l}.instructions`),criteria:text(t.criteria??'',{max:1000,multiline:true},`translations.${l}.criteria`)};
+  out[l]={title:text(t.title??'',{max:160},`translations.${l}.title`),goal:text(t.goal??'',{max:600,multiline:true},`translations.${l}.goal`),instructions:text(t.instructions??'',{max:4000,multiline:true},`translations.${l}.instructions`),criteria:text(t.criteria??'',{max:1000,multiline:true},`translations.${l}.criteria`)};
  }
+ if(!LANGS.some(l=>out[l].title))fail(400,'INVALID_FIELDS',{field:'title'});
+ if(!LANGS.some(l=>out[l].title&&out[l].instructions))fail(400,'INVALID_FIELDS',{field:'instructions'});
  return out;
 }
 function cleanTask(body){
  const type=oneOf(body.type,TYPES,'type'),scope=oneOf(body.scope,['personal','team'],'scope');
- const checklist=type==='checklist'?(Array.isArray(body.checklist)?body.checklist:[]).slice(0,12).map((item,i)=>Object.fromEntries(LANGS.map(l=>[l,text(item?.[l]??'',{min:l==='en'?1:0,max:200},'checklist.'+i)]))):[];
+ const checklist=type==='checklist'?(Array.isArray(body.checklist)?body.checklist:[]).slice(0,12).map((item,i)=>Object.fromEntries(LANGS.map(l=>[l,text(item?.[l]??'',{max:200},'checklist.'+i)]))).filter(item=>LANGS.some(l=>item[l])):[];
  if(type==='checklist'&&!checklist.length)fail(400,'INVALID_FIELDS',{field:'checklist'});
  const due=body.dueAt?text(body.dueAt,{max:40},'dueAt'):null;
  if(due&&Number.isNaN(Date.parse(due)))fail(400,'INVALID_FIELDS',{field:'dueAt'});
@@ -217,12 +225,13 @@ function cleanAnswer(ctx,task,a,input,final){
   case 'text':{const body=text(c.text??'',{min:final?1:0,max:5000,multiline:true},'text');return {text:body};}
   case 'link':{const url=httpUrl(c.url,'url');if(final&&!url)fail(400,'INVALID_FIELDS',{field:'url'});return {url,note};}
   case 'attachment':{
-   const fileId=c.fileId?text(c.fileId,{max:80},'fileId'):'';
-   if(final&&!fileId)fail(400,'INVALID_FIELDS',{field:'fileId'});
+   // A video is too big to upload: a link (YouTube, Drive) counts as the proof instead of a file.
+   const fileId=c.fileId?text(c.fileId,{max:80},'fileId'):'',url=c.url?httpUrl(c.url,'url'):'';
+   if(final&&!fileId&&!url)fail(400,'INVALID_FIELDS',{field:'fileId'});
    if(fileId){const f=ctx.db.query("SELECT * FROM files WHERE id=? AND status='active'").get(fileId);
     const owned=f&&(a.project_id?f.project_id===a.project_id:f.owner_user_id===ctx.user.id);
     if(!owned||!canReadFile(ctx.db,ctx.user,f)||f.purpose==='reference')fail(400,'INVALID_FIELDS',{field:'fileId'});}
-   return {fileId,note};}
+   return url?{fileId,url,note}:{fileId,note};}
   case 'attendance':{
    const lectureIds=[...new Set((Array.isArray(c.lectureIds)?c.lectureIds:[]).slice(0,50).map(x=>String(x).slice(0,80)))];
    return {lectureIds,note};}
@@ -292,6 +301,8 @@ export async function submitAnswer(ctx,id){
 function baseKey(task,a){return `task:${task.id}:${a.user_id||a.project_id}:${a.period||''}${task.repeat_rule==='weekly_reward'?':'+isoWeek():''}`;}
 /** A revoked result can be accepted again: each revocation starts a new key round (…#2, #3). */
 function rewardKey(task,a,db){const base=baseKey(task,a);if(!db)return base;const rounds=db.query("SELECT count(*) n FROM xp_ledger WHERE source_key LIKE ? AND amount<0").get('reversal:'+base+'%').n;return rounds?base+'#'+(rounds+1):base;}
+/** What a notification about a submission names: the task in every language and its points. */
+const taskNote=task=>({task:Object.fromEntries(LANGS.map(l=>[l,localText(task.translations,l)])),xp:task.xp});
 function accept(db,{submissionId,revision,task,assignment,reviewer,comment,submitter}){
  const now=nowIso();
  if(reviewer||task.requires_review)db.query("INSERT INTO reviews(id,submission_id,revision,reviewer,decision,comment,created) VALUES(?,?,?,?,'accepted',?,?)").run(newId('rev'),submissionId,revision,reviewer||'system',comment,now);
@@ -303,7 +314,7 @@ function accept(db,{submissionId,revision,task,assignment,reviewer,comment,submi
  badgeForRule(db,submitter,'submission.accepted');
  if(task.key==='presentation'||task.type==='attachment')badgeForRule(db,submitter,'presentation.accepted');
  if(task.key==='help-team')badgeForRule(db,submitter,'help.confirmed');
- notify(db,submitter,'submission.accepted',{assignmentId:assignment.id});
+ notify(db,submitter,'submission.accepted',{assignmentId:assignment.id,...taskNote(task)});
 }
 
 // Review ------------------------------------------------------------------------------
@@ -336,7 +347,7 @@ export async function review(ctx,submissionId){
   else{
    ctx.db.query('INSERT INTO reviews(id,submission_id,revision,reviewer,decision,comment,created) VALUES(?,?,?,?,?,?,?)').run(newId('rev'),s.id,s.revision,user.id,decision,comment,nowIso());
    ctx.db.query('UPDATE submissions SET status=?,updated=? WHERE id=?').run(decision,nowIso(),s.id);
-   notify(ctx.db,s.submitted_by,'submission.'+decision,{assignmentId:assignment.id});
+   notify(ctx.db,s.submitted_by,'submission.'+decision,{assignmentId:assignment.id,...taskNote(task)});
   }
   audit(ctx.db,user.id,'submission.review','submission',s.id,{decision,revision:s.revision});
  })();

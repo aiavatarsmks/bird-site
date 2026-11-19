@@ -71,7 +71,7 @@ function ring(pct,label,inner){
 }
 const bar=(pct,cls='is-ok')=>`<span class="ui-bar ${cls}" aria-hidden="true"><i style="--w:${Math.max(0,Math.min(100,pct||0))}%"></i></span>`;
 const units=tasks=>tasks.length?`<span class="ui-units ps-units" aria-hidden="true">${tasks.slice(0,40).map((x,j)=>`<i class="${x.status==='accepted'?'is-ok':x.status==='submitted'?'is-watch':x.status==='changes_requested'?'is-risk':''}" style="--j:${j%12}"></i>`).join('')}</span>`:'';
-const title=x=>pick(x.title)?.title||x.title?.en?.title||'';
+const title=x=>[pick(x.title),x.title?.en,x.title?.hr,x.title?.ru].map(t=>t?.title).find(Boolean)||'';
 const isLate=x=>OPEN.has(x.status)&&x.dueAt&&x.dueAt<new Date().toISOString();
 function signal(level,signals=[]){
  if(!level)return '';
@@ -176,6 +176,8 @@ async function fill(el,vm,{mode,extra=''}){
  if(key!==lastKey&&!reduced()){el.querySelector('.ps')?.classList.add('ps-anim');window.BirdMotion?.play(body);}
  lastKey=key;
  bindNudges(body,auth.csrf);
+ // Outside the office (which adds its own write link): "This is you" / "This is me" for a participant's card.
+ if(mode!=='office'&&vm.kind==='person'&&!vm.staff&&auth.user)window.BirdWhoami?.card(body.querySelector('.ps-actions'),{personId:vm.key||vm.id,lang});
  return {admin,viewer:auth.user};
 }
 function bindNudges(scope,csrf){

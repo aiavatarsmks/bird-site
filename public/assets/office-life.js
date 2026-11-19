@@ -76,9 +76,11 @@ function create(scene,roster,options={}){
  const exerciseIds=new Set(['person-antun-matijasec','person-filip-glavica']);
  const workSeats=seats.filter((_,i)=>i<4||i>7),allocated=[];
  let clock=0,serial=0;
+ // Sit only where a chair or lecture seat stands: with more people than chairs, the rest stand at their spot instead of sitting in the air.
+ const onChair=pos=>scene.staticLayers.some(c=>['chair','lecture'].includes(c.kind)&&c.anchor&&dist(pos,c.anchor)<12);
  for(const row of roster){const i=serial++;let home=row.id==='person-maxim-ilin'?windowSeats[0]:row.id==='person-pavel-isaykov'?windowSeats[1]:row.id.startsWith('staff-')?seats[4+Number(row.id.slice(-1))-1]:lectureIds.includes(row.id)?lectureSeats[lectureIds.indexOf(row.id)]:workSeats.find(p=>!allocated.includes(p))||row.home||lectureSeats.find(p=>!allocated.includes(p))||workSeats[i%workSeats.length];
   allocated.push(home);
-  actors.set(row.id,{...row,index:i,home:[...home],pos:[...home],mode:'idle',activity:'work',until:2+(i*7)%17,path:[],round:0,variant:[...row.id].reduce((n,c)=>n+c.charCodeAt(0),0)%7,visited:new Set(),seated:true,hidden:false,carry:null});}
+  actors.set(row.id,{...row,index:i,home:[...home],pos:[...home],mode:'idle',activity:'work',until:2+(i*7)%17,path:[],round:0,variant:[...row.id].reduce((n,c)=>n+c.charCodeAt(0),0)%7,visited:new Set(),seated:onChair(home),hidden:false,carry:null});}
  const groups=new Map();for(const a of actors.values())if(a.projectId){if(!groups.has(a.projectId))groups.set(a.projectId,[]);groups.get(a.projectId).push(a.id);}
  // Participant presence: a fixed number are in the office, the rest are
  // outside. People swap through the lift; no team stays empty for long.

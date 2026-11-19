@@ -407,8 +407,8 @@ details.m-more[open]>summary{margin-bottom:10px}
  .m-loot{grid-row:auto}
  .m-task-head{grid-template-columns:auto 1fr;grid-template-areas:"icon pts" "title title"}
  .m-task-head>.m-pts{align-self:center}
- .m-mentors{grid-template-columns:1fr 1fr;gap:6px}
- .acc-m .m-mentor{padding:8px;gap:8px}
+ .m-mentors{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px}
+ .acc-m .m-mentor{padding:8px;gap:6px;min-width:0}.m-mentor-char{width:44px}.m-mentor-text strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
  .m-mentor .m-ava{width:30px;height:30px;font-size:12px}
  .m-mentor .m-slotdots i{display:none}
  .m-task-title h2{font-size:22px!important}
@@ -448,3 +448,9 @@ details.m-more[open]>summary{margin-bottom:10px}
 @media(prefers-reduced-motion:reduce){
  .m-badges li.is-got::after{display:none}
 }
+
+/* Mentors on the team's mentor page stand as living characters, not initials. */
+.m-mentor-char{flex:none;width:58px;display:grid;place-items:end center;margin:-6px 0 -10px}
+.m-mentor-char .cs-stage{gap:0;padding:0;background:none}
+.acc-m .m-mentor:hover .m-mentor-char .cs-mover{animation:cs-hop .45s ease-out}
+.is-before .m-dot{background:transparent;border:1px dashed currentColor;opacity:.45}

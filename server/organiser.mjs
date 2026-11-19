@@ -5,18 +5,19 @@ import {audit,requireAdmin} from './permissions.mjs';
 import {addRecoveryCode} from './auth.mjs';
 import {award,projectXp,userXp} from './progress.mjs';
 import {notify} from './notifications.mjs';
-import {riskSignals,streak,teamScore,teamPercent,csvCell,brandSlug} from './cohort.mjs';
+import {riskSignals,streak,teamScore,teamPercent,csvCell,brandSlug,personSince,teamSince,attendanceSince} from './cohort.mjs';
 import {lastSeen,pitchOf} from './admin.mjs';
-import {assignForUser} from './tasks.mjs';
+import {assignForUser,localText} from './tasks.mjs';
 import {wallet} from './wallet.mjs';
 import {onlyDemoPeople} from './demo-visit.mjs';
+import {canReadFile} from './files.mjs';
 
 const TEAM_ROLES="('owner','editor','member')";
 const nameOf=project=>JSON.parse(project.draft||'{}').name||project.id;
 const zagrebToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Zagreb',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const memberRows=(db,projectId)=>db.query(`SELECT u.id,u.display_name,u.status,u.person_id,m.role FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.project_id=? AND m.revoked_at IS NULL AND m.role IN ${TEAM_ROLES} ORDER BY u.display_name`).all(projectId);
 const memberIds=(db,projectId)=>memberRows(db,projectId).map(m=>m.id);
-const taskTitle=(t,lang='en')=>{const x=JSON.parse(t);return x[lang]?.title||x.en?.title||'';};
+const taskTitle=(t,lang='en')=>localText(t,lang);
 const notesFor=(db,type,id)=>db.query('SELECT n.id,n.body,n.created,u.display_name author FROM organiser_notes n LEFT JOIN users u ON u.id=n.author WHERE n.target_type=? AND n.target_id=? ORDER BY n.created DESC LIMIT 30').all(type,id);
 const lastNudge=(db,ids)=>ids.length?db.query(`SELECT max(created) t FROM notifications WHERE kind='nudge' AND user_id IN (${ids.map(()=>'?').join(',')})`).get(...ids).t:null;
 const OPEN="('not_started','draft','changes_requested')";
@@ -24,10 +25,12 @@ const OPEN="('not_started','draft','changes_requested')";
 function assignmentList(db,where,...args){
  return db.query(`SELECT a.id,a.user_id,a.project_id,a.period,t.id task_id,t.translations,t.xp,t.due_at,t.pick_mode,coalesce(s.status,'not_started') status,s.id submission_id,s.revision,u.display_name who FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id LEFT JOIN users u ON u.id=a.user_id WHERE t.status IN ('published','closed') AND ${where} ORDER BY t.due_at IS NULL,t.due_at,a.created LIMIT 200`).all(...args).map(r=>({id:r.id,taskId:r.task_id,title:JSON.parse(r.translations),xp:r.xp,dueAt:r.due_at,status:r.status,who:r.who||'',optional:r.pick_mode==='catalog',submissionId:r.submission_id||null,revision:r.revision||0}));
 }
+// Lectures held before the person joined are "before", never "missed".
 function attendanceOf(db,userId){
  const held=db.query("SELECT id,date,title FROM lectures WHERE status='published' AND date<=? ORDER BY date").all(zagrebToday());
  const marks=new Map(db.query('SELECT lecture_id,kind FROM attendance WHERE user_id=?').all(userId).map(a=>[a.lecture_id,a.kind]));
- return held.map(l=>({id:l.id,date:l.date,title:JSON.parse(l.title),kind:marks.get(l.id)||null}));
+ const from=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Zagreb'}).format(new Date(personSince(db,userId)));
+ return held.map(l=>({id:l.id,date:l.date,title:JSON.parse(l.title),kind:marks.get(l.id)||null,...(!marks.has(l.id)&&l.date<from?{before:true}:{})}));
 }
 
 /** The one place to start the day: only what needs a decision. */
@@ -36,7 +39,7 @@ export function today(ctx){
  // Titles in the organiser's language; the screen asks with ?lang= when the interface language differs from the account's.
  const lang=['en','hr','ru'].find(l=>l===ctx.url.searchParams.get('lang'))||admin.language||'en';
  const waiting=db.query("SELECT count(*) n FROM submissions WHERE status='submitted'").get().n;
- const overdue=db.query(`SELECT a.user_id,a.project_id,t.id task_id,t.translations,t.due_at,u.display_name who,json_extract(p.draft,'$.name') team FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id LEFT JOIN users u ON u.id=a.user_id LEFT JOIN projects p ON p.id=a.project_id WHERE t.status='published' AND t.pick_mode<>'catalog' AND t.due_at IS NOT NULL AND t.due_at<? AND coalesce(s.status,'not_started') IN ${OPEN} ORDER BY t.due_at LIMIT 40`).all(now).map(r=>({taskId:r.task_id,title:taskTitle(r.translations,lang),dueAt:r.due_at,who:r.who||r.team||'',userId:r.user_id||null,projectId:r.project_id||null}));
+ const overdue=db.query(`SELECT a.user_id,a.project_id,t.id task_id,t.translations,t.due_at,u.display_name who,json_extract(p.draft,'$.name') team FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id LEFT JOIN users u ON u.id=a.user_id LEFT JOIN projects p ON p.id=a.project_id WHERE t.status='published' AND t.pick_mode<>'catalog' AND t.due_at IS NOT NULL AND t.due_at<? AND coalesce(s.status,'not_started') IN ${OPEN} ORDER BY t.due_at LIMIT 80`).all(now).filter(r=>r.due_at>(r.user_id?personSince(db,r.user_id):teamSince(db,r.project_id))).slice(0,40).map(r=>({taskId:r.task_id,title:taskTitle(r.translations,lang),dueAt:r.due_at,who:r.who||r.team||'',userId:r.user_id||null,projectId:r.project_id||null}));
  const help=db.query("SELECT c.project_id,c.blocker,json_extract(p.draft,'$.name') name FROM checkins c JOIN projects p ON p.id=c.project_id WHERE c.needs_help=1 ORDER BY c.created DESC LIMIT 8").all().map(r=>({projectId:r.project_id,name:r.name,blocker:r.blocker}));
  const day=zagrebToday();
  return json({
@@ -74,12 +77,13 @@ export function teamRecord(ctx,id){
  const held=db.query("SELECT count(*) n FROM lectures WHERE status='published' AND date<=?").get(zagrebToday()).n;
  const ledger=db.query(`SELECT beneficiary_type type,amount,reason,created FROM xp_ledger WHERE (beneficiary_type='project' AND beneficiary_id=?) ${ids.length?`OR (beneficiary_type='user' AND beneficiary_id IN (${marks}))`:''} ORDER BY id DESC LIMIT 30`).all(id,...ids);
  return json({
-  id,name:nameOf(p),status:p.status,score:{...teamScore(db,id,ids),percent:teamPercent(db,id,ids)},wallet:wallet(db,id),risk:riskSignals(db,id,ids),streak:streak(db,id),teamXp:projectXp(db,id),pitch:pitchOf(db,id),lectures:held,
+  id,name:nameOf(p),status:p.status,project:JSON.parse(p.draft||'{}'),score:{...teamScore(db,id,ids),percent:teamPercent(db,id,ids)},wallet:wallet(db,id),risk:riskSignals(db,id,ids),streak:streak(db,id),teamXp:projectXp(db,id),pitch:pitchOf(db,id),lectures:held,seats:attendanceSince(db,ids).seats,
   members:members.map(m=>({id:m.id,personId:m.person_id||null,name:m.display_name,role:m.role,status:m.status,lastSeen:lastSeen(db,m.id),xp:userXp(db,m.id),attended:db.query('SELECT count(*) n FROM attendance WHERE user_id=?').get(m.id).n,lastNudge:lastNudge(db,[m.id])})),
   noAccount:roster.filter(r=>!r.linked).map(r=>({id:r.id,name:r.display_name})),
   tasks:assignmentList(db,`(a.project_id=? ${ids.length?`OR a.user_id IN (${marks})`:''})`,id,...ids),
   checkins:db.query('SELECT week,metric_name,metric_value,goal,blocker,needs_help FROM checkins WHERE project_id=? ORDER BY week DESC LIMIT 6').all(id),
-  files:db.query("SELECT id,filename,purpose,size,created FROM files WHERE project_id=? AND status='active' ORDER BY created DESC LIMIT 20").all(id),
+  // Only files the organiser can open: a link that answers 404 helps nobody.
+  files:db.query("SELECT * FROM files WHERE project_id=? AND status='active' ORDER BY created DESC LIMIT 40").all(id).filter(f=>canReadFile(db,ctx.user,f)).slice(0,20).map(f=>({id:f.id,filename:f.filename,purpose:f.purpose,size:f.size,created:f.created})),
   mentors:db.query('SELECT h.mentor_name,h.starts_at,h.topic,b.note FROM office_hour_bookings b JOIN office_hours h ON h.id=b.slot_id WHERE b.project_id=? ORDER BY h.starts_at DESC LIMIT 10').all(id),
   ledger,notes:notesFor(db,'team',id),lastNudge:lastNudge(db,ids),
  });
@@ -100,7 +104,8 @@ export function personRecord(ctx,id){
  return json({
   hasAccount:true,user:{id:user.id,login:user.login,name:user.display_name,email:user.email||'',role:user.role,status:user.status,created:user.created,lastSeen:lastSeen(db,user.id),xp:userXp(db,user.id),linkedin:user.linkedin||'',website:user.website||''},
   person:user.person_id?{id:user.person_id}:null,teams:teams.map(t=>({id:t.id,name:nameOf(t),role:t.role})),
-  tasks:assignmentList(db,`(a.user_id=? OR a.project_id=?)`,user.id,pid),attendance:attendanceOf(db,user.id),
+  // Personal assignments carry project_id='': without a team, match only the person's own.
+  tasks:pid?assignmentList(db,`(a.user_id=? OR a.project_id=?)`,user.id,pid):assignmentList(db,'a.user_id=?',user.id),attendance:attendanceOf(db,user.id),
   ledger:db.query("SELECT amount,reason,created FROM xp_ledger WHERE beneficiary_type='user' AND beneficiary_id=? ORDER BY id DESC LIMIT 20").all(user.id),
   notes:notesFor(db,'user',user.id),lastNudge:lastNudge(db,[user.id]),
  });

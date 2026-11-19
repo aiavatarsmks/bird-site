@@ -16,6 +16,8 @@ const EASE='cubic-bezier(.23,1,.32,1)';
 const done=new WeakSet();
 const reduced=()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches;}catch{return false;}};
 const target=el=>Number(el.dataset.count??el.dataset.tkN??el.dataset.pgCount??el.dataset.psCount);
+// The demo skin (assets/demo-skin.css, body.is-demo) adds a few extra beats; BIRD keeps exactly its own motion.
+const skinned=()=>document.body?.classList.contains('is-demo');
 const store={get(k){try{return localStorage.getItem(k);}catch{return null;}},set(k,v){try{localStorage.setItem(k,v);}catch{}}};
 
 // Anime.js lives next to this file; it is fetched only when something asks for it.
@@ -44,7 +46,9 @@ function countUp(el,delay=0){
    if(!el.isConnected)return resolve();
    const k=Math.max(0,Math.min(1,(now-t0)/dur));el.textContent=Math.round(to*easeOut(k))+suffix;
    if(k<1)return requestAnimationFrame(step);
-   el.classList.remove('is-counting');el.classList.add('is-landed');resolve();
+   el.classList.remove('is-counting');el.classList.add('is-landed');
+   if(skinned())el.closest('.m-xp')?.classList.replace('is-arriving','is-arrived');
+   resolve();
   };
   requestAnimationFrame(step);
  });
@@ -55,6 +59,8 @@ const landed=new WeakMap();
 function counters(scope){
  const list=[...scope.querySelectorAll(SELECTOR)].filter(el=>!done.has(el));
  if(!list.length)return;
+ // Demo: the XP bar's end station waits for its number to land.
+ if(skinned()&&!reduced())list.forEach(el=>{if(el.matches('.is-xp'))el.closest('.m-xp')?.classList.add('is-arriving');});
  if(reduced()){list.forEach(el=>done.add(el));return;}
  const go=el=>{const p=countUp(el,delayOf(el));if(p)landed.set(el,p);};
  if(!('IntersectionObserver' in window)){list.forEach(go);return;}
@@ -126,6 +132,21 @@ async function celebrate(numEl,plus,lvEl){
   return;
  }
  const {createTimeline,stagger}=A;
+ if(skinned()){
+  // Demo: the number arrives like a train at a station. A ring opens round it and small station roundels burst out
+  // on all sides (evenly spread, slightly irregular), then the "+N" chip rises and settles away.
+  const halo=document.createElement('i');halo.className='mo-halo';halo.setAttribute('aria-hidden','true');host.append(halo);
+  const cx=numEl.offsetLeft+numEl.offsetWidth/2,cy=numEl.offsetTop+numEl.offsetHeight/2;
+  halo.style.left=(cx-32)+'px';halo.style.top=(cy-32)+'px';halo.style.margin='0';
+  const n=sparks.length,ang=i=>(i/n)*Math.PI*2+(i%2?.18:-.12),dist=i=>40+(i%3)*12;
+  const tl=createTimeline({onComplete:()=>{cleanup();halo.remove();tl.revert();}});
+  tl.add(numEl,{scale:[1,1.18,1],duration:640,ease:'out(3)'},0)
+   .add(halo,{opacity:[.9,0],scale:[.5,1.9],duration:900,ease:'out(3)'},40)
+   .add(sparks,{opacity:[0,1,0],scale:[.4,1,.6],x:(el,i)=>cx-18+Math.cos(ang(i))*dist(i),y:(el,i)=>cy-8+Math.sin(ang(i))*dist(i)*.7,duration:900,delay:stagger(18),ease:'out(4)'},60)
+   .add(chip,{opacity:[0,1,1,0],y:[10,-14,-22,-36],scale:[.8,1.06,1,1],duration:1700,ease:'out(3)'},120);
+  if(lvEl)tl.add(lvEl,{scale:[1,1.25,1],duration:700,ease:'outElastic(1,.6)'},160);
+  return;
+ }
  const tl=createTimeline({onComplete:()=>{cleanup();tl.revert();}});
  tl.add(numEl,{scale:[1,1.14,1],duration:520,ease:'out(3)'},0)
   .add(chip,{opacity:[0,1,1,0],y:[6,-10,-18,-30],duration:1500,ease:'out(2)'},40)

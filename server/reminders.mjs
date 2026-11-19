@@ -18,7 +18,7 @@ export function zagrebInstant(date,time){
  const shown=Date.parse(new Intl.DateTimeFormat('sv-SE',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(guess)).replace(' ','T')+':00Z');
  return guess-(shown-guess);
 }
-const pickTitle=(json,field)=>{const t=JSON.parse(json||'{}');const get=l=>(field?t[l]?.[field]:t[l])||(field?t.en?.[field]:t.en)||'';return {en:get('en'),hr:get('hr')||get('en'),ru:get('ru')||get('en')};};
+const pickTitle=(json,field)=>{const t=JSON.parse(json||'{}');const one=l=>(field?t[l]?.[field]:t[l])||'',get=l=>[l,'en','hr','ru'].map(one).find(Boolean)||'';return {en:get('en'),hr:get('hr'),ru:get('ru')};};
 
 const TEXT={
  task48:{en:(t,a)=>`2 days left for “${t}” (due ${a}).`,hr:(t,a)=>`Za „${t}” ostala su još 2 dana (rok ${a}).`,ru:(t,a)=>`До сдачи «${t}» осталось 2 дня (срок ${a}).`},

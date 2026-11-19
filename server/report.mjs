@@ -104,7 +104,7 @@ export function buildReport(db,{from,to,basis='custom'},{workspace='BIRD',canVer
  // Tasks accepted in the period, for a team or one of its members.
  const accepted=projectIds.length?db.query(`SELECT s.id,s.updated,a.project_id,a.user_id,t.translations FROM submissions s JOIN assignments a ON a.id=s.assignment_id JOIN task_templates t ON t.id=a.task_id WHERE s.status='accepted' AND ${inRange('s.updated')} AND (a.project_id IN (${marks(projectIds)})${allUsers.length?` OR a.user_id IN (${marks(allUsers)})`:''})`).all(from,to,...projectIds,...allUsers):[];
  const taskTeam=s=>s.project_id&&byId.has(s.project_id)?s.project_id:teamOfUser.get(s.user_id)||'';
- const taskTitle=s=>{try{const t=JSON.parse(s.translations);return t.en?.title||Object.values(t)[0]?.title||'';}catch{return '';}};
+ const taskTitle=s=>{try{const t=JSON.parse(s.translations);return t.en?.title||Object.values(t).find(x=>x?.title)?.title||'';}catch{return '';}};
 
  // A team counts as active when anything happened in the period: check-in, accepted task, lecture, mentor session or outcome.
  const active=new Set([...checkins.map(c=>c.project_id),...accepted.map(taskTeam),...att.map(a=>teamOfUser.get(a.user_id)),...sessions.map(s=>s.project_id),...outcomes.map(o=>o.project_id)].filter(Boolean));

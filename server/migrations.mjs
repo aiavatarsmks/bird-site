@@ -243,5 +243,11 @@ CREATE INDEX IF NOT EXISTS waiting_messages_person ON waiting_messages(person_id
  {id:22,name:'pilot-requests',sql:`
 CREATE TABLE IF NOT EXISTS pilot_requests(id TEXT PRIMARY KEY,name TEXT NOT NULL,organisation TEXT NOT NULL,email TEXT NOT NULL,phone TEXT NOT NULL DEFAULT '',teams TEXT NOT NULL DEFAULT '',message TEXT NOT NULL DEFAULT '',language TEXT NOT NULL DEFAULT 'hr',consent_at TEXT NOT NULL,created TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS pilot_requests_created ON pilot_requests(created);
+`}, // A participant card carries an email, so organisers can link it to the account that signed up with it.
+ {id:23,name:'person-email',sql:`
+ALTER TABLE people ADD COLUMN email TEXT;
+`}, // Croatian grammar in an example task already stored in existing databases; only the untouched wording changes.
+ {id:24,name:'hr-tell-friends',sql:`
+UPDATE task_templates SET translations=json_set(translations,'$.hr.title','Ispričajte petorici prijatelja o projektu') WHERE key='tell-friends' AND json_extract(translations,'$.hr.title')='Ispričajte petero prijatelja o projektu';
 `},
 ];

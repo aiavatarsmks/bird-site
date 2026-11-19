@@ -634,3 +634,20 @@ tr[hidden]{display:none}
 @media(prefers-reduced-motion:reduce){
  .is-io [data-in].is-in{animation:mo-fade .3s ease both!important}
 }
+/* Invitation link with a Copy button; organiser roster forms (new team, add person). Flat, square, Timetable rules. */
+.acc-invite p{margin:0 0 8px}
+.acc-copy{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;max-width:100%}
+.acc-copy-input{flex:1 1 260px;min-width:0;font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--ink);border-radius:0;background:#fff}
+.acc-invite small{display:block;margin-top:8px}
+.acc-roster{margin-bottom:16px}
+.acc-roster>details>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px}
+.m-proof{display:grid;gap:4px}
+.m-proof input[type=file]{max-width:100%}
+.wl-auto+small{flex:1 1 280px}
+/* Organiser reading a team's project; the project block on the team card. */
+.acc-admin-view{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.rec-project-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px 24px;margin:0}
+.rec-project-fields dt{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#666)}
+.rec-project-fields dd{margin:2px 0 0}
+.rec-project-links{display:flex;flex-wrap:wrap;gap:8px 16px;padding:0;list-style:none}
+.rec-project-deck a{overflow-wrap:anywhere}

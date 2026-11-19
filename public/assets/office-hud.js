@@ -72,7 +72,7 @@
  // After a number: the form for that count (k_one / k_few) when there is one.
  const tp=(k,n)=>{const f=k+'_'+(window.BirdPlural?.(lang,n)||'many');return T[f]?t(f):t(k);};
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const title=tr=>tr?.[lang]?.title||tr?.en?.title||'';
+ const title=tr=>[lang,'en','hr','ru'].map(l=>tr?.[l]?.title).find(Boolean)||'';
  const when=iso=>new Intl.DateTimeFormat({en:'en-GB',hr:'hr-HR',ru:'ru-RU'}[lang],{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Zagreb'}).format(new Date(iso));
  const get=async url=>{const r=await fetch(url,{credentials:'same-origin'});if(!r.ok)throw r.status;return r.json();};
 

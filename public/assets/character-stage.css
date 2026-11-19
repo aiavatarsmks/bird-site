@@ -4,7 +4,7 @@
 .cs-char:focus-visible figcaption{outline:2px solid var(--ink);outline-offset:2px}
 .cs-mover{position:relative;transition:transform .1s linear;z-index:1}
 .cs-flip{position:relative;width:var(--w);height:var(--h)}
-.cs-xl{--h:clamp(190px,30vh,280px)}.cs-lg{--h:176px}.cs-md{--h:120px}.cs-sm{--h:84px}
+.cs-xl{--h:clamp(190px,30vh,280px)}.cs-lg{--h:176px}.cs-md{--h:120px}.cs-sm{--h:84px}.cs-xs{--h:64px}
 .cs-char[role=button]{cursor:pointer}
 .cs-stage{--w:calc(var(--h)*384/352)}
 .cs-body{position:absolute;inset:0;background-repeat:no-repeat;background-size:300% 100%;background-position:0 0;image-rendering:pixelated;transform-origin:50% 100%}

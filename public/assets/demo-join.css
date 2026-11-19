@@ -1,0 +1,47 @@
+/* "Join as yourself" in the demo (demo-join.js). Timetable rules: square corners, hairline rules, flat panels,
+   labels in the mono face. Phone first: the character stays in view above the choices. */
+.dj{max-width:1080px;margin:0 auto;padding:20px 0 40px}
+.dj-head h1{margin:0 0 6px}
+.dj-head p{margin:0 0 12px;color:var(--muted);max-width:60ch}
+.dj-steps{display:flex;gap:0;margin:0 0 16px;padding:0;list-style:none;border:1px solid var(--line);width:max-content;max-width:100%;font-family:var(--mono,ui-monospace,monospace);font-size:11.5px;letter-spacing:.03em}
+.dj-steps li{padding:6px 12px;color:var(--muted)}
+.dj-steps li+li{border-left:1px solid var(--line)}
+.dj-steps li[aria-current]{background:var(--ink);color:#fff}
+.dj-body{display:grid;gap:16px}
+.dj-stage{position:sticky;top:0;z-index:2;display:flex;flex-direction:row;align-items:flex-end;justify-content:center;gap:16px;padding:8px 0;background:var(--paper,#eef1f4);border-bottom:1px solid var(--line)}
+.dj-preview{width:min(38vw,160px);aspect-ratio:96/88;height:auto;image-rendering:pixelated;background:linear-gradient(to bottom,transparent 86%,rgba(13,26,58,.07) 86%)}
+.dj .dj-shuffle{min-height:36px;padding:6px 12px;border:1px solid var(--ink);background:transparent;color:var(--ink);font:inherit;font-size:13px;padding:6px 12px;min-height:36px;cursor:pointer;border-radius:0}
+.dj-panel{background:var(--white,#fff);border:1px solid var(--line);padding:4px 16px 16px;min-width:0}
+.dj-row{border:0;border-bottom:1px solid var(--line);margin:0;padding:12px 0;min-width:0}
+.dj-row legend{float:left;width:100%;padding:0 0 8px;font-family:var(--mono,ui-monospace,monospace);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.dj-opts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;clear:both}
+.dj-opts.is-three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.dj-opts.is-swatches{display:flex;flex-wrap:wrap;gap:8px}
+.dj-opt{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:44px;padding:6px 4px;border:1px solid var(--line);background:#fff;color:var(--ink);font:inherit;font-size:13px;line-height:1.2;cursor:pointer;border-radius:0;transition:border-color var(--t-ui,.2s) ease,background-color var(--t-ui,.2s) ease}
+.dj-opt[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);background:var(--tram-wash,#d9e1ff)}
+.dj-opt:active,.dj-swatch:active{transform:scale(.97)}
+.dj-thumb{width:48px;height:auto;image-rendering:pixelated}
+.dj-swatch{width:44px;height:44px;border:1px solid var(--line);background:#fff;cursor:pointer;border-radius:0;padding:3px;position:relative}
+.dj-swatch span{display:block;width:100%;height:100%}
+.dj-swatch[aria-pressed="true"]{outline:2px solid var(--ink);outline-offset:2px}
+.dj-opt:focus-visible,.dj-swatch:focus-visible{outline:2px solid var(--tram,#1f3fc4);outline-offset:2px}
+.dj-field{display:grid;gap:6px;margin:14px 0 0}
+.dj-field span,.dj-team-now span{font-family:var(--mono,ui-monospace,monospace);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.dj-field input,.dj-field select{font:inherit;font-size:16px;min-height:44px;padding:8px 10px;border:1px solid var(--ink);border-radius:0;background:#fff;color:var(--ink);width:100%;box-sizing:border-box}
+.dj-team-now{margin:14px 0 0}
+.dj-match:not(:empty){margin:12px 0 0;padding:12px;border:1px solid var(--watch,#a86a00);background:var(--watch-soft,#fbecc8)}
+.dj-match p{margin:0 0 8px}
+.dj-hint{margin:12px 0 0;color:var(--muted);font-size:14px}
+.dj-actions{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}
+.dj-actions .acc-primary[disabled]{opacity:.45;cursor:not-allowed}
+.dj-note{margin:12px 0 0;font-size:12.5px;color:var(--muted)}
+.dj .acc-flash{margin:14px 0 0}
+.dj-edit-link{margin-top:10px}
+@media (min-width:900px){
+ .dj-body{grid-template-columns:minmax(260px,360px) minmax(0,1fr);align-items:start}
+ .dj-stage{flex-direction:column;align-items:center;top:16px;border:1px solid var(--line);background:#fff;padding:20px 0 16px}
+ .dj-preview{width:min(100%,320px)}
+}
+@media (prefers-reduced-motion:reduce){.dj-opt,.dj-swatch{transition:none}.dj-opt:active,.dj-swatch:active{transform:none}}
+.dj .dj-opt{padding:6px 2px;min-height:44px;font-size:13px}
+.dj .dj-swatch{padding:3px;min-height:0;width:44px;height:44px}

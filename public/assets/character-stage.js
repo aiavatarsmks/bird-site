@@ -3,8 +3,8 @@
    walks a few steps and back. Hover or a click makes it hop; it never spins, a flat sprite turned round looks flat.
    Artwork: assets/<id>.webp (3 poses), and when published BIRD_OFFICE_ACTIVITIES / BIRD_OFFICE_WALK for that id.
 
-   BirdCharacter.html(people,{size})  -> markup; people: [{id,name,src?,attrs?,label?}] (src defaults to assets/<id>.webp)
-                                         size: sm | md | lg | xl | fit (fit: as tall as the stage width allows, people-sheet.css)
+   BirdCharacter.html(people,{size})  -> markup; people: [{id,name,src?,attrs?,label?,decorative?}] (src defaults to assets/<id>.webp)
+                                         size: xs | sm | md | lg | xl | fit (fit: as tall as the stage width allows, people-sheet.css)
    BirdCharacter.start(root)          -> starts the behaviour of every character inside root; returns stop()   */
 (()=>{
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -18,7 +18,9 @@ function html(people,{size='lg'}={}){
  return `<div class="cs-stage cs-${esc(size)}" data-cs-stage>${people.map((p,i)=>{
   const src=p.src||`assets/${p.id}.webp`,act=window.BIRD_OFFICE_ACTIVITIES?.[p.id];
   // p.attrs (escaped by the caller) turns the character into a control, e.g. one that opens that person.
-  return `<figure class="cs-char${noArt(p)?' cs-missing':''}" data-cs-id="${esc(p.id)}" style="--i:${i}" tabindex="0" ${p.attrs?`${p.attrs} role="button"`:'role="img"'} aria-label="${esc(p.label||p.name||'')}">
+  // p.decorative: the character sits inside a link or button that already names the person, so it takes no focus.
+  const role=p.decorative?'aria-hidden="true"':`tabindex="0" ${p.attrs?`${p.attrs} role="button"`:'role="img"'} aria-label="${esc(p.label||p.name||'')}"`;
+  return `<figure class="cs-char${noArt(p)?' cs-missing':''}" data-cs-id="${esc(p.id)}" style="--i:${i}" ${role}>
    <div class="cs-mover"><div class="cs-flip">
     <span class="cs-body cs-idle" style="${noArt(p)?'':`background-image:url('${esc(src)}');`}--beat:-${(i*3.7)%11}s;--breath:-${(i*.9)%3}s"></span>
     ${act?`<span class="cs-body cs-act" style="background-image:url('${esc(act.asset)}')"></span>`:''}

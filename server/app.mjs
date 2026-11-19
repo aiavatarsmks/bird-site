@@ -26,6 +26,7 @@ import * as messages from './messages.mjs';
 import * as wallet from './wallet.mjs';
 import * as report from './report.mjs';
 import * as demoVisit from './demo-visit.mjs';
+import * as demoJoin from './demo-join.mjs';
 import * as leads from './leads.mjs';
 import {LANDING_ASSETS,renderLanding} from './landing.mjs';
 import {createDemoOffice} from './demo-office.mjs';
@@ -56,7 +57,7 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  try{releaseInfo=JSON.parse(readFileSync(publicDir+'/release.json','utf8'));}catch{}
  const integration=createIntegration({config,db,data,publicDir,release:releaseInfo.release});
  // A workspace from the blank template has the account pages only: BIRD's lecture notes, teams, people and office stay with BIRD.
- const blank=seedProfile!=='bird',WORKSPACE_ASSETS=['style.css','account.css','account-i18n.js','letter.js','account.js','workspace.js','workspace.css','character-stage.js','character-stage.css','icons.js','admin-tasks.css','admin-programme.css','account-member.css','bird-motion.js','people-sheet.js','people-sheet.css','admin-report.js','admin-report.css','anime.js'];
+ const blank=seedProfile!=='bird',WORKSPACE_ASSETS=['style.css','account.css','account-i18n.js','whoami.js','whoami.css','letter.js','account.js','workspace.js','workspace.css','character-stage.js','character-stage.css','icons.js','admin-tasks.css','admin-programme.css','account-member.css','bird-motion.js','people-sheet.js','people-sheet.css','admin-report.js','admin-report.css','anime.js','demo-skin.css','character-kit.js','demo-join.js','demo-join.css'];
  const staticFiles=blank
   ?new Map([['/','workspace.html'],['/index.html','workspace.html'],...releaseInfo.assets.filter(n=>WORKSPACE_ASSETS.includes(n)).map(n=>['/assets/'+n,'assets/'+n])])
   :new Map([['/','index.html'],['/index.html','index.html'],['/city-harness.html','city-harness.html'],...releaseInfo.assets.map(n=>['/assets/'+n,'assets/'+n])]);
@@ -74,7 +75,8 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
 
  // Side effects of domain events: task assignment, rewards and badges.
  const hooks={
-  onUserReady(ctx,user){tasks.assignForUser(db,user);},
+  onUserReady(ctx,user){if(people.autoLinkByEmail(db,user))ctx.user=user=db.query('SELECT * FROM users WHERE id=?').get(user.id);tasks.assignForUser(db,user);},
+  onProfileUpdated(ctx,user){if(people.autoLinkByEmail(db,user)){ctx.user=db.query('SELECT * FROM users WHERE id=?').get(user.id);tasks.assignForUser(db,ctx.user);}},
   onEvent(ctx,e){
    if(e.type==='project.created'){progress.badgeForRule(db,e.userId,'project.created');tasks.assignForUser(db,ctx.user);}
    if(e.type==='project.update')tasks.onProjectUpdate(db,e);
@@ -98,6 +100,12 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('GET','/api/demo',ctx=>demoVisit.status(ctx));
  on('POST','/api/demo/enter',ctx=>demoVisit.enter(ctx));
  on('GET','/api/demo/roster',ctx=>demoVisit.roster(ctx));
+ // Join as yourself: the visitor's own character and team, demo only (demo-join.mjs).
+ const withPublic=fn=>ctx=>{ctx.publicDir=publicDir;return fn(ctx);};
+ on('GET','/api/demo/teams',ctx=>demoJoin.listTeams(ctx));
+ on('POST','/api/demo/join',withPublic(demoJoin.join));
+ on('GET','/api/demo/me',ctx=>demoJoin.mine(ctx));
+ on('PUT','/api/demo/me',withPublic(demoJoin.updateMine));
  on('POST','/api/auth/login',ctx=>auth.login(ctx));
  on('POST','/api/auth/logout',ctx=>auth.logout(ctx),{auth:user});
  on('POST','/api/auth/logout-all',ctx=>auth.logout(ctx,true),{auth:user});
@@ -114,6 +122,8 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('GET','/api/people',ctx=>people.listPeople(ctx));
  on('POST','/api/people/claims',ctx=>people.createClaim(ctx),{auth:user});
  on('GET','/api/people/claims',ctx=>people.myClaims(ctx),{auth:user});
+ on('GET','/api/people/:id/status',(ctx,p)=>people.personStatus(ctx,p.id),{auth:user});
+ on('POST','/api/people/:id/link-self',(ctx,p)=>people.linkSelf(ctx,p.id),{auth:user});
  on('POST','/api/invites',ctx=>people.createInvite(ctx),{auth:user});
  on('GET','/api/invites',ctx=>people.listInvites(ctx),{auth:user});
  on('DELETE','/api/invites/:id',(ctx,p)=>people.revokeInvite(ctx,p.id),{auth:user});
@@ -170,6 +180,15 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('PUT','/api/admin/users/:id/status',(ctx,p)=>admin.setUserStatus(ctx,p.id),{auth:user});
  on('GET','/api/admin/claims',ctx=>people.adminClaims(ctx),{auth:user});
  on('POST','/api/admin/claims/:id',(ctx,p)=>people.decideClaim(ctx,p.id),{auth:user});
+ on('GET','/api/admin/links',ctx=>people.adminLinks(ctx),{auth:user});
+ on('POST','/api/admin/links/by-email',ctx=>people.adminLinkByEmail(ctx),{auth:user});
+ on('GET','/api/admin/links/auto',ctx=>people.autoLinkStatus(ctx),{auth:user});
+ on('PUT','/api/admin/links/auto',ctx=>people.setAutoLink(ctx),{auth:user});
+ on('POST','/api/admin/teams',ctx=>people.adminCreateTeam(ctx),{auth:user});
+ on('POST','/api/admin/people',ctx=>people.adminCreatePerson(ctx),{auth:user});
+ on('PUT','/api/admin/people/:id/email',(ctx,p)=>people.setPersonEmail(ctx,p.id),{auth:user});
+ on('POST','/api/admin/people/:id/link',(ctx,p)=>people.adminLink(ctx,p.id),{auth:user});
+ on('POST','/api/admin/people/:id/unlink',(ctx,p)=>people.adminUnlink(ctx,p.id),{auth:user});
  on('GET','/api/admin/tasks',ctx=>tasks.adminTasks(ctx),{auth:user});
  on('POST','/api/admin/tasks',ctx=>tasks.createTask(ctx),{auth:user});
  on('PUT','/api/admin/tasks/:id',(ctx,p)=>tasks.updateTask(ctx,p.id),{auth:user});
@@ -306,7 +325,7 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
    if(route.needs&&!ctx.user)fail(401,'UNAUTHENTICATED');
    if(MUTATING.has(request.method))auth.checkCsrf(ctx);
    // Demo visitors share the invented accounts, so nothing they do may change them.
-   if(MUTATING.has(request.method)&&demoVisit.isDemoUser(ctx.user)&&!['/api/auth/logout','/api/demo/enter'].includes(url.pathname))fail(403,'DEMO_READ_ONLY');
+   if(MUTATING.has(request.method)&&demoVisit.isDemoUser(ctx.user)&&!['/api/auth/logout','/api/demo/enter','/api/demo/join','/api/demo/me'].includes(url.pathname))fail(403,'DEMO_READ_ONLY');
    const response=await route.handler(ctx,url.pathname.match(route.re).groups||{});
    return finish(ctx,response);
   }catch(error){return finish(ctx,errorResponse(error));}
@@ -327,7 +346,8 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
   let file=demo&&['/','/index.html'].includes(url.pathname)?'landing.html':demo&&url.pathname==='/demo'?'workspace.html':staticFiles.get(url.pathname);
   // A demo workspace also gets the office and the incubator map, with characters under invented names.
   if(!file&&demo){
-   if(url.pathname==='/assets/office-demo-data.js')return new Response(demoOffice().script,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+   if(url.pathname==='/assets/office-demo-data.js')return new Response(demoOffice().script+demoJoin.officeScript(db,publicDir),{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+   const own=demoJoin.art(db,publicDir,url.pathname,request);if(own)return own;
    file=DEMO_ASSETS.has(url.pathname.slice(8))&&url.pathname.startsWith('/assets/')?url.pathname.slice(1):demoOffice().files.get(url.pathname);
   }
   if(!file)return new Response('Not found',{status:404});
@@ -335,8 +355,14 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
   let body;try{body=await readFile(publicDir+'/'+file);}catch{return new Response('Not found',{status:404});}
   if(file==='workspace.html')body=body.toString('utf8').replaceAll('{{name}}',escapeHtml(config.workspace?.name||''));
   if(file==='landing.html')body=renderLanding(body.toString("utf8"),selfOrigin(request,config));
-  const type=file.endsWith('.png')?'image/png':file.endsWith('.webp')?'image/webp':file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html';
-  const headers={'Content-Type':type+(type.startsWith('image/')?'':'; charset=utf-8'),'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-BIRD-Release':releaseInfo.release,'Referrer-Policy':'same-origin'};
+  const type=file.endsWith('.png')?'image/png':file.endsWith('.webp')?'image/webp':file.endsWith('.avif')?'image/avif':file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html';
+  // Caching: pages stay no-store; scripts and styles are revalidated against the release (a 304 costs no body);
+  // pictures change rarely and are cached for a day. Text is gzipped when the browser accepts it.
+  const image=type.startsWith('image/'),etag=`"${releaseInfo.release}"`;
+  const cache=type==='text/html'?'no-store':image?'public, max-age=86400':'no-cache';
+  const headers={'Content-Type':type+(image?'':'; charset=utf-8'),'Cache-Control':cache,'X-Content-Type-Options':'nosniff','X-BIRD-Release':releaseInfo.release,'Referrer-Policy':'same-origin'};
+  if(type!=='text/html'){headers.ETag=etag;if(request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers});}
+  if(!image&&body.length>1024&&/\bgzip\b/.test(request.headers.get('accept-encoding')||'')){body=Bun.gzipSync(typeof body==='string'?new TextEncoder().encode(body):body);headers['Content-Encoding']='gzip';headers.Vary='Accept-Encoding';}
   // The office may be framed only by the allowed city origin (light visit); other pages not at all.
   if(type==='text/html')headers['Content-Security-Policy']=`frame-ancestors 'self' ${config.cityOrigins.join(' ')}`;
   return new Response(request.method==='HEAD'?null:body,{headers});

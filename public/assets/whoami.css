@@ -1,0 +1,77 @@
+/* Account control in the header (whoami.js), "This is you / This is me" on a card, and the admin screen of cards and accounts.
+   Timetable rules: square corners, hairline rules, flat panels; only the initials roundel is round (a station). */
+[data-account-menu]{position:relative;display:flex;align-items:center;flex:0 0 auto;margin-left:8px}
+.wm{position:relative;min-width:0}
+.wm-btn,.wm-in{display:inline-flex;align-items:center;gap:8px;min-height:44px;max-width:220px;padding:4px 10px 4px 4px;border:1px solid currentColor;border-color:color-mix(in srgb,currentColor 28%,transparent);border-radius:0;background:transparent;color:inherit;font:inherit;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer;white-space:nowrap}
+.wm-btn:hover,.wm-in:hover,.wm-btn[aria-expanded=true]{border-color:currentColor}
+.wm-ini{flex:0 0 auto;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#1f2a24;color:#fff;font-size:12px;font-weight:700;letter-spacing:.5px}
+.wm-ini.is-out{background:transparent;border:2px solid currentColor;width:22px;height:22px;margin-left:4px;position:relative}
+.wm-ini.is-out::after{content:"";position:absolute;left:50%;bottom:-2px;width:10px;height:5px;margin-left:-5px;border:2px solid currentColor;border-bottom:0}
+.wm-name{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.wm-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.wm-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:60;min-width:230px;max-width:min(300px,calc(100vw - 24px));background:#fff;color:#1f2a24;border:1px solid #1f2a24;box-shadow:none;padding:6px 0;text-align:left}
+.wm-pop[hidden]{display:none}
+.wm-who{margin:0;padding:8px 14px 10px;border-bottom:1px solid #d8dad2;display:grid;gap:2px;font-size:13px}
+.wm-who small{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#5b625c}
+.wm-who b{font-size:15px;overflow-wrap:anywhere}
+.wm-who span{color:#5b625c;overflow-wrap:anywhere}
+.wm-item{display:flex;align-items:center;width:100%;min-height:44px;padding:0 14px;border:0;background:none;color:inherit;font:inherit;font-size:14px;text-decoration:none;text-align:left;cursor:pointer}
+.wm-item:hover,.wm-item:focus-visible{background:#eef0ea;outline:none}
+.wm-item[data-wm-out]{border-top:1px solid #d8dad2}
+.office-page .site-header [data-account-menu]{margin-left:4px}
+/* Demo skin and landing: their own ink and brand blue. */
+.is-demo .wm-ini:not(.is-out),.top .wm-ini:not(.is-out){background:var(--tram,var(--brand,#1f3fc4))}
+.top [data-account-menu]{order:5}
+@media(max-width:640px){
+ [data-account-menu]{margin-left:4px}
+ .site-header [data-account-menu]{order:2}
+ .wm-btn{max-width:132px;padding-right:8px;font-size:13px}
+ .wm-in{padding-right:10px;font-size:13px}
+}
+@media(max-width:400px){.wm-btn{max-width:112px}.wm-ini{width:28px;height:28px;font-size:11px}}
+
+/* On a person's card */
+.wm-card{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%}
+.wm-card:empty{display:none}
+.wm-act{min-height:44px;padding:9px 14px;border:1px solid #1f2a24;border-radius:0;background:#fff;color:#1f2a24;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.wm-act.is-main{background:#1f2a24;color:#fff}
+.wm-act:disabled{opacity:.55;cursor:wait}
+.wm-you{display:inline-flex;align-items:center;min-height:32px;padding:4px 10px;background:#e3efe6;color:#0b6b44;font-size:13px;font-weight:700}
+.wm-you::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:8px}
+.wm-you.is-wait{background:#f7eedb;color:#7a5200}
+.wm-note{width:100%;margin:2px 0 0;font-size:13px;line-height:1.5}
+.wm-note.is-error{color:#b3321b}
+.wm-invite{width:100%;font-size:13px;line-height:1.5}
+.wm-invite p{margin:4px 0 6px}
+.wm-invite span{display:flex;gap:6px}
+.wm-link{flex:1;min-width:0;min-height:44px;padding:8px;border:1px solid #b9bcb1;border-radius:0;font:12px/1.3 ui-monospace,Menlo,monospace;background:#f6f6f2}
+
+/* Admin: participant cards and accounts (#/admin/links) */
+.wl-bar{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:12px 0}
+.wl-count{font-weight:700;margin-right:auto}
+.wl-q{flex:1 1 260px;margin:0}
+.wl-free{display:inline-flex;align-items:center;gap:8px;min-height:44px;font-size:14px}
+.wl-flash{margin:8px 0;padding:8px 12px;background:#e3efe6}
+.wl-flash.is-error{background:#fbe4de;color:#8f2412}
+.wl-list{list-style:none;margin:0;padding:0;border-top:1px solid #d8dad2}
+.wl-row{display:grid;grid-template-columns:minmax(150px,1fr) minmax(220px,1.2fr) minmax(240px,1.6fr);gap:12px 18px;align-items:start;padding:14px 0;border-bottom:1px solid #d8dad2}
+.wl-who{display:grid;gap:2px;overflow-wrap:anywhere}.wl-who small{color:#5b625c}
+.wl-email{display:flex;gap:6px;align-items:end}
+.wl-email label{display:grid;gap:4px;flex:1;min-width:0;font-size:12px;color:#5b625c}
+.wl-email input{min-height:44px;padding:8px;border:1px solid #b9bcb1;border-radius:0;font:inherit;font-size:14px;width:100%}
+.wl-acc{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.wl-acc p{margin:0;flex:1 1 100%;overflow-wrap:anywhere;font-size:14px}
+.wl-acc small{color:#5b625c}
+.wl-tag{display:inline-block;padding:2px 8px;margin-right:4px;font-size:12px;font-weight:700;background:#ecebe3}
+.wl-tag.is-ok{background:#e3efe6;color:#0b6b44}.wl-tag.is-watch{background:#f7eedb;color:#7a5200}
+.wl-pick{flex:1 1 100%;margin:0;border:0;background:none}
+.wl-pick summary{padding:6px 0;font-size:13px;font-weight:600}
+.wl-pick form{display:flex;flex-wrap:wrap;gap:6px;align-items:end}
+.wl-pick select{max-width:100%}
+@media(max-width:760px){.wl-row{grid-template-columns:1fr}}
+/* The demo's brand and language switch leave no room for a name on a phone: initials only (the name is in the menu). */
+@media(max-width:480px){.is-demo .wm-btn .wm-name{display:none}.is-demo .wm-btn{padding-right:4px}}
+/* The office header on a phone keeps its Back link: initials only there. BIRD's other pages keep a short name. */
+@media(max-width:640px){.office-page .wm-btn .wm-name{display:none}.office-page .wm-btn{padding-right:4px}.office-page .site-header [data-account-menu]{order:9;margin-left:auto}}
+@media(max-width:400px){.site-header .wm-btn{max-width:100px}}
+.wm-btn,.wm-in{background:var(--white,#fff)}

@@ -21,9 +21,9 @@ const T={
  navHow:{en:'How it works',ru:'Как это работает'},navMap:{en:'Map',ru:'Карта'},navFaq:{en:'Questions',ru:'Вопросы'},
  ctaDemo:{en:'Open the demo',ru:'Открыть демо'},ctaPilot:{en:'Arrange a pilot',ru:'Договориться о пилоте'},
  heroEyebrow:{en:'For incubators and accelerators',ru:'Для инкубаторов и акселераторов'},
- heroTitle:{en:'Know what all your teams are doing <em><span class="nowrap">—&nbsp;even</span> after the last lecture.</em>',ru:'Вы знаете, чем заняты все ваши команды <em><span class="nowrap">—&nbsp;и</span> после последней лекции.</em>'},
+ heroTitle:{en:'Know what all your teams are doing. <em>Even after the last lecture.</em>',ru:'Вы знаете, чем заняты все ваши команды. <em>И после последней лекции.</em>'},
  heroLead:{en:'Teams earn points for real progress, and you see on one dashboard who is moving, who is stuck and who needs help.',ru:'Команды получают баллы за реальный прогресс, а вы на одной панели видите, кто движется, кто застрял и кому нужна помощь.'},
- heroFine:{en:'No sign-up. An invented incubator with six teams — nothing is saved.',ru:'Без регистрации. Выдуманный инкубатор с шестью командами — ничего не сохраняется.'},
+ heroFine:{en:'No sign-up. An invented incubator with six teams. Nothing is saved.',ru:'Без регистрации. Выдуманный инкубатор с шестью командами. Ничего не сохраняется.'},
  altOffice:{en:'Virtual office of the demo incubator: teams at their desks, each with a progress percentage and a streak of weeks.',ru:'Виртуальный офис демо-инкубатора: команды за своими столами, у каждой процент прогресса и серия недель.'},
  capOffice:{en:'Virtual office: every team has a desk, every person a character',ru:'Виртуальный офис: у каждой команды стол, у каждого человека персонаж'},
  altDash:{en:'Programme manager dashboard: six teams, activity in the last 7 days, average progress, overdue tasks and progress per team.',ru:'Панель руководителя программы: шесть команд, активность за 7 дней, средний прогресс, просроченные задания и прогресс по командам.'},
@@ -45,7 +45,7 @@ const T={
  tagRisk:{en:'3 tasks overdue',ru:'3 задания просрочены'},
  p2Kicker:{en:'What nobody sees',ru:'То, чего не видно'},
  p2Title:{en:'Two months of lectures. Then a year in which nobody knows what happens.',ru:'Два месяца лекций. Потом год, когда никто не знает, что происходит.'},
- p2Pain:{en:'After the programme the teams develop on their own. That is exactly when the results you must show the city, the ministry or a donor happen — and there is no data.',ru:'После программы команды развиваются сами. Именно тогда появляются результаты, которые нужно показать городу, министерству или фонду, — а данных нет.'},
+ p2Pain:{en:'After the programme the teams develop on their own. That is exactly when the results you must show the city, the ministry or a donor happen. And there is no data.',ru:'После программы команды развиваются сами. Именно тогда появляются результаты, которые нужно показать городу, министерству или фонду. А данных нет.'},
  gapBefore:{en:'Today',ru:'Сегодня'},gapAfter:{en:'With {p}',ru:'С {p}'},
  gapFog:{en:'Silence. Who gave up? Who grew?',ru:'Тишина. Кто бросил? Кто вырос?'},
  gapPulse:{en:'a signal every week',ru:'сигнал каждую неделю'},
@@ -54,7 +54,7 @@ const T={
  gapNote:{en:'An illustration, not a measurement: how many teams really keep checking in is what a pilot measures.',ru:'Иллюстрация, а не измерение: сколько команд действительно отчитываются каждую неделю, покажет пилот.'},
  p3Kicker:{en:'For the teams',ru:'Для команд'},
  p3Title:{en:'For teams it is a game, not paperwork.',ru:'Для команд это игра, а не бумажная работа.'},
- p3Pain:{en:'Nobody likes writing reports. So the teams don’t write reports — they complete tasks and collect points.',ru:'Длинные отчёты никто писать не любит. Поэтому вместо них команды выполняют задания и собирают баллы.'},
+ p3Pain:{en:'Nobody likes writing reports. So the teams don’t write reports: they complete tasks and collect points.',ru:'Длинные отчёты никто писать не любит. Поэтому вместо них команды выполняют задания и собирают баллы.'},
  p3Chips:{en:'Game',ru:'Игра'},
  chipPoints:{en:'Points',ru:'Баллы'},chipPointsT:{en:'for tasks, attendance and the weekly check-in',ru:'за задания, посещения и еженедельный отчёт'},
  chipLevels:{en:'Levels',ru:'Уровни'},chipLevelsT:{en:'and achievements',ru:'и достижения'},
@@ -67,7 +67,7 @@ const T={
  p4Kicker:{en:'Network',ru:'Сеть'},
  p4Title:{en:'Global, not local.',ru:'Глобально, а не локально.'},
  p4Pain:{en:'Every incubator has its own mentors and contacts. A team that needs someone from another country is left without a connection.',ru:'У каждого инкубатора свои менторы и свои контакты. Команда, которой нужен человек из другой страны, остаётся без связи.'},
- p4Answer:{en:'We connect incubators: a team from Split will be able to reach a mentor in Belgrade or an incubator in Ljubljana, with both sides’ consent. We start with Croatia.',ru:'Мы связываем инкубаторы: команда из Сплита сможет выйти на ментора в Белграде или инкубатор в Любляне — с согласия обеих сторон. Начинаем с Хорватии.'},
+ p4Answer:{en:'We connect incubators: a team from Split will be able to reach a mentor in Belgrade or an incubator in Ljubljana, with both sides’ consent. We start with Croatia.',ru:'Мы связываем инкубаторы: команда из Сплита сможет выйти на ментора в Белграде или инкубатор в Любляне, с согласия обеих сторон. Начинаем с Хорватии.'},
  p4Honest:{en:'The network is being built. The map shows only what we have actually mapped.',ru:'Сеть строится. На карте только те организации, которые мы действительно проверили.'},
  p4Cta:{en:'See the map',ru:'Посмотреть карту'},
  altNet:{en:'Network sketch: Zagreb, Split and Rijeka connected to Ljubljana, Sarajevo and Belgrade by dashed lines',ru:'Схема сети: Загреб, Сплит и Риека связаны пунктиром с Любляной, Сараево и Белградом'},
@@ -87,15 +87,23 @@ regionTitle:{en:'Croatia and neighbouring countries',ru:'Хорватия и с�
  faqEyebrow:{en:'Questions',ru:'Вопросы'},faqTitle:{en:'What we are asked before a pilot.',ru:'О чём спрашивают перед пилотом.'},
  q1:{en:'Whose data is it?',ru:'Чьи это данные?'},a1:{en:'Yours. Every incubator has a separate database, and the server is in the EU (Amsterdam). On request we export and delete the data.',ru:'Ваши. У каждого инкубатора отдельная база данных, сервер в ЕС (Амстердам). По запросу выгружаем и удаляем данные.'},
  q2:{en:'Does it work in Croatian?',ru:'Есть ли хорватский язык?'},a2:{en:'Yes. The interface is in Croatian, English and Russian, and every user picks their own language.',ru:'Да. Интерфейс на хорватском, английском и русском, и каждый пользователь выбирает свой язык.'},
- q3:{en:'Do teams have to use it?',ru:'Обязаны ли команды этим пользоваться?'},a3:{en:'They don’t — and that is exactly what the pilot measures. Before it starts we write down the success criteria together, for example the share of teams checking in every week and how much time you spend collecting status updates.',ru:'Нет — и именно это измеряет пилот. До старта мы вместе записываем критерии успеха, например долю команд, которые отчитываются каждую неделю, и сколько времени вы тратите на сбор статуса.'},
+ q3:{en:'Do teams have to use it?',ru:'Обязаны ли команды этим пользоваться?'},a3:{en:'They don’t, and that is exactly what the pilot measures. Before it starts we write down the success criteria together, for example the share of teams checking in every week and how much time you spend collecting status updates.',ru:'Нет, и именно это измеряет пилот. До старта мы вместе записываем критерии успеха, например долю команд, которые отчитываются каждую неделю, и сколько времени вы тратите на сбор статуса.'},
  q4:{en:'Our applications are already in Google Forms.',ru:'Заявки у нас уже в Google Forms.'},a4:{en:'We can import Google Forms answers, so teams don’t type everything again.',ru:'Ответы из Google Forms можно импортировать, и командам не придётся вводить всё заново.'},
  q5:{en:'What in the demo is real?',ru:'Что в демо настоящее?'},a5:{en:'The platform is real. The teams, people and numbers in the demo are invented, and nothing you do there is saved.',ru:'Платформа настоящая. Команды, люди и цифры в демо выдуманы, и ничего из того, что вы там делаете, не сохраняется.'},
  actEyebrow:{en:'Next step',ru:'Следующий шаг'},actTitle:{en:'See for yourself. It takes two minutes.',ru:'Посмотрите сами. Это займёт две минуты.'},
  pilotTitle:{en:'Arrange a pilot',ru:'Договориться о пилоте'},
  pilotText:{en:'A pilot runs for one programme cycle. We set up your space with your teams and write down the success criteria before it starts.',ru:'Пилот длится один цикл программы. Мы настраиваем пространство с вашими командами и записываем критерии успеха до старта.'},
- contactSoon:{hr:'Javite nam se — kontakt uskoro. Do tada demo je otvoren svima.',en:'Get in touch — contact details coming soon. Until then the demo is open to everyone.',ru:'Свяжитесь с нами — контакты скоро. А пока демо открыто для всех.'},
+ contactSoon:{hr:'Javite nam se, kontakt stiže uskoro. Do tada demo je otvoren svima.',en:'Get in touch: contact details are coming soon. Until then the demo is open to everyone.',ru:'Свяжитесь с нами: контакты появятся скоро. А пока демо открыто для всех.'},
  email:{hr:'E-pošta',en:'Email',ru:'Почта'},telegram:{hr:'Telegram',en:'Telegram',ru:'Telegram'},phone:{hr:'Telefon',en:'Phone',ru:'Телефон'},
  footLine:{en:'· a platform for incubators and accelerators',ru:'· платформа для инкубаторов и акселераторов'},footTop:{en:'Back to top ↑',ru:'Наверх ↑'},
+ creditWc:{en:'Paintings: watercolours by Albrecht Dürer (1494–1503), Thomas Girtin (1800) and J.&nbsp;M.&nbsp;W.&nbsp;Turner (1842). Public domain, via <a href="https://commons.wikimedia.org/">Wikimedia Commons</a>.',ru:'Картины: акварели Альбрехта Дюрера (1494–1503), Томаса Гёртина (1800) и Уильяма Тёрнера (1842). Общественное достояние, источник — <a href="https://commons.wikimedia.org/">Wikimedia Commons</a>.'},
+ creditOil:{en:'Paintings: Joachim Patinir, Pieter Bruegel the Elder and his circle, Albrecht Altdorfer, Giovanni Bellini. Public domain, via <a href="https://commons.wikimedia.org/">Wikimedia Commons</a>.',ru:'Картины: Иоахим Патинир, Питер Брейгель Старший и его круг, Альбрехт Альтдорфер, Джованни Беллини. Общественное достояние, источник — <a href="https://commons.wikimedia.org/">Wikimedia Commons</a>.'},
+ // Museum labels under the painted plates (one per art variant; HR is in landing.html).
+ lbWcPains:{en:'Thomas Girtin · 1800',ru:'Томас Гёртин · 1800'},lbOilPains:{en:'After Pieter Bruegel the Elder · c. 1600',ru:'По Питеру Брейгелю Старшему · ок. 1600'},
+ lbWcHow:{en:'Albrecht Dürer · c. 1494',ru:'Альбрехт Дюрер · ок. 1494'},lbOilHow:{en:'Pieter Bruegel the Elder · 1565',ru:'Питер Брейгель Старший · 1565'},
+ lbWcMap:{en:'Albrecht Dürer · 1495',ru:'Альбрехт Дюрер · 1495'},lbOilMap:{en:'Albrecht Altdorfer · c. 1528',ru:'Альбрехт Альтдорфер · ок. 1528'},
+ lbWcFaq:{en:'Albrecht Dürer · 1503',ru:'Альбрехт Дюрер · 1503'},lbOilFaq:{en:'Giovanni Bellini · c. 1480',ru:'Джованни Беллини · ок. 1480'},
+ lbWcAct:{en:'J.&nbsp;M.&nbsp;W.&nbsp;Turner · 1842',ru:'Уильям Тёрнер · 1842'},lbOilAct:{en:'Pieter Bruegel the Elder · 1565',ru:'Питер Брейгель Старший · 1565'},
  // Map tooltips.
  HR:{hr:'Hrvatska',en:'Croatia',ru:'Хорватия'},RS:{hr:'Srbija',en:'Serbia',ru:'Сербия'},SI:{hr:'Slovenija',en:'Slovenia',ru:'Словения'},BA:{hr:'Bosna i Hercegovina',en:'Bosnia and Herzegovina',ru:'Босния и Герцеговина'},AT:{hr:'Austrija',en:'Austria',ru:'Австрия'},HU:{hr:'Mađarska',en:'Hungary',ru:'Венгрия'},
  orgs:{hr:'organizacija na karti',en:'organisations on the map',ru:'организаций на карте'},
@@ -246,6 +254,7 @@ const seen=new IntersectionObserver(entries=>entries.forEach(e=>{
 // With the hero intro running, the facts under it wait for their cue in the timeline (see intro()).
 document.querySelectorAll('[data-reveal],[data-gap]').forEach(el=>{if(!(MO&&el.closest('.facts')))seen.observe(el);});
 if(!MO)document.querySelectorAll('[data-map]').forEach(el=>seen.observe(el));
+document.querySelectorAll('.steps').forEach(el=>seen.observe(el));
 
 // The gap: 52 weeks. Programme weeks are dense; afterwards activity fades into fog, or keeps a weekly pulse.
 (function gap(){
@@ -262,13 +271,6 @@ if(!MO)document.querySelectorAll('[data-map]').forEach(el=>seen.observe(el));
  }
  before.innerHTML=a;after.innerHTML=b;
 })();
-
-// Subtle depth in the hero while scrolling: a CSS scroll-driven animation (landing.css) where the browser has one,
-// otherwise this listener. It moves the `translate` property, so the intro's `transform` composes with it.
-if(!reduced&&!(window.CSS?.supports?.('(animation-timeline: scroll()) and (animation-range: 0 1px)'))){
- const layers=[...document.querySelectorAll('[data-depth]')];let ticking=false;
- addEventListener('scroll',()=>{if(ticking)return;ticking=true;requestAnimationFrame(()=>{const y=Math.min(scrollY,1400);layers.forEach(l=>{l.style.translate=`0 ${(y*Number(l.dataset.depth)).toFixed(1)}px`;});ticking=false;});},{passive:true});
-}
 
 /* ---------- Motion (Anime.js; only called when MO) ---------- */
 function onceInView(el,fn,threshold=.25){
@@ -294,30 +296,89 @@ function splitWords(el){
  }
  return words;
 }
+/* ---------- The programme line ----------
+   One SVG over the hero: the main line runs along the top of the facts (each fact is a station), and a branch climbs at
+   45 degrees to a terminal station on the lower edge of the office screenshot. layoutRoute() measures the page, so the
+   line always meets the stations whatever the width or language. */
+const route=document.querySelector('[data-route]');
+let routeParts=null;
+function layoutRoute(){
+ const hero=document.querySelector('.hero'),facts=document.querySelector('.facts'),office=document.querySelector('.shot-office');
+ if(!route||!hero||!facts||!office)return null;
+ const H=hero.getBoundingClientRect(),F=facts.getBoundingClientRect(),O=office.getBoundingClientRect();
+ const w=Math.round(H.width),h=Math.round(H.height),thin=w<720,sw=thin?6:8;
+ const y=F.top-H.top+4,sx=O.left-H.left+O.width*.14,sy=O.bottom-H.top;
+ const drop=Math.max(0,y-sy),stub=Math.min(drop*.35,thin?18:36);
+ // The diagonal never reaches back under the copy column: if the drop is long, the branch climbs straight up instead.
+ const diag=Math.max(0,Math.min(drop-stub,sx-Math.max(sw,O.left-H.left-28))),jx=sx-diag;
+ route.setAttribute('viewBox',`0 0 ${w} ${h}`);
+ if(!routeParts){
+  route.innerHTML='<path class="rl rl-main"/><path class="rl rl-branch"/><circle class="rs"/>';
+  routeParts={main:route.querySelector('.rl-main'),branch:route.querySelector('.rl-branch'),stop:route.querySelector('.rs')};
+ }
+ const {main,branch,stop}=routeParts;
+ main.setAttribute('d',`M${-sw} ${y.toFixed(1)}H${w+sw}`);
+ branch.setAttribute('d',`M${jx.toFixed(1)} ${y.toFixed(1)}L${sx.toFixed(1)} ${(y-diag).toFixed(1)}V${sy.toFixed(1)}`);
+ [main,branch].forEach(p=>p.setAttribute('stroke-width',sw));
+ stop.setAttribute('cx',sx.toFixed(1));stop.setAttribute('cy',sy.toFixed(1));stop.setAttribute('r',thin?9:11);stop.setAttribute('stroke-width',thin?4:5);
+ document.documentElement.classList.add('has-route');
+ return {w,junction:jx/w};
+}
+
 function intro(){
  const h1=document.querySelector('.hero h1'),copy=document.querySelector('.hero-copy');if(!h1||!copy)return;
  const original=h1.innerHTML,words=splitWords(h1);h1.classList.add('is-split');
  const rest=[...copy.children].filter(el=>el!==h1);
  const office=document.querySelector('.shot-office'),dash=document.querySelector('.shot-dash');
- const facts=[...document.querySelectorAll('.facts [data-reveal]')];
+ const facts=[...document.querySelectorAll('.facts .fact')];
+ const geo=layoutRoute();
  let finished=false;
  const finish=()=>{
   if(finished)return;finished=true;
   document.documentElement.classList.remove('mo-intro');
-  clean([...rest,office,dash].filter(Boolean));
+  clean([...rest,dash].filter(Boolean));
+  facts.forEach(f=>{f.classList.add('is-in');f.style.removeProperty('--s');});
   if(h1.querySelector('.mo-w'))h1.innerHTML=original; // a language switch mid-intro already replaced it
   h1.classList.remove('is-split');
  };
  const tl=A.createTimeline({defaults:{ease:'out(4)'},onComplete:finish});
- tl.add(rest[0],{opacity:[0,1],y:[14,0],duration:500},0)
-  .add(words,{y:['135%','0%'],duration:820,delay:A.stagger(42)},90)
-  .add(rest.slice(1),{opacity:[0,1],y:[18,0],duration:620,delay:A.stagger(90)},420)
-  .call(()=>{facts.forEach(el=>seen.observe(el));},900);
- if(office)tl.add(office,{opacity:[0,1],x:[70,0],y:[24,0],rotate:[2.5,0],scale:[.94,1],duration:1150},260);
- if(dash)tl.add(dash,{opacity:[0,1],x:[40,0],y:[90,0],rotate:[-4,0],scale:[.9,1],duration:1050,ease:'outBack(1.15)'},620);
+ tl.add(rest[0],{opacity:[0,1],y:[12,0],duration:500},0)
+  .add(words,{y:['135%','0%'],duration:820,delay:A.stagger(40)},90)
+  .add(rest.slice(1),{opacity:[0,1],y:[16,0],duration:620,delay:A.stagger(90)},420);
+ // The line runs left to right; each station lights (and counts) as the line passes it; at the junction the branch
+ // climbs to the office, and the office paints in from that station.
+ const LINE=1500,T0=300;
+ if(geo&&routeParts){
+  const [main,branch]=A.svg.createDrawable([routeParts.main,routeParts.branch]);
+  A.animate([main,branch],{draw:'0 0',duration:0});routeParts.stop.style.opacity='0';
+  tl.add(main,{draw:['0 0','0 1'],duration:LINE,ease:'inOut(1.6)'},T0);
+  const at=x=>T0+LINE*Math.min(1,Math.max(0,x));
+  const hr=document.querySelector('.hero').getBoundingClientRect();
+  facts.forEach(f=>{const x=(f.getBoundingClientRect().left-hr.left+11)/geo.w;
+   tl.call(()=>{f.classList.add('is-lit','is-in');f.querySelectorAll('[data-count]').forEach(countUp);setTimeout(()=>f.classList.remove('is-lit'),700);},at(x));});
+  const jt=at(geo.junction)-120;
+  tl.add(branch,{draw:['0 0','0 1'],duration:520,ease:'out(2)'},jt)
+   .add(routeParts.stop,{opacity:[0,1],scale:[.3,1],duration:420,ease:'outBack(2)'},jt+440);
+  if(dash)tl.add(dash,{opacity:[0,1],y:[46,0],scale:[.96,1],duration:900,ease:'out(3)'},jt+900);
+ }else{
+  facts.forEach(f=>f.classList.add('is-in'));facts.forEach(f=>f.querySelectorAll('[data-count]').forEach(countUp));
+  if(dash)tl.add(dash,{opacity:[0,1],y:[46,0],duration:900},700);
+ }
+ routeParts?.stop&&tl.call(()=>{routeParts.stop.style.removeProperty('opacity');routeParts.stop.style.removeProperty('transform');},'+=10');
  // A language button pressed mid-intro jumps to the end first, so the new text is not split or hidden.
  document.querySelectorAll('[data-lang]').forEach(b=>b.addEventListener('click',()=>{if(!finished){tl.complete();finish();}},{capture:true}));
- setTimeout(finish,4000); // whatever happens, nothing stays hidden
+ setTimeout(()=>{if(!finished){tl.complete();finish();}},5200); // whatever happens, nothing stays hidden
+}
+// Screenshots further down paint in the same way when they come into view.
+function inkShots(){
+ document.querySelectorAll('.pain .shot-block, .shot-stack').forEach(host=>{
+  const shots=host.matches('.shot-stack')?[...host.querySelectorAll('.shot')]:[host];
+  const pop=host.querySelector('.shot-pop');
+  onceInView(host,()=>{
+   host.classList.add('is-in');
+   if(pop)A.animate(pop,{opacity:[0,1],y:[40,0],rotate:[-3,0],scale:[.94,1],duration:900,delay:650,ease:'out(3)'});
+  },.3);
+ });
 }
 // The map section: the world spreads out from Croatia, the lens and zoom wedge follow, then the region fills in:
 // country dots, country markers, every incubator by distance from Zagreb, and finally the links between cities.
@@ -492,7 +553,7 @@ addEventListener('resize',()=>{if(tipFor)showTip(tipFor);});
  const P=k=>proj(C[k][0],C[k][1]);
  const links=[['zg','st',1],['zg','ri',1],['zg','lj',0],['st','bg',0],['zg','bg',0],['st','sa',0]];
  const style=document.createElementNS(NS,'style');
- style.textContent=`.nl{fill:none;stroke-width:2.2}.nl.on{stroke:#5cc48a}.nl.off{stroke:#e8a93c;stroke-dasharray:6 7;animation:flow 1.6s linear infinite}@keyframes flow{to{stroke-dashoffset:-26}}.nc{fill:#242a26;stroke-width:3}.nt{font:700 15px Inter,-apple-system,sans-serif;fill:#f7f5f0;paint-order:stroke;stroke:#242a26;stroke-width:5px}@media(prefers-reduced-motion:reduce){.nl.off{animation:none}}`;
+ style.textContent=`.nl{fill:none;stroke-width:2.2}.nl.on{stroke:#5fd39b}.nl.off{stroke:#ffc24a;stroke-dasharray:6 7;animation:flow 1.6s linear infinite}@keyframes flow{to{stroke-dashoffset:-26}}.nc{fill:#0b1a55;stroke-width:3}.nt{font:600 14px Unbounded,system-ui,sans-serif;letter-spacing:.02em;fill:#fff;paint-order:stroke;stroke:#0b1a55;stroke-width:5px}@media(prefers-reduced-motion:reduce){.nl.off{animation:none}}`;
  root.append(style);
  // With Anime.js each link is revealed through a mask that draws itself, so dashed lines keep their dashes while drawing.
  const defs=MO?svg('defs',{},root):null,draw=[];
@@ -502,7 +563,7 @@ addEventListener('resize',()=>{if(tipFor)showTip(tipFor);});
   if(defs){const m=svg('mask',{id:'nl-m'+n,maskUnits:'userSpaceOnUse',x:0,y:0,width:R.w,height:R.h},defs);draw.push(svg('path',{d,fill:'none',stroke:'#fff','stroke-width':8,'stroke-linecap':'round'},m));line.setAttribute('mask',`url(#nl-m${n})`);}
  });
  const nodes=[],labels=[];
- for(const k of Object.keys(C)){const [x,y]=P(k),hr=['zg','st','ri'].includes(k);nodes.push(svg('circle',{cx:x,cy:y,r:k==='zg'?9:7,class:'nc',stroke:hr?'#5cc48a':'#e8a93c'},root));const tx=svg('text',{x:x+(k==='ri'||k==='lj'?-12:12),y:y+(k==='st'?22:-12),class:'nt','text-anchor':k==='ri'||k==='lj'?'end':'start'},root);tx.textContent=C[k][2];labels.push(tx);}
+ for(const k of Object.keys(C)){const [x,y]=P(k),hr=['zg','st','ri'].includes(k);nodes.push(svg('circle',{cx:x,cy:y,r:k==='zg'?9:7,class:'nc',stroke:hr?'#5fd39b':'#ffc24a'},root));const tx=svg('text',{x:x+(k==='ri'||k==='lj'?-12:12),y:y+(k==='st'?22:-12),class:'nt','text-anchor':k==='ri'||k==='lj'?'end':'start'},root);tx.textContent=C[k][2];labels.push(tx);}
  if(!MO)return;
  // Cities appear first, then the links draw from Zagreb outwards, then the names.
  const drawables=A.svg.createDrawable(draw);
@@ -519,5 +580,10 @@ addEventListener('resize',()=>{if(tipFor)showTip(tipFor);});
 
 applyLang();labelCountries();
 document.querySelectorAll('[data-lang]').forEach(b=>b.addEventListener('click',labelCountries));
-if(MO){intro();mapIntro();}
+if(MO){intro();mapIntro();inkShots();}
+else{layoutRoute();}
+let rT;addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(layoutRoute,120);});
+addEventListener('load',()=>layoutRoute());
+document.fonts?.ready.then(()=>layoutRoute());
+document.querySelectorAll('[data-lang]').forEach(b=>b.addEventListener('click',()=>requestAnimationFrame(layoutRoute)));
 })();

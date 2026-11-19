@@ -1,0 +1,239 @@
+/* Demo skin: the "Programme line" art direction of the landing page, carried into the demo app.
+   Everything here is scoped to body.is-demo, which workspace.js sets only in a demo workspace. BIRD (index.html) never
+   loads this file, and other workspaces never get the class, so they keep the incumbent look.
+   Shape rule as on the landing page: controls are pills, panels have a 16px radius, stations are circles.
+   Motion tokens are shared with landing.css: --ease-out for arrivals, --ease-io for travel, --ease-pop for stations. */
+body.is-demo{
+ --paper:#eef1f4;--ink:#0d1a3a;--ink-soft:#2a3654;--muted:#4b5672;--line:#d3d9e3;--accent:#1f3fc4;--light:#e3e9fb;--white:#fff;
+ --ok:#0b8a5c;--ok-soft:#d7f1e4;--watch:#a86a00;--watch-soft:#fbecc8;--risk:#cf3a21;--risk-soft:#fbe0d9;--info:#1f3fc4;--info-soft:#dfe6ff;--track:#e1e6ee;
+ --tram:#1f3fc4;--tram-deep:#10267a;--tram-night:#0b1a55;--tram-wash:#d9e1ff;
+ --ease-out:cubic-bezier(.16,1,.3,1);--ease-io:cubic-bezier(.77,0,.175,1);--ease-pop:cubic-bezier(.3,1.3,.6,1);
+ --t-press:120ms;--t-ui:220ms;--t-move:480ms;--ease:var(--ease-out);--mo-ease:var(--ease-out);
+ --display:"Unbounded","Arial Black",system-ui,sans-serif;--sans:"Onest",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+ --r:16px;--lift:0 1px 0 rgba(13,26,58,.05),0 18px 36px -24px rgba(16,38,122,.5);
+ background:var(--paper);color:var(--ink);font-family:var(--sans);font-size-adjust:from-font
+}
+@view-transition{navigation:auto}
+
+/* ---------- Top menu ---------- */
+.is-demo .site-header{background:var(--white);border-bottom:1px solid var(--line);view-transition-name:demo-header}
+.is-demo .header-inner{min-height:66px}
+.is-demo .brand{gap:10px}
+.is-demo .brand::before{content:"";width:21px;height:20px;flex:none;background:
+ linear-gradient(#e2462c,#e2462c) 0 100%/6px 9px no-repeat,linear-gradient(#f0a500,#f0a500) 7.5px 100%/6px 14px no-repeat,linear-gradient(#12a36d,#12a36d) 15px 100%/6px 20px no-repeat;border-radius:3px}
+.is-demo .brand b{font:600 17px/1 var(--display);letter-spacing:-.02em}
+.is-demo .site-header .top-nav{gap:4px}
+.is-demo .site-header .top-nav a{font-size:14.5px;font-weight:600;color:var(--muted);padding:8px 14px;border:0;border-radius:999px;transition:background-color var(--t-ui) ease,color var(--t-ui) ease}
+.is-demo .site-header .top-nav a:hover{color:var(--ink);background:var(--paper)}
+.is-demo .site-header .top-nav a[aria-current]{color:#fff;background:var(--ink)}
+.is-demo .langs{background:var(--white);border-color:var(--line)}
+.is-demo .langs button{transition:background-color var(--t-ui) ease,color var(--t-ui) ease}
+
+/* ---------- Demo strip ("View as") ---------- */
+.is-demo .demo-bar{background:var(--tram-night);color:#d6ddf7;border-bottom:0;padding:8px 16px;font-size:13.5px;view-transition-name:demo-strip}
+.is-demo .demo-bar>span:first-child{display:inline-flex;align-items:center;gap:8px}
+.is-demo .demo-bar>span:first-child::before{content:"";width:10px;height:10px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px #12a36d;flex:none}
+.is-demo .demo-switch{gap:4px}
+.is-demo .demo-switch button,.is-demo .demo-bar button{border:1px solid rgba(255,255,255,.34);color:#fff;background:transparent;border-radius:999px;padding:5px 14px;font-weight:600;transition:background-color var(--t-ui) ease,color var(--t-ui) ease,transform var(--t-press) var(--ease-out)}
+.is-demo .demo-switch button:hover{background:rgba(255,255,255,.12)}
+.is-demo .demo-switch button[aria-pressed="true"]{background:#fff;color:var(--ink);border-color:#fff}
+.is-demo .demo-switch button:active{transform:scale(.96)}
+.is-demo .demo-hero-links{border-left-color:rgba(255,255,255,.2)}
+.is-demo .demo-hero-links a{border:1px solid rgba(255,255,255,.34);color:#fff;border-radius:999px;padding:3px 14px;transition:background-color var(--t-ui) ease,color var(--t-ui) ease}
+.is-demo .demo-hero-links a:first-child{background:var(--tram);border-color:var(--tram);color:#fff}
+.is-demo .demo-hero-links a:hover{background:#fff;color:var(--ink);border-color:#fff}
+@media(max-width:640px){
+ .is-demo .demo-switch{gap:0}
+ .is-demo .demo-switch button{border-radius:0}
+ .is-demo .demo-switch button:first-of-type{border-radius:999px 0 0 999px}
+ .is-demo .demo-switch button:last-of-type{border-radius:0 999px 999px 0}
+}
+
+/* ---------- Type ---------- */
+.is-demo :is(.acc h1,.acc .acc-project-title,.acc-score b,.acc-preview h2,.acc .dash-title,.acc .rec-title h2,.rec-stats .acc-card-head h2,.m-task-title h2,.pg .pg-title,.ps-id h2,.tk-ed-title h2){font-family:var(--display);font-weight:600;letter-spacing:-.03em}
+.is-demo .acc h1{font-size:clamp(26px,3.6vw,40px);line-height:1.08}
+.is-demo .acc .dash-title{font-size:clamp(22px,2.6vw,30px)}
+.is-demo .pg .pg-title{font-size:clamp(22px,2.8vw,32px);line-height:1.12}
+.is-demo .acc .eyebrow{color:var(--tram)}
+.is-demo :is(.ui-num,.dash-alert b,.pg-num,.m-xp-top .is-xp,.m-lv-big b,.m-loot .m-num,.m-coin .m-num,.m-serie-head .m-num,.acc-m .m-counter output,.m-stat .m-num){font-family:var(--display);font-weight:500;letter-spacing:-.045em}
+.is-demo .ui-num small{font-family:var(--sans);letter-spacing:0}
+.is-demo .dash-kpis .ui-num{font-size:42px}
+.is-demo .ui-ring b{font:600 16px/1 var(--display);letter-spacing:-.04em}
+.is-demo .acc .dash-card h3{font:600 16.5px/1.2 var(--display);letter-spacing:-.02em}
+.is-demo .m-xp-top .is-xp{font-size:44px;color:var(--tram)}
+.is-demo .acc-m .acc-card h2,.is-demo .dash-panel h3{letter-spacing:-.01em}
+
+/* ---------- Tabs ---------- */
+.is-demo .acc-tabs a[aria-current=page]{border-bottom-color:var(--tram)}
+.is-demo .acc-tabs a::after{background:var(--tram);height:3px;border-radius:3px}
+.is-demo .acc-m>.acc-tabs{border-bottom:1px solid var(--line);gap:4px;padding-bottom:8px}
+.is-demo .acc-m>.acc-tabs a{border-radius:999px;transition:background-color var(--t-ui) ease,color var(--t-ui) ease}
+.is-demo .acc-m>.acc-tabs a[aria-current=page]{background:var(--ink);color:#fff}
+
+/* ---------- Buttons: pills, tram blue primary, a press sinks ---------- */
+.is-demo :is(.acc button,.acc-primary,.acc-secondary,.acc-m button,.acc-m .acc-primary,.acc-m .acc-secondary){border-radius:999px;transition:background-color var(--t-ui) ease,border-color var(--t-ui) ease,color var(--t-ui) ease,transform var(--t-press) var(--ease-out),box-shadow var(--t-ui) ease}
+.is-demo :is(.acc .acc-primary,.acc-m .acc-primary){background:var(--tram);border-color:var(--tram);color:#fff}
+.is-demo :is(.acc .acc-primary,.acc-m .acc-primary):hover{background:var(--tram-deep);border-color:var(--tram-deep);transform:none;box-shadow:0 12px 24px -14px rgba(16,38,122,.8)}
+.is-demo :is(.acc button,.acc-primary,.acc-secondary):active:not(:disabled){transform:scale(.97);transition-duration:60ms}
+.is-demo .acc .acc-secondary{border-color:var(--ink)}
+.is-demo .acc .acc-secondary:hover{background:var(--ink);color:#fff}
+.is-demo .acc-dot{border-radius:999px}
+/* The 1-10 scale and other square chips inside cards stay readable as small rounded keys. */
+.is-demo .acc-m .acc-scale span{border-radius:10px}
+
+/* ---------- Panels: white, rounded, a soft blue-tinted lift ---------- */
+.is-demo :is(.acc-card,.acc-m .acc-card,.dash-panel,.pg-card,.pg-tile,.acc .ui-kpi,.acc .dash-alert,.dash-card,.m-hero,.acc-m .acc-table-wrap,.acc-m details.acc-card){border-radius:var(--r);border-color:var(--line)}
+.is-demo :is(.dash-panel,.pg-card,.acc .ui-kpi,.dash-card,.m-hero,.acc-m .acc-card){box-shadow:var(--lift)}
+/* Status shows as a station roundel in the corner, not as a thick coloured side bar. */
+.is-demo .acc .ui-kpi::before,.is-demo .acc .dash-alert::before{left:auto;right:14px;top:14px;bottom:auto;width:13px;height:13px;border-radius:50%;background:#fff;border:3.5px solid var(--kc,var(--line));box-sizing:border-box}
+.is-demo .acc .dash-alert::before{top:50%;margin-top:-6.5px;right:auto;left:14px}
+.is-demo .acc .dash-alert{padding-left:38px}
+.is-demo .acc a.ui-kpi:hover,.is-demo .acc button.ui-kpi:hover,.is-demo .acc .dash-alert:hover{transform:translateY(-2px);box-shadow:0 22px 40px -24px rgba(16,38,122,.65);border-color:var(--tram)}
+.is-demo .acc .ui-kpi[aria-pressed=true]{border-color:var(--tram);box-shadow:inset 0 0 0 2px var(--tram)}
+.is-demo .acc .ui-kpi,.is-demo .acc .dash-alert{transition:transform var(--t-ui) var(--ease-out),box-shadow var(--t-ui) ease,border-color var(--t-ui) ease}
+/* Team cards: the status line runs along the top edge inside the rounded card. */
+.is-demo .dash-card{border-top-width:1px;border-top-color:var(--line);box-shadow:inset 0 4px 0 var(--c),var(--lift);transition:transform var(--t-ui) var(--ease-out),box-shadow var(--t-ui) ease,border-color var(--t-ui) ease}
+.is-demo .dash-card.is-ok,.is-demo .dash-card:not(.is-watch):not(.is-risk){--c:var(--ok)}
+.is-demo .dash-card:hover{transform:translateY(-3px);border-color:var(--c);border-top-color:var(--c);box-shadow:inset 0 4px 0 var(--c),0 26px 44px -26px rgba(16,38,122,.6);background:#fff}
+.is-demo .dash-card:focus-within{outline-color:var(--tram)}
+/* Today: the same rule. */
+.is-demo .pg{--pg-shadow:0 22px 40px -24px rgba(16,38,122,.6);--pg-c0:#1f3fc4;--pg-c2:#cf3a21}
+.is-demo .pg-card{border-top-width:1px}
+.is-demo .pg-tile{border-left-width:1px;border-left-color:var(--line);position:relative;padding-left:16px}
+.is-demo .pg-tile::after{content:"";position:absolute;right:12px;top:12px;width:12px;height:12px;border-radius:50%;border:3.5px solid var(--tone,var(--line));box-sizing:border-box;background:#fff}
+.is-demo a.pg-kpi:hover,.is-demo .pg-tile:hover{transform:translateY(-2px)}
+/* Participant: the hero card, stats and quests. */
+.is-demo .acc-m{--m-shadow:var(--lift);--m-track:#e1e6ee;--m-xp:var(--tram)}
+.is-demo .m-hero{border-width:1px;overflow:visible}
+.is-demo .m-hero-stage{border-radius:var(--r) 0 0 var(--r)}
+@media(max-width:600px){.is-demo .m-hero-stage{border-radius:var(--r) var(--r) 0 0}}
+.is-demo .m-hero-stage{border-right:1px solid var(--line);background:linear-gradient(180deg,var(--light),#f3f6ff)}
+.is-demo .m-hero-stage::before{background:repeating-linear-gradient(90deg,rgba(31,63,196,.07) 0 22px,transparent 22px 44px);border-top-color:rgba(31,63,196,.18)}
+.is-demo .m-stat{border-radius:12px;background:var(--paper);border-color:var(--line)}
+.is-demo .m-stat.is-streak{background:#fff4e6;border-color:#f6d2a8}
+.is-demo .m-quest>a{border-left-width:1px;border-radius:14px;transition:transform var(--t-ui) var(--ease-out),box-shadow var(--t-ui) ease,border-color var(--t-ui) ease}
+.is-demo .m-quest>a:hover{transform:translateY(-2px);box-shadow:var(--lift);border-color:var(--tram)}
+.is-demo .acc-m .acc-grid>.acc-card:first-child{border-top-width:1px;box-shadow:inset 0 4px 0 var(--tram),var(--lift)}
+.is-demo .m-alert{border-left-width:1px!important;box-shadow:inset 4px 0 0 var(--m-info),var(--lift)}
+.is-demo .m-alert.is-ok{box-shadow:inset 4px 0 0 var(--m-ok),var(--lift)}
+.is-demo .acc-m .m-mentor{border-radius:14px}
+.is-demo .acc-m .m-mentor:hover{transform:translateY(-2px);box-shadow:var(--lift)}
+.is-demo .acc-m .acc-chip,.is-demo .m-tag{border-radius:999px}
+
+/* ---------- Numbers, rings, bars ---------- */
+.is-demo .ui-ring circle{stroke-linecap:round}
+.is-demo .ui-ring .ring-t{stroke:var(--track)}
+.is-demo .ui-bar,.is-demo .m-bar{border-radius:999px}
+.is-demo .ui-bar>i{border-radius:999px}
+.is-demo .m-bar i{border-radius:999px}
+/* The XP bar ends in a station: when the count lands (bird-motion.js adds .is-arrived) the roundel drops in. */
+.is-demo .m-bar.is-xp{overflow:visible}
+.is-demo .m-bar.is-xp i{position:relative;background-image:none}
+.is-demo .m-bar.is-xp i::after{content:"";position:absolute;right:-9px;top:50%;width:20px;height:20px;margin-top:-10px;border-radius:50%;background:#fff;border:5px solid var(--tram);box-sizing:border-box;transform:scale(0)}
+.is-demo .m-xp.is-arrived .m-bar.is-xp i::after,.is-demo .m-xp:not(.is-arriving) .m-bar.is-xp i::after{transform:none;transition:transform .5s var(--ease-pop)}
+.is-demo span.is-landed:not(.ui-num){display:inline-block}
+@media(prefers-reduced-motion:no-preference){
+ .is-demo .is-landed{animation:num-land .45s var(--ease-pop)}
+ @keyframes num-land{40%{transform:translateY(-2px) scale(1.05)}}
+}
+/* "+N points": a tram-blue chip rises from the number while station rings burst outward (bird-motion.js). */
+.is-demo .mo-gain{font:600 14px/1 var(--display);letter-spacing:-.02em;color:#fff;background:var(--tram);border:0;border-radius:999px;padding:6px 10px;box-shadow:0 10px 20px -10px rgba(16,38,122,.9)}
+.is-demo .mo-spark{width:12px;height:12px;border-radius:50%;background:#fff;border:3.5px solid var(--tram);box-sizing:border-box}
+.is-demo .mo-spark:nth-of-type(3n){border-color:#12a36d;background:#fff}
+.is-demo .mo-spark:nth-of-type(3n+1){width:9px;height:9px;border-width:3px;border-color:#f0a500;background:#fff}
+.is-demo .mo-halo{position:absolute;left:0;top:50%;width:64px;height:64px;margin:-32px 0 0 -8px;border-radius:50%;border:3px solid var(--tram);pointer-events:none;opacity:0}
+
+/* ---------- Route changes: the page under the menu cross-fades and settles ---------- */
+::view-transition-old(root){animation:vt-out 160ms ease both}
+::view-transition-new(root){animation:vt-in 300ms var(--ease-out,cubic-bezier(.16,1,.3,1)) both}
+@keyframes vt-out{to{opacity:0}}
+@keyframes vt-in{from{opacity:0;transform:translateY(8px)}}
+::view-transition-group(demo-header),::view-transition-group(demo-strip){animation-duration:0s}
+@media(prefers-reduced-motion:reduce){
+ ::view-transition-new(root){animation:vt-fade 200ms ease both}
+ @keyframes vt-fade{from{opacity:0}}
+ .is-demo .m-bar.is-xp i::after{transform:none}
+}
+
+/* ---------- Participant details: keys and tags in the same rounded grammar ---------- */
+.is-demo .m-quest>a,.is-demo .m-quest[class*=is-]>a{border-left-color:var(--line)}
+.is-demo .m-quest>a:hover{border-color:var(--tram)}
+.is-demo .m-pts{border-radius:999px;border-width:1.5px}
+.is-demo .m-lv-tag{border-radius:var(--r) 0 12px 0}
+.is-demo .m-badges li,.is-demo .m-badges.is-small li{border-radius:12px}
+.is-demo .m-add{border-radius:50%;border-width:1.5px;transition:background-color var(--t-ui) ease,color var(--t-ui) ease}
+.is-demo .m-add:hover{background:var(--ink);color:#fff}
+.is-demo .acc-feedback{border-color:var(--line)}
+.is-demo .acc-m .acc-news.is-unread{border-width:1px;box-shadow:inset 0 4px 0 var(--tram),var(--lift)}
+
+/* ---------- Office toolbar: the same pill controls (the office art itself is untouched) ---------- */
+.is-demo .office-toolbar :is(input,select,button){border-radius:999px;transition:background-color var(--t-ui) ease,border-color var(--t-ui) ease,transform var(--t-press) var(--ease-out)}
+.is-demo .office-toolbar button:active{transform:scale(.96)}
+.is-demo .office-toolbar :is(input,select):focus-visible{outline:3px solid var(--tram);outline-offset:1px}
+/* The map keeps its own colours but takes the demo's type. */
+.is-demo :is(.imap-head h1,.imap-card h3,.imap-hrcard b){font-family:var(--display);font-weight:600;letter-spacing:-.03em}
+.is-demo .imap-seaname{font-family:var(--sans)}
+/* Phone: the top menu stays on one line and scrolls sideways instead of wrapping under the logo. */
+@media (max-width:720px){
+ .is-demo .site-header .top-nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent)}
+ .is-demo .site-header .top-nav::-webkit-scrollbar{display:none}
+ .is-demo .site-header .top-nav a{flex:0 0 auto;padding:7px 11px;font-size:14px}
+}
+
+/* ==========================================================================
+   Timetable pass (owner, 17 Nov): rounded panels, pills and soft shadows read as machine-made.
+   The shape rule is now a printed timetable: square corners, hairline rules, flat panels, one filled control per view.
+   Only stations, dots and sparks stay round. Headings in Onest, figures and labels in Martian Mono.
+   ========================================================================== */
+body.is-demo{--r:0px;--lift:none;--display:"Onest",system-ui,sans-serif;--mono:"Martian Mono",ui-monospace,Menlo,monospace}
+.is-demo :is(button,input,select,textarea,a,.acc-card,.dash-panel,.pg-card,.pg-tile,.ui-kpi,.dash-alert,.dash-card,.m-hero,.m-hero-stage,.m-stat,.m-quest>a,.m-mentor,.acc-chip,.m-tag,.m-pts,.m-lv-tag,.m-badges li,.acc-scale span,.acc-table-wrap,.mo-gain,.ui-bar,.ui-bar>i,.m-bar,.m-bar i,.langs,.langs button,.acc-tabs a::after){border-radius:0!important;box-shadow:none}
+.is-demo :is(.dash-panel,.pg-card,.acc .ui-kpi,.dash-card,.m-hero,.acc-m .acc-card,.acc .dash-alert){box-shadow:none!important}
+
+/* Headings: tight grotesque, no wide display face. */
+.is-demo :is(.acc h1,.acc .acc-project-title,.acc-score b,.acc-preview h2,.acc .dash-title,.acc .rec-title h2,.rec-stats .acc-card-head h2,.m-task-title h2,.pg .pg-title,.ps-id h2,.tk-ed-title h2,.acc .dash-card h3,.imap-head h1,.imap-card h3,.imap-hrcard b){font-family:var(--display);font-weight:700;letter-spacing:-.035em}
+.is-demo .acc h1{font-size:clamp(28px,3.8vw,44px);line-height:1}
+/* Figures and small labels: monospaced, like a departures board. */
+.is-demo :is(.ui-num,.dash-alert b,.pg-num,.m-xp-top .is-xp,.m-lv-big b,.m-loot .m-num,.m-coin .m-num,.m-serie-head .m-num,.acc-m .m-counter output,.m-stat .m-num,.ui-ring b){font-family:var(--mono);font-weight:500;letter-spacing:-.06em;font-variant-numeric:tabular-nums}
+.is-demo .dash-kpis .ui-num{font-size:40px}
+.is-demo :is(.acc .eyebrow,.dash-card .ui-kpi-label,.ui-kpi>span:first-child,.dash-panel h3,.acc-m .acc-card h2 small){font-family:var(--mono);font-weight:500;font-size:11px;letter-spacing:.04em}
+
+/* Top menu: words on a rule, the current one underlined, nothing filled. */
+.is-demo .site-header .top-nav{gap:22px}
+.is-demo .site-header .top-nav a{padding:22px 0 20px;color:var(--muted);background:none!important;border-bottom:2px solid transparent}
+.is-demo .site-header .top-nav a:hover{color:var(--ink)}
+.is-demo .site-header .top-nav a[aria-current]{color:var(--ink);background:none!important;border-bottom-color:var(--tram)}
+.is-demo .langs{border:1px solid var(--line);padding:0;gap:0}
+.is-demo .langs button{min-width:40px;font-family:var(--mono);font-size:11px}
+
+/* Demo strip: thin, text controls; the role switch is one square segmented control. */
+.is-demo .demo-bar{padding:6px 16px;font-size:13px}
+.is-demo .demo-bar>span:first-child::before{width:7px;height:7px;box-shadow:none;background:#12d18a}
+.is-demo .demo-switch{gap:0;border:1px solid rgba(255,255,255,.35)}
+.is-demo .demo-switch button,.is-demo .demo-bar button{border:0;padding:4px 12px}
+.is-demo .demo-switch button+button{border-left:1px solid rgba(255,255,255,.35)}
+.is-demo .demo-hero-links{gap:18px}
+.is-demo .demo-hero-links a,.is-demo .demo-hero-links a:first-child{border:0;background:none;padding:4px 0;color:#fff;text-decoration:underline;text-decoration-color:rgba(255,255,255,.4);text-underline-offset:4px}
+.is-demo .demo-hero-links a:first-child{text-decoration-color:#7f9bff;font-weight:600}
+.is-demo .demo-hero-links a:hover{background:none;color:#fff;text-decoration-color:#fff}
+
+/* Buttons: rectangles. Primary is ink, secondary is an outline, quiet actions are underlined text. */
+.is-demo :is(.acc .acc-primary,.acc-m .acc-primary){background:var(--ink);border-color:var(--ink)}
+.is-demo :is(.acc .acc-primary,.acc-m .acc-primary):hover{background:var(--tram);border-color:var(--tram);box-shadow:none}
+.is-demo .acc-m>.acc-tabs a[aria-current=page]{background:none;color:var(--ink);box-shadow:inset 0 -2px 0 var(--tram)}
+.is-demo .acc-tabs a::after{height:2px}
+
+/* Panels: flat white sheets on hairlines. KPI status is a short coloured rule on top, not a roundel. */
+.is-demo .acc .ui-kpi::before{left:0;right:auto;top:0;width:40px;height:3px;border:0;background:var(--kc,var(--line))}
+.is-demo .acc .dash-alert::before{left:0;top:0;bottom:0;margin:0;width:3px;height:auto;border:0;background:var(--kc,var(--line))}
+.is-demo .acc .dash-alert{padding-left:18px}
+.is-demo .ui-bar,.is-demo .m-bar{height:6px}
+
+/* Office toolbar: one row of square controls; zoom buttons joined into a group. */
+.is-demo .office-toolbar :is(input,select,button){border-radius:0}
+.is-demo .office-toolbar .camera-tools{gap:0}
+.is-demo .office-toolbar .camera-tools button+button{margin-left:-1px}
+.is-demo .office-toolbar button:active{transform:none}
+.is-demo .acc .ui-kpi::before,.is-demo .acc .dash-alert::before{border-radius:0}
+.is-demo .demo-switch{margin-left:8px}
+/* The stage chart sits right under its heading instead of at the bottom of a tall panel, where it looked empty above the fold. */
+.is-demo .dash-panel .viz-stages{flex:0 0 auto;margin-top:14px}

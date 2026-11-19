@@ -81,7 +81,8 @@ document.addEventListener?.('keydown',e=>{if(e.key!=='Escape'||!root)return;if(f
 window.addEventListener?.('orientationchange',()=>{if(root&&camera)setTimeout(()=>fullscreen?fit():applyCamera(),250);});
 // The team label hugs its text, and while a person is hovered it sits above that person.
 function labelWidth(name){return Math.round(Math.max(64,42+truncate(name,40).length*7.6));}
-function labelTransform(el){const scale=camera?.scale||1,a=el.dataset.anchorPerson&&life?.actors.get(el.dataset.anchorPerson);if(a){const[x,y]=BirdOfficeScene.project(...a.pos);el.dataset.labelX=x-Number(el.dataset.labelW)/(2*scale);el.dataset.labelY=y-150*BirdOfficeScene.visualMetrics.personScale-38/scale;}return `translate(${el.dataset.labelX} ${el.dataset.labelY}) scale(${1/scale})`;}
+// Team labels stay readable at any zoom but must not cover the people: smaller on a phone, full size when chosen.
+function labelTransform(el){const scale=camera?.scale||1,k=el.classList.contains('is-selected')?1:innerWidth<=720?.62:.8,a=el.dataset.anchorPerson&&life?.actors.get(el.dataset.anchorPerson);if(a){const[x,y]=BirdOfficeScene.project(...a.pos);el.dataset.labelX=x-Number(el.dataset.labelW)*k/(2*scale);el.dataset.labelY=y-150*BirdOfficeScene.visualMetrics.personScale-38*k/scale;}return `translate(${el.dataset.labelX} ${el.dataset.labelY}) scale(${k/scale})`;}
 function anchorTeamLabel(el,personId){if(!el)return;if(personId)el.dataset.anchorPerson=personId;else{delete el.dataset.anchorPerson;el.dataset.labelX=el.dataset.zoneX;el.dataset.labelY=el.dataset.zoneY;}el.setAttribute('transform',labelTransform(el));}
 // A living character for the side card: breathes, turns its head, waves (office.css .hud-sprite).
 // On the manager dashboard (demo) the office is a hero above the admin pages: picks stay on that page.
@@ -260,7 +261,10 @@ async function fillMessageLink(){
  if(!viewer){add(orgText('Sign in to write','Prijavite se da biste pisali','Войдите, чтобы написать'),'#/account');return;}
  const r=await fetch('/api/messages/person/'+encodeURIComponent(key),{credentials:'same-origin'}).catch(()=>null);
  if(!r?.ok||details.dataset.dmKey!==key||!details.isConnected||details.querySelector('.office-dm'))return;
- const {person}=await r.json();if(person.id===viewer.id)return;
+ const {person}=await r.json();
+ // "This is you" on one's own card; an organiser can link their own card or invite the person (whoami.js).
+ await window.BirdWhoami?.card(details,{personId:key,lang:language});
+ if(person.id===viewer.id||details.dataset.dmKey!==key||details.querySelector('.office-dm'))return;
  // The chat opens beside the map; the link still leads to the full conversation if the chat script is missing.
  add(orgText('Write a message','Napiši poruku','Написать'),'#/account/messages/'+encodeURIComponent(person.id)).addEventListener('click',e=>{if(!window.BirdOfficeChat)return;e.preventDefault();window.BirdOfficeChat.open({id:person.id,name:person.name,language});});
 }

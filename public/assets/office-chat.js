@@ -1,9 +1,9 @@
 /** Chat beside the office: one conversation per person, and the map stays in view. */
 (function(){
  const TEXT={
-  en:{placeholder:'Message…',send:'Send',empty:'No messages yet.',waiting:'has not registered yet. Your messages will be waiting for them.',closed:'You cannot write to this person.',failed:'Could not send. Try again.',all:'All messages',close:'Close chat',signIn:'Sign in to write'},
-  hr:{placeholder:'Poruka…',send:'Pošalji',empty:'Još nema poruka.',waiting:'još nema račun. Poruke će ih čekati.',closed:'Ovoj osobi ne možete pisati.',failed:'Nije poslano. Pokušajte ponovno.',all:'Sve poruke',close:'Zatvori razgovor',signIn:'Prijavite se da biste pisali'},
-  ru:{placeholder:'Сообщение…',send:'Отправить',empty:'Сообщений пока нет.',waiting:'ещё не зарегистрирован(а). Сообщения будут ждать.',closed:'Этому человеку написать нельзя.',failed:'Не отправлено. Попробуйте ещё раз.',all:'Все сообщения',close:'Закрыть чат',signIn:'Войдите, чтобы написать'},
+  en:{placeholder:'Message…',send:'Send',empty:'No messages yet.',waiting:'{name} hasn\'t joined the platform yet. Your message will be delivered when they link their account.',closed:'You cannot write to this person.',failed:'Could not send. Try again.',all:'All messages',close:'Close chat',signIn:'Sign in to write'},
+  hr:{placeholder:'Poruka…',send:'Pošalji',empty:'Još nema poruka.',waiting:'{name} još nije na platformi. Vaša poruka stići će kad poveže svoj račun.',closed:'Ovoj osobi ne možete pisati.',failed:'Nije poslano. Pokušajte ponovno.',all:'Sve poruke',close:'Zatvori razgovor',signIn:'Prijavite se da biste pisali'},
+  ru:{placeholder:'Сообщение…',send:'Отправить',empty:'Сообщений пока нет.',waiting:'{name} ещё нет на платформе. Сообщение будет доставлено, когда аккаунт свяжут с этой карточкой.',closed:'Этому человеку написать нельзя.',failed:'Не отправлено. Попробуйте ещё раз.',all:'Все сообщения',close:'Закрыть чат',signIn:'Войдите, чтобы написать'},
  };
  const drafts=new Map();
  let panel=null,current=null,timer=0,csrf='',shown='',lang='en',failed=false;
@@ -43,7 +43,7 @@
   const data=await r.json();
   if(data.person?.name&&data.person.name!==current.name){current.name=data.person.name;label();}
   form.hidden=!data.canSend;
-  if(!failed)note(data.waiting?current.name+' '+tr('waiting'):data.canSend?'':tr('closed'));
+  if(!failed)note(data.waiting?tr('waiting').replace('{name}',current.name):data.canSend?'':tr('closed'));
   // Redraw only when something changed, so a half-read conversation does not jump.
   const key=id+':'+data.items.map(m=>m.id+(m.read?'r':'')).join(',');
   if(key===shown)return;shown=key;

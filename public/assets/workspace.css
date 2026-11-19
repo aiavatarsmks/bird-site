@@ -11,73 +11,168 @@
 .demo-card .acc-primary,.demo-card .acc-secondary{justify-self:start;margin-top:6px}
 .demo-note{font-size:14px;color:var(--muted);margin:0}
 .demo-map-page{max-width:1280px}
-.imap{display:grid;gap:16px;padding:24px 0 40px}
-.imap-head h1{margin:0 0 6px;font-size:clamp(26px,4vw,36px)}.imap-head p{margin:0;color:var(--muted)}
-.imap-body{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;align-items:start}
-.imap-map{margin:0;border:1px solid var(--line);background:var(--white);min-width:0}
-/* The infographic map: flat Croatia, faint neighbours, plain sea, a dot per city. */
-.imap-svg{display:block;width:100%;height:auto;font-family:inherit}
-.imap-sea{fill:var(--white)}
-.imap-land{fill:color-mix(in srgb,var(--line) 38%,var(--paper));stroke:var(--line);stroke-width:1;stroke-linejoin:round}
-.imap-hr{fill:var(--light);stroke:var(--ink);stroke-width:.9;stroke-linejoin:round}
-.imap-country{font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;fill:var(--muted);opacity:.75;pointer-events:none}
-.imap-seaname{font:italic 13px Georgia,serif;letter-spacing:.12em;fill:var(--muted);opacity:.7;pointer-events:none}
-.imap-cityname,.imap-org{paint-order:stroke;stroke:var(--white);stroke-width:3.2px;stroke-linejoin:round}
-.imap-cityname{font-size:12.5px;font-weight:700;fill:var(--ink);pointer-events:none}
-.imap-cityname.is-alt{display:none}
-.imap-n{font-weight:600;fill:var(--accent)}
-.imap-org{font-size:10.5px;fill:var(--ink-soft,var(--ink));cursor:pointer;outline:none;transition:opacity .2s}
-.imap-key{font-size:9px;stroke:none}
-.imap-org:hover,.imap-org:focus-visible,.imap-org.is-hot{fill:var(--accent);text-decoration:underline}
-.imap-org:focus-visible{stroke:var(--light)}
-.imap-org.is-chosen{font-weight:700;fill:var(--accent)}
-.imap-callout{fill:var(--white);stroke:var(--ink);stroke-width:1}
-.imap-leader{fill:none;stroke:var(--ink);stroke-width:1}
-.imap-pin{cursor:pointer;outline:none}
-.imap-dot{stroke:var(--white);stroke-width:1.6}
-.imap-dot circle[fill=none]{stroke:var(--ink);stroke-width:1}
+/* Incubator map (assets/incubator-map.js): a dark relief surface in the office's green, counties and countries that light up,
+   rust city markers that open into rings of organisations, a paper card per organisation. Only transform and opacity move. */
+@property --imap-z{syntax:'<number>';inherits:true;initial-value:1}
+.imap{--m-sea:#182822;--m-sea2:#22372f;--m-land:#2a3d34;--m-edge:rgba(245,241,232,.14);--m-hr:#355244;--m-paper:#f5f1e8;--m-rust:#a8432a;--m-rust2:#c4623f;--m-ink:#1c2621;--m-ease:cubic-bezier(.23,1,.32,1);display:grid;gap:18px;padding:24px 0 40px}
+.imap-head h1{margin:0 0 6px;font:clamp(28px,4vw,40px)/1.1 Georgia,serif;letter-spacing:-.02em}.imap-head p{margin:0;color:var(--muted);max-width:46em}
+.imap-body{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
+.imap-map{margin:0;min-width:0}
+.imap-stage{position:relative;aspect-ratio:800/723;overflow:hidden;isolation:isolate;color:var(--m-paper);
+ background:radial-gradient(120% 90% at 30% 20%,var(--m-sea2) 0,var(--m-sea) 62%,#13201b 100%);box-shadow:inset 0 0 0 1px rgba(8,19,14,.6),0 24px 48px -28px rgba(20,38,30,.55)}
+/* A faint survey grid on the water, fixed under the moving map. */
+.imap-stage::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.5;
+ background-image:radial-gradient(rgba(245,241,232,.09) 1px,transparent 1.3px);background-size:18px 18px;mask-image:radial-gradient(90% 80% at 45% 40%,#000 30%,transparent 100%)}
+.imap-svg{position:absolute;inset:0;width:100%;height:100%;display:block;font-family:inherit;z-index:1;transition:opacity .45s ease,transform .6s var(--m-ease);touch-action:pan-y}
+.imap-stage:not([data-view="hr"]) .imap-svg.is-hr{opacity:0;transform:scale(.94);pointer-events:none}
+.imap-stage:not([data-view="eu"]) .imap-svg.is-eu{opacity:0;transform:scale(1.06);pointer-events:none}
+.imap-svg.is-zoomed{cursor:grab;touch-action:none}.imap-svg.is-dragging{cursor:grabbing}
+.imap-cam{transform-origin:0 0;transition:transform .75s var(--m-ease),--imap-z .75s var(--m-ease)}
+.imap-cam.is-still,.imap-svg.is-dragging .imap-cam{transition:none}
+.imap-land{fill:var(--m-land);stroke:var(--m-edge);stroke-width:1;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.imap-hr-lift{fill:#2c463a;transition:opacity .4s ease}
+.imap-svg.is-zoomed .imap-hr-lift{opacity:0}
+.imap-hr-edge{fill:none;stroke:rgba(245,241,232,.55);stroke-width:1.2;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
+.imap-sheen{pointer-events:none}
+.imap-country{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;fill:rgba(245,241,232,.38);pointer-events:none}
+.imap-seaname{font:italic 13px Georgia,serif;letter-spacing:.14em;fill:rgba(245,241,232,.32);pointer-events:none}
+/* Counties: shaded by how many organisations they hold (0, 1, 2-3, 4+). */
+.imap-county{stroke:rgba(245,241,232,.2);stroke-width:.7;stroke-linejoin:round;vector-effect:non-scaling-stroke;cursor:pointer;outline:none;transition:fill .25s ease}
+.imap-county.is-s0{fill:#304b3e}.imap-county.is-s1{fill:#3f5f4c}.imap-county.is-s2{fill:#5a7556}.imap-county.is-s3{fill:#8c5f3e}
+.imap-county:hover,.imap-county:focus-visible{fill:#6c4a35}
+.imap-county.is-picked{fill:var(--m-rust)}
+/* The lit outline is a copy of the region under the pointer, drawn on top so its edge is never hidden by a neighbour. */
+.imap-focus-shape{fill:rgba(240,185,85,.24);stroke:var(--m-paper);stroke-width:2;vector-effect:non-scaling-stroke;pointer-events:none;opacity:0;transition:opacity .2s ease}
+.imap-focus-shape.is-on{opacity:1}.imap-focus-shape.is-quiet{fill:rgba(245,241,232,.06);stroke:rgba(245,241,232,.5)}
+/* Europe: Croatia full, a few countries with listed programmes, the rest not covered yet. */
+.imap-nation{stroke:rgba(245,241,232,.18);stroke-width:.7;stroke-linejoin:round;vector-effect:non-scaling-stroke;outline:none;transition:fill .25s ease}
+.imap-nation.is-none{fill:#2f463a}.imap-nation.is-none[role]{cursor:pointer}.imap-nation.is-none[role]:hover,.imap-nation.is-none[role]:focus-visible{fill:#3a5446}
+.imap-nation.is-some{fill:#5b7a5f;cursor:pointer}.imap-nation.is-some:hover,.imap-nation.is-some:focus-visible{fill:#6c8d6e}
+.imap-nation.is-full{fill:var(--m-rust);cursor:pointer}.imap-nation.is-full:hover,.imap-nation.is-full:focus-visible{fill:var(--m-rust2)}
+/* Markers keep their screen size at every zoom and stage width: scale against the camera and the SVG's own scaling. */
+.imap-svg{--imap-u:1;--ms:1}
+.imap-place{transform:translate(calc(var(--x)*1px),calc(var(--y)*1px)) scale(calc(var(--ms)/(var(--imap-z)*var(--imap-u))));transition:opacity .3s ease}
+.imap-place.is-out{opacity:.25}
+.imap-pop{transform-origin:0 0}
+.imap-pin,.imap-orgdot{cursor:pointer;outline:none}
 .imap-hit{fill:transparent}
-.imap-pin:focus-visible .imap-hit{stroke:var(--accent);stroke-width:2.5}
-.imap-place{transition:opacity .25s}
-.imap-place .imap-dot{transform-box:fill-box;transform-origin:center;transition:transform .2s var(--ease,ease)}
-.imap-place.is-hot .imap-dot,.imap-pin:hover .imap-dot{transform:scale(1.25)}
-.imap-place.is-out{opacity:.22}
-.imap-place:not(.is-out) .imap-org.is-out{opacity:.3}
-.imap-pulse{fill:none;stroke:var(--accent);stroke-width:2;opacity:0;transform-box:fill-box;transform-origin:center}
-.imap-place.is-chosen .imap-pulse{animation:imap-pulse 1.8s ease-out infinite}
-@keyframes imap-pulse{0%{opacity:.8;transform:scale(1)}100%{opacity:0;transform:scale(2.6)}}
-.imap-svg.is-intro .imap-dot{animation:imap-pop .45s var(--ease,ease) both;animation-delay:calc(var(--i)*45ms + .15s)}
-.imap-svg.is-intro .imap-place text,.imap-svg.is-intro .imap-callout,.imap-svg.is-intro .imap-leader{animation:imap-fade .5s ease both;animation-delay:calc(var(--i)*45ms + .3s)}
-@keyframes imap-pop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
-@keyframes imap-fade{from{opacity:0}to{opacity:1}}
-.imap-item.is-hot{border-color:var(--ink)}
-@media (prefers-reduced-motion:reduce){.imap-svg.is-intro *{animation:none!important}.imap-place.is-chosen .imap-pulse{animation:none;opacity:.8;transform:scale(1.6)}.imap-place .imap-dot{transition:none}}
-.imap-side{display:grid;gap:10px;max-height:min(72vh,680px);grid-template-rows:auto auto auto minmax(0,1fr) auto}
-.imap-search input{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--line);border-radius:0;font:inherit;background:var(--white)}
+.imap-glow{fill:rgba(196,98,63,.22);filter:blur(5px);opacity:.75;pointer-events:none;transition:opacity .3s ease,transform .3s var(--m-ease)}
+.imap-place:has(.is-single) .imap-glow{fill:rgba(245,241,232,.14)}
+.imap-core{stroke:var(--m-paper);stroke-width:1.6;transition:transform .25s var(--m-ease)}
+.is-cluster .imap-core,.is-country .imap-core{fill:var(--m-rust)}
+.imap-arc{fill:none;stroke-width:3.2;transform:rotate(-90deg);pointer-events:none}
+.imap-num{fill:var(--m-paper);font-size:11.5px;font-weight:700;text-anchor:middle;pointer-events:none;font-variant-numeric:tabular-nums}
+.is-country .imap-num{font-size:13px}
+.imap-cityname{fill:var(--m-paper);font-size:12px;font-weight:650;letter-spacing:.01em;paint-order:stroke;stroke:rgba(20,34,28,.92);stroke-width:3.5px;stroke-linejoin:round;pointer-events:none;transition:opacity .25s ease}
+.imap-place.is-minor .imap-cityname{opacity:0}
+.imap-svg.is-close .imap-place.is-minor .imap-cityname,.imap-place.is-minor.is-hot .imap-cityname{opacity:1}
+.imap-place.is-open .imap-cityname{opacity:0}
+.imap-pin:hover .imap-core,.imap-pin:focus-visible .imap-core,.imap-place.is-hot .imap-pin .imap-core,.imap-orgdot:hover .imap-core,.imap-orgdot:focus-visible .imap-core,.is-active .imap-core{transform:scale(1.22)}
+.imap-place.is-hot .imap-glow,.imap-place:has(.imap-pin:hover) .imap-glow{opacity:1;transform:scale(1.3)}
+.imap-pin:focus-visible .imap-hit,.imap-orgdot:focus-visible .imap-hit{stroke:var(--m-paper);stroke-width:2;stroke-dasharray:3 3}
+.imap-pin.is-out,.imap-orgdot.is-out{opacity:.3}
+/* Halo on cities with applications open now: slow, soft, only when motion is welcome. */
+.imap-halo{fill:none;stroke:#f0b955;stroke-width:1.5;opacity:.55;pointer-events:none}
+@media (prefers-reduced-motion:no-preference){.imap-halo{animation:imap-halo 2.8s cubic-bezier(.2,.6,.35,1) infinite}}
+@keyframes imap-halo{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(2.3)}}
+/* A city with several organisations opens into a ring of dots. */
+.imap-fan{pointer-events:none}
+.imap-orgdot{opacity:0;transform:scale(.2);transition:transform .45s var(--m-ease),opacity .25s ease;transition-delay:calc(var(--k)*25ms)}
+.imap-place.is-open .imap-fan{pointer-events:auto}
+.imap-place.is-open .imap-orgdot{opacity:1;transform:translate(calc(var(--a)*1px),calc(var(--b)*1px))}
+.imap-place.is-open .imap-orgdot.is-out{opacity:.3}
+.imap-orgdot .imap-core{stroke-width:2}
+.imap-place.is-open .is-cluster .imap-core{transform:scale(.8)}
+@media (prefers-reduced-motion:reduce){.imap-cam,.imap-svg,.imap-orgdot,.imap-core,.imap-glow{transition-duration:0s!important;transition-delay:0s!important}}
+/* Controls over the map. */
+.imap-bar{position:absolute;inset:12px 12px auto;display:flex;justify-content:space-between;align-items:start;gap:8px;z-index:3;pointer-events:none}
+.imap-bar>*{pointer-events:auto}
+.imap-views,.imap-zoom{display:flex;background:rgba(17,29,24,.78);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:inset 0 0 0 1px rgba(245,241,232,.16)}
+.imap-zoom{flex-direction:column}
+.imap-views button,.imap-zoom button{min-width:44px;min-height:44px;border:0;background:transparent;color:var(--m-paper);font:inherit;font-size:14px;font-weight:600;padding:0 16px;cursor:pointer;transition:background-color .2s ease,color .2s ease}
+.imap-zoom button{padding:0;display:grid;place-items:center}
+.imap-zoom button+button{box-shadow:inset 0 1px 0 rgba(245,241,232,.12)}
+.imap-zoom svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.imap-views button[aria-pressed="true"]{background:var(--m-paper);color:var(--m-ink)}
+.imap-views button:not([aria-pressed="true"]):hover,.imap-zoom button:hover:not(:disabled){background:rgba(245,241,232,.12)}
+.imap-zoom button:disabled{opacity:.35;cursor:default}
+.imap-views button:focus-visible,.imap-zoom button:focus-visible{outline:2px solid #f0b955;outline-offset:-2px}
+.imap-legend{position:absolute;left:12px;bottom:12px;z-index:2;display:flex;flex-wrap:wrap;gap:4px 12px;max-width:calc(100% - 24px);margin:0;padding:8px 12px;list-style:none;font-size:12px;color:rgba(245,241,232,.86);background:rgba(17,29,24,.7);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);pointer-events:none}
+.imap-legend li{display:inline-flex;align-items:center;gap:6px}
+.imap-legend i{width:9px;height:9px;border-radius:50%;background:var(--c);box-shadow:0 0 0 1.5px var(--m-paper)}
+.imap-legend .is-live i{background:transparent;box-shadow:0 0 0 1.5px #f0b955}
+/* Hint: a small label over the region or city under the pointer or focus. */
+.imap-hint{position:absolute;left:0;top:0;z-index:4;display:grid;gap:1px;padding:7px 11px;max-width:240px;background:var(--m-paper);color:var(--m-ink);font-size:13px;line-height:1.3;
+ box-shadow:0 10px 24px -8px rgba(8,19,14,.6);pointer-events:none;opacity:0;transform:translate(var(--px),calc(var(--py) + 4px));transition:opacity .15s ease,transform .2s var(--m-ease)}
+.imap-hint.is-on{opacity:1;transform:translate(var(--px),var(--py))}
+.imap-hint.is-jump,.imap-card.is-jump{transition:none}
+.imap-hint span{color:#5b6058;font-size:12px}
+/* Card: the organisation under the pointer, or the one tapped. Hoverable, closes with Escape. */
+.imap-card{position:absolute;left:0;top:0;z-index:5;width:min(310px,calc(100% - 16px));background:var(--m-paper);color:var(--m-ink);
+ box-shadow:0 22px 44px -16px rgba(6,14,10,.75),0 0 0 1px rgba(8,19,14,.25);opacity:0;visibility:hidden;transform:translate(var(--px),calc(var(--py) + 8px)) scale(.98);transform-origin:top left;
+ transition:opacity .18s ease,transform .28s var(--m-ease),visibility 0s linear .28s}
+.imap-card.is-on{opacity:1;visibility:visible;transform:translate(var(--px),var(--py));transition-delay:0s}
+.imap-card-body{display:grid;gap:6px;padding:16px 18px 16px;border-top:3px solid var(--c)}
+.imap-card h3{margin:0;font:600 18px/1.2 Georgia,serif;padding-right:28px}
+.imap-card p{margin:0;font-size:13.5px;line-height:1.45}
+.imap-card .imap-desc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;color:#3f463f}
+.imap-card-x{position:absolute;top:6px;right:6px;width:36px;height:36px;border:0;background:transparent;color:var(--m-ink);font-size:22px;line-height:1;cursor:pointer;opacity:0;pointer-events:none}
+.imap-card[data-pinned] .imap-card-x{opacity:1;pointer-events:auto}
+.imap-card-x:focus-visible{outline:2px solid var(--m-rust);outline-offset:-2px}
+@media (prefers-reduced-motion:reduce){.imap-card,.imap-card.is-on,.imap-hint,.imap-hint.is-on{transform:translate(var(--px),var(--py));transition:opacity .15s ease,visibility 0s linear .15s}}
+/* Side list. */
+.imap-side{display:grid;gap:10px;max-height:min(80vh,760px);grid-template-rows:auto auto auto minmax(0,1fr) auto}
+.imap-search input{width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:0;font:inherit;background:var(--white)}
+.imap-search input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .imap-filters{display:flex;flex-wrap:wrap;gap:6px}
-.imap-filters button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--white);border-radius:0;padding:4px 10px;font:inherit;font-size:13px;cursor:pointer}
-.imap-filters button[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:#fff}
-.imap-filters i,.imap-type::before{content:'';width:9px;height:9px;border-radius:50%;background:var(--c);display:inline-block}
+.imap-filters button{display:inline-flex;align-items:center;gap:6px;min-height:36px;border:1px solid var(--line);background:var(--white);border-radius:0;padding:4px 10px;font:inherit;font-size:13px;cursor:pointer}
+.imap-filters button[aria-pressed="true"]{border-color:#263c34;background:#263c34;color:#f5f1e8}
+.imap-filters i,.imap-type::before{content:'';width:9px;height:9px;border-radius:50%;background:var(--c);display:inline-block;box-shadow:0 0 0 1px rgba(28,38,33,.35)}
+.imap-meta{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
 .imap-count{margin:0;font-size:13px;color:var(--muted)}
+.imap-countychip{display:inline-flex;gap:6px;align-items:center;min-height:32px;border:0;background:#a8432a;color:#f5f1e8;font:inherit;font-size:13px;font-weight:600;padding:2px 10px;cursor:pointer}
+.imap-countychip[hidden]{display:none}
 .imap-list{list-style:none;margin:0;padding:0 4px 0 0;overflow:auto;display:grid;gap:8px;align-content:start}
-.imap-item{display:grid;gap:4px;width:100%;text-align:left;background:var(--white);border:1px solid var(--line);border-radius:0;padding:12px 14px;font:inherit;color:inherit;cursor:pointer}
-.imap-item.is-chosen{border-color:var(--ink);box-shadow:0 2px 0 var(--ink)}
-.imap-item h3,.imap-popup h3{margin:0;font-size:16px}
-.imap-item p,.imap-popup p{margin:0;font-size:14px;line-height:1.45}
-.imap-item:not(.is-chosen) p:not(.imap-city){display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.imap-item{display:grid;gap:6px;background:var(--white);border:1px solid var(--line);border-left:3px solid var(--c);padding:12px 14px;transition:border-color .2s ease,box-shadow .2s ease}
+.imap-item-btn{display:grid;gap:4px;width:100%;text-align:left;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer}
+.imap-item-btn:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.imap-item:hover{border-color:#263c34;border-left-color:var(--c)}
+.imap-item.is-chosen{border-color:#263c34;border-left-color:var(--c);box-shadow:0 2px 0 #263c34}
+.imap-item h3{margin:0;font-size:16px}
+.imap-item p{margin:0;font-size:14px;line-height:1.45}
+.imap-item:not(.is-chosen) .imap-desc{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .imap-city{color:var(--muted)}
 .imap-type{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
 .imap-next{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;font-size:14px;margin-top:4px}
 .imap-next small{color:var(--muted)}
 .imap-label{flex-basis:100%;font-size:12px;color:var(--muted)}
-.imap-status{font-size:12px;font-weight:600;border-radius:0;padding:1px 8px;background:var(--light)}
+.imap-status{font-size:12px;font-weight:600;padding:1px 8px;background:var(--light)}
 .imap-status.is-open{background:#d9eedf;color:#1f5a35}.imap-status.is-upcoming{background:#f6ead2;color:#7a4f0c}.imap-status.is-running{background:#e1e8f4;color:#24426f}
-.imap-site{font-size:14px;color:var(--accent);font-weight:600;justify-self:start}
-.imap-popup{display:grid;gap:4px;font-family:inherit}
+.imap-site{display:inline-flex;align-items:center;min-height:32px;font-size:14px;color:#9e4d29;font-weight:600;justify-self:start;text-underline-offset:3px}
+.imap-hrcard button{display:grid;gap:2px;width:100%;text-align:left;border:0;padding:16px 18px;cursor:pointer;font:inherit;color:#f5f1e8;background:linear-gradient(135deg,#a8432a,#7f3220)}
+.imap-hrcard b{font:600 20px/1.2 Georgia,serif}.imap-hrcard span{font-size:13px;opacity:.85}.imap-hrcard em{font-style:normal;font-weight:600;margin-top:6px}
+.imap-hrcard button:focus-visible{outline:2px solid #263c34;outline-offset:2px}
+.imap-group h2{margin:8px 0 2px;font-size:15px}.imap-group p{margin:0;font-size:13px;color:var(--muted);line-height:1.45}
 .imap-source{margin:0;font-size:12px;color:var(--muted)}
-@media (max-width:860px){.imap-body{grid-template-columns:1fr}.imap-side{max-height:none}.imap-list{overflow:visible}}
-/* Phone: the map shows cities only, in a larger type; organisation names live in the list below. */
-@media (max-width:560px){.imap-cityname.is-alt{display:inline}.imap-cityname.is-boxed,.imap-org,.imap-callout,.imap-leader,.imap-place.is-minor .imap-cityname,.imap-country,.imap-seaname{display:none}.imap-cityname{font-size:22px;stroke-width:5px}.imap-dot{stroke-width:1.2}.imap-place .imap-dot{transform:scale(1.7)}.imap-place.is-hot .imap-dot,.imap-pin:hover .imap-dot{transform:scale(2)}}
+.imap-empty{display:grid;gap:10px;justify-items:start;padding:16px;border:1px dashed var(--line);background:var(--white)}.imap-empty p{margin:0;color:var(--muted)}
+.imap-empty button{min-height:40px;border:1px solid #263c34;background:transparent;padding:6px 14px;font:inherit;font-size:14px;cursor:pointer}
+@media (max-width:900px){.imap-body{grid-template-columns:minmax(0,1fr)}.imap-side{max-height:none}.imap-list{overflow:visible}}
+/* Phone: a taller stage so the map fills the width, the card becomes a sheet along the bottom of the map. */
+@media (max-width:600px){
+ .imap{padding-top:16px}
+ .imap-stage{aspect-ratio:auto;height:min(118vw,520px);margin-inline:-6px}
+ .imap-bar{inset:8px 8px auto}
+ .imap-views button{padding:0 12px}
+ .imap-svg{--ms:.82}
+ .imap-legend{left:8px;bottom:8px;font-size:11px;padding:5px 8px}
+ .imap-legend li:not(.is-live){display:none}
+ .imap-country,.imap-seaname{display:none}
+ .imap-cityname{font-size:12.5px}
+ .imap-card{width:auto;left:8px;right:8px;top:auto;bottom:8px;transform:translateY(12px)}
+ .imap-card.is-on{transform:none}
+ .imap-card-body{padding:14px 16px}
+ .imap-stage:has(.imap-card.is-on) .imap-legend{opacity:0}
+}
 .office-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .office-wrap .office-intro>.office-primary{display:none}
 .demo-switch{display:inline-flex;align-items:center;gap:6px}
@@ -100,20 +195,21 @@
 .demo-office-hero .office-board{display:flex;flex-direction:column;height:100%;border:0;border-radius:0}
 .demo-office-hero .office-viewport-wrap{flex:1;min-height:0;height:auto}
 .demo-office-hero.office-wrap .office-canvas{height:100%;min-height:0;max-height:none}
-.demo-hero-bar{position:absolute;z-index:30;left:12px;bottom:12px;display:flex;gap:6px}
-.demo-hero-bar.demo-hero-top{top:var(--demo-bar-top,84px);bottom:auto;left:auto;right:12px}
-.demo-hero-bar a{display:inline-flex;align-items:center;min-height:40px;padding:8px 14px;background:var(--white,#fffefa);color:var(--ink);border:1px solid var(--ink);font-weight:600;font-size:14px;text-decoration:none;box-shadow:2px 2px 0 var(--ink)}
-.demo-hero-bar a:first-child{background:var(--ink);color:#fff}
-.demo-hero-bar a:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+/* Ways out of the demo office: links in the demo strip, outside the office picture. */
+.demo-hero-links{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;padding-left:12px;border-left:1px solid var(--line)}
+.demo-hero-links a{display:inline-flex;align-items:center;min-height:30px;padding:3px 10px;border:1px solid var(--ink);color:var(--ink);font-weight:600;text-decoration:none;white-space:nowrap}
+.demo-hero-links a:first-child{background:var(--ink);color:#fff}
+.demo-hero-links a:hover{background:var(--ink);color:#fff}
+/* A slimmer toolbar leaves more of the screen to the office. */
+.demo-office-hero .office-toolbar{padding:6px 10px;gap:6px}
+.demo-office-hero .office-toolbar input,.demo-office-hero .office-toolbar select{min-height:36px;height:36px;padding-block:4px;font-size:14px}
+.demo-office-hero .office-toolbar button{min-height:36px;height:36px;padding:2px 10px;font-size:13.5px}
 .demo-view-switch{margin:16px 0 0;font-size:14px}
 .demo-view-switch a{color:var(--ink);font-weight:600}
 @media (max-width:720px){
  .demo-office-hero{height:auto;min-height:0}
  .demo-office-hero #bird-office,.demo-office-hero .incubator,.demo-office-hero .office-grid,.demo-office-hero .office-grid>div,.demo-office-hero .office-board{height:auto}
  .demo-office-hero .office-viewport-wrap{flex:none;height:max(300px,min(50svh,420px))}
- .demo-hero-bar{left:8px;bottom:8px}
- /* The phone office is short, so the bottom copy is already in view and the top one would cover the goal. */
- .demo-hero-top{display:none}
- .demo-hero-bar a{min-height:36px;padding:6px 10px;font-size:13px}
+ .demo-hero-links{border-left:0;padding-left:0}.demo-hero-links a{min-height:36px}
 }
 @media (min-width:721px){.demo-office-hero .office-grid:has(.office-side.ps-host) .office-toolbar{margin-right:clamp(330px,30vw,430px)}}

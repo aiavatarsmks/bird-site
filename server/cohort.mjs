@@ -9,6 +9,30 @@ import {isoWeek} from './tasks.mjs';
 const CHECKIN_XP=10,START_SCORE=10;
 const weekBefore=(week,n=1)=>{const [y,w]=week.split('-W').map(Number);const d=new Date(Date.UTC(y,0,4+(w-1)*7-n*7));return isoWeek(d);};
 
+// Joined dates: nothing is "missed" or "late" from before a team or a person was in the programme.
+const DAY=86400000;
+/** When a person joined: their first current team membership, else the account itself. ISO timestamp. */
+export function personSince(db,userId){
+ return db.query("SELECT min(created) t FROM memberships WHERE user_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").get(userId)?.t
+  ||db.query('SELECT created FROM users WHERE id=?').get(userId)?.created||new Date().toISOString();
+}
+/** When a team started: its first current member joined (people without accounts cannot report), else the project was made. */
+export function teamSince(db,projectId){
+ return db.query("SELECT min(created) t FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").get(projectId)?.t
+  ||db.query('SELECT created FROM projects WHERE id=?').get(projectId)?.created||new Date().toISOString();
+}
+const zagrebDay=iso=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Zagreb',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(iso));
+/** Lectures held since each member joined, and how many of those they attended (any kind). */
+export function attendanceSince(db,memberIds){
+ const today=zagrebDay(new Date().toISOString());let seats=0,seen=0;
+ for(const id of memberIds){
+  const from=zagrebDay(personSince(db,id));
+  seats+=db.query("SELECT count(*) n FROM lectures WHERE status='published' AND date>=? AND date<=?").get(from,today).n;
+  seen+=db.query("SELECT count(*) n FROM attendance a JOIN lectures l ON l.id=a.lecture_id WHERE a.user_id=? AND l.status='published' AND l.date>=? AND l.date<=?").get(id,from,today).n;
+ }
+ return {seats,seen};
+}
+
 /** Consecutive weeks with a check-in; one missed week inside the run is forgiven. */
 export function streak(db,projectId){
  const weeks=new Set(db.query('SELECT week FROM checkins WHERE project_id=?').all(projectId).map(r=>r.week));
@@ -116,7 +140,7 @@ export function teamScore(db,projectId,memberIds){
  const team=tally(db.query(query+'a.project_id=?').all(projectId));
  const personal=memberIds.length?tally(db.query(query+`a.user_id IN (${memberIds.map(()=>'?').join(',')})`).all(...memberIds)):{earned:0,available:0};
  const manual=(type,ids)=>ids.length?db.query(`SELECT coalesce(sum(amount),0) n FROM xp_ledger WHERE beneficiary_type=? AND beneficiary_id IN (${ids.map(()=>'?').join(',')}) AND source_key LIKE 'manual:%'`).get(type,...ids).n:0;
- const size=memberIds.length||1,weeks=db.query('SELECT count(DISTINCT week) n FROM checkins').get().n;
+ const size=memberIds.length||1,weeks=db.query('SELECT count(DISTINCT week) n FROM checkins WHERE week>=?').get(isoWeek(new Date(teamSince(db,projectId)))).n;
  const checkins=db.query('SELECT count(*) n FROM checkins WHERE project_id=?').get(projectId).n*CHECKIN_XP;
  const earned=team.earned+personal.earned/size+checkins+manual('project',[projectId])+manual('user',memberIds)/size;
  const available=team.available+personal.available/size+weeks*CHECKIN_XP;
@@ -134,16 +158,27 @@ export function teamPercent(db,projectId,memberIds){
  return teamScore(db,projectId,memberIds).percent;
 }
 
-/** Team ranking by fair percentage. Personal tasks and private metrics stay out. */
+/**
+ * Team ranking by fair percentage. Every active (not archived) team of the cohort takes part, draft or published;
+ * guests see only published teams. Personal tasks and private metrics stay out.
+ * place: shared by equal results (1, 2, 2, 4); teams that have earned nothing share the place after every team that has,
+ * and when nobody has earned anything yet nobody has a place.
+ */
 export function teamRanking(ctx){
  const week=isoWeek(),since=new Date(Date.now()-7*86400000).toISOString();
- const rows=ctx.db.query("SELECT p.id,json_extract(p.published,'$.name') name FROM projects p WHERE p.status='published' AND p.published IS NOT NULL").all();
+ const rows=ctx.db.query(`SELECT p.id,coalesce(json_extract(p.published,'$.name'),json_extract(p.draft,'$.name')) name FROM projects p WHERE ${ctx.user?"p.status<>'archived'":"p.status='published' AND p.published IS NOT NULL"}`).all();
  const items=rows.filter(r=>r.id).map(p=>{
   const members=ctx.db.query("SELECT user_id FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").all(p.id).map(m=>m.user_id);
   const team=projectXp(ctx.db,p.id),weekGain=ctx.db.query("SELECT coalesce(sum(amount),0) n FROM xp_ledger WHERE beneficiary_type='project' AND beneficiary_id=? AND created>=?").get(p.id,since).n;
-  return {projectId:p.id,name:p.name,percent:teamPercent(ctx.db,p.id,members),teamXp:team,weekGain,streak:streak(ctx.db,p.id),members:members.length};
- }).sort((a,b)=>(b.percent??-1)-(a.percent??-1)||b.teamXp-a.teamXp||b.weekGain-a.weekGain||a.name.localeCompare(b.name));
- return json({week,items,rules:{checkinXp:CHECKIN_XP}});
+  const earned=members.length?teamScore(ctx.db,p.id,members).earned:0;
+  return {projectId:p.id,name:p.name||'',percent:teamPercent(ctx.db,p.id,members),teamXp:team,weekGain,streak:streak(ctx.db,p.id),members:members.length,scored:earned>0||team>0};
+ }).sort((a,b)=>(b.scored-a.scored)||(b.percent??-1)-(a.percent??-1)||b.teamXp-a.teamXp||b.weekGain-a.weekGain||a.name.localeCompare(b.name,'hr'));
+ const anyone=items.some(t=>t.scored);
+ items.forEach((t,i)=>{
+  const prev=items[i-1],same=prev&&prev.scored===t.scored&&(!t.scored||prev.percent===t.percent&&prev.teamXp===t.teamXp);
+  t.place=!anyone?null:same?prev.place:i+1;
+ });
+ return json({week,items:items.map(({scored,...t})=>t),rules:{checkinXp:CHECKIN_XP}});
 }
 
 /** Risk signals: red needs overdue work plus another signal; one soft signal alone stays calm. */
@@ -151,12 +186,15 @@ export function riskSignals(db,projectId,memberIds){
  const week=isoWeek(),signals=[];
  // Teams without accounts cannot report anything yet: flag once, softly.
  if(!memberIds.length)return {level:'watch',signals:['no_accounts']};
+ // "No check-in for 2 weeks" only once the team has been here for two weeks.
  const recent=db.query('SELECT count(*) n FROM checkins WHERE project_id=? AND week IN (?,?)').get(projectId,week,weekBefore(week)).n;
- if(!recent)signals.push('no_checkin');
- const overdue=db.query(`SELECT count(*) n FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id WHERE t.status='published' AND t.due_at IS NOT NULL AND t.due_at<? AND coalesce(s.status,'not_started') IN ('not_started','draft','changes_requested') AND (a.project_id=? ${memberIds.length?`OR a.user_id IN (${memberIds.map(()=>'?').join(',')})`:''})`).get(nowIso(),projectId,...memberIds).n;
+ if(!recent&&Date.now()-Date.parse(teamSince(db,projectId))>=14*DAY)signals.push('no_checkin');
+ // A deadline that passed before the team joined is not theirs to have missed.
+ const overdue=db.query(`SELECT count(*) n FROM assignments a JOIN task_templates t ON t.id=a.task_id LEFT JOIN submissions s ON s.assignment_id=a.id WHERE t.status='published' AND t.due_at IS NOT NULL AND t.due_at<? AND t.due_at>? AND coalesce(s.status,'not_started') IN ('not_started','draft','changes_requested') AND (a.project_id=? ${memberIds.length?`OR a.user_id IN (${memberIds.map(()=>'?').join(',')})`:''})`).get(nowIso(),teamSince(db,projectId),projectId,...memberIds).n;
  if(overdue)signals.push('overdue_tasks');
- const held=db.query("SELECT count(*) n FROM lectures WHERE status='published' AND date<=?").get(nowIso().slice(0,10)).n;
- if(held&&memberIds.length){const seen=db.query(`SELECT count(*) n FROM attendance WHERE user_id IN (${memberIds.map(()=>'?').join(',')})`).get(...memberIds).n;if(seen<held*memberIds.length/2)signals.push('low_attendance');}
+ // Attendance counts only lectures held since each member joined.
+ const att=attendanceSince(db,memberIds);
+ if(att.seats&&att.seen<att.seats/2)signals.push('low_attendance');
  const help=db.query('SELECT needs_help FROM checkins WHERE project_id=? AND week=?').get(projectId,week);
  if(help?.needs_help)signals.push('needs_help');
  const count=signals.filter(s=>s!=='needs_help').length;
