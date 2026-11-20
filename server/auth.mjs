@@ -1,9 +1,11 @@
-/** Accounts, password login, sessions, recovery codes and owner bootstrap. */
+/** Accounts, password login, sessions, recovery codes, password reset by email and owner bootstrap. */
 import {writeFileSync,chmodSync,existsSync} from 'node:fs';
 import {join} from 'node:path';
-import {fail,text,oneOf,sha256,token,newId,cookie,parseCookies,rateLimit,json,readJson} from './http.mjs';
+import {fail,text,oneOf,sha256,token,newId,cookie,parseCookies,rateLimit,json,readJson,selfOrigin} from './http.mjs';
 import {nowIso} from './db.mjs';
 import {audit} from './permissions.mjs';
+import {sendMail,mailEnabled} from './mail.mjs';
+import {isDemo} from './demo-visit.mjs';
 
 export const SESSION_COOKIE='bird_session';
 const LOGIN_RE=/^[a-z0-9][a-z0-9._@+-]{2,59}$/;
@@ -19,6 +21,11 @@ async function limited(fn){
 export const hashPassword=password=>limited(()=>Bun.password.hash(password,{algorithm:'argon2id',memoryCost:19456,timeCost:2}));
 const verifyPassword=(password,hash)=>limited(()=>Bun.password.verify(password,hash));
 let dummyHash=null;
+/** True when `password` is the account's current one (deleting an account asks for it again). */
+export async function passwordMatches(db,userId,password){
+ const row=db.query('SELECT hash FROM password_credentials WHERE user_id=?').get(userId);
+ return !!row&&await verifyPassword(String(password||'').slice(0,200)||'x',row.hash);
+}
 
 function device(ua=''){
  const browser=/Edg\//.test(ua)?'Edge':/Firefox\//.test(ua)?'Firefox':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':'Browser';
@@ -67,6 +74,15 @@ function validLogin(l){const v=typeof l==='string'?l.trim().toLowerCase():'';if(
 export async function register(ctx){
  const body=await readJson(ctx.request);
  rateLimit(ctx.db,'register-ip:'+ctx.ip,30,3600);
+ const r=await createAccount(ctx,body);
+ return json({user:publicUser(ctx.user),csrf:r.csrf,recoveryCodes:r.recoveryCodes},201);
+}
+/**
+ * A new account with a password, signed in at once. `body` is what the sign-up form sent (login, password, displayName,
+ * email, language, appearance). `inside(userId,now)` runs in the same transaction, so a profile made with the account
+ * (server/network.mjs) never exists without it, nor the account without the profile.
+ */
+export async function createAccount(ctx,body,{inside}={}){
  const login=validLogin(body.login),password=validPassword(body.password);
  const displayName=text(body.displayName,{min:1,max:80},'displayName');
  const email=text(body.email,{max:200,optional:true},'email');
@@ -84,12 +100,13 @@ export async function register(ctx){
    ctx.db.query('INSERT INTO password_credentials(user_id,hash,updated) VALUES(?,?,?)').run(userId,hash,now);
    codes=makeRecoveryCodes(ctx.db,userId);
    audit(ctx.db,userId,'user.register','user',userId,{});
+   inside?.(userId,now);
   })();
  }catch(e){if(String(e.message).includes('UNIQUE'))fail(409,'LOGIN_TAKEN');throw e;}
  const session=createSession(ctx,userId);
  ctx.user=ctx.db.query('SELECT * FROM users WHERE id=?').get(userId);
  ctx.hooks?.onUserReady?.(ctx,ctx.user);
- return json({user:publicUser(ctx.user),csrf:session.csrf,recoveryCodes:codes},201);
+ return {userId,csrf:session.csrf,recoveryCodes:codes};
 }
 
 export async function login(ctx){
@@ -151,6 +168,76 @@ export async function recover(ctx){
  })();
  if(!used)fail(401,'INVALID_LOGIN');
  const session=createSession(ctx,user.id);ctx.user=user;
+ const left=ctx.db.query('SELECT count(*) n FROM recovery_codes WHERE user_id=? AND used_at IS NULL').get(user.id).n;
+ return json({user:publicUser(user),csrf:session.csrf,recoveryCodesLeft:left});
+}
+
+// Forgot password ---------------------------------------------------------------------------
+const RESET_MINUTES=30;
+const RESET_LETTER={
+ hr:{subject:'{brand}: nova lozinka',text:'Pozdrav, {name}!\n\nZatražena je nova lozinka za račun „{login}”. Otvorite poveznicu i postavite novu lozinku:\n{link}\n\nPoveznica vrijedi 30 minuta i može se iskoristiti samo jednom. Ako to niste bili vi, zanemarite ovu poruku: lozinka ostaje ista.'},
+ en:{subject:'{brand}: reset your password',text:'Hello {name},\n\nSomeone asked for a new password for the account “{login}”. Open this link to set one:\n{link}\n\nThe link works for 30 minutes and only once. If it was not you, ignore this email: your password stays the same.'},
+ ru:{subject:'{brand}: новый пароль',text:'Здравствуйте, {name}!\n\nДля аккаунта «{login}» запрошен новый пароль. Откройте ссылку и задайте его:\n{link}\n\nСсылка действует 30 минут и только один раз. Если это были не вы, просто проигнорируйте письмо: пароль останется прежним.'},
+};
+const escHtml=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function resetLetter(config,user,link){
+ const l=RESET_LETTER[user.language]||RESET_LETTER.hr,brand=(config.workspace?.name||'BIRD').trim()||'BIRD',vars={brand,name:user.display_name,login:user.login,link};
+ const fill=(t,html)=>t.replace(/\{(\w+)\}/g,(_,k)=>html?(k==='link'?`<a href="${escHtml(link)}">${escHtml(link)}</a>`:escHtml(vars[k])):vars[k]??'');
+ return {to:user.email,subject:fill(l.subject),text:fill(l.text),html:l.text.split('\n\n').map(p=>'<p>'+fill(p,true).replace(/\n/g,'<br>')+'</p>').join('')};
+}
+
+/**
+ * Forgot password: a single-use link by email. The answer is the same whether or not the account exists or has an
+ * email, so nobody learns which logins are real. A demo workspace and its invented accounts never get a link.
+ */
+export async function requestReset(ctx){
+ const body=await readJson(ctx.request);
+ const name=typeof body.login==='string'?body.login.trim().toLowerCase().slice(0,200):'';
+ rateLimit(ctx.db,'reset-ip:'+ctx.ip,20,3600);rateLimit(ctx.db,'reset-account:'+name,5,3600);
+ const mail=mailEnabled(ctx.config)&&!isDemo(ctx.db);
+ if(!mail||!name)return json({ok:true,mail});
+ // A login first (logins may contain @); otherwise every account saved with that email gets its own link.
+ const byLogin=ctx.db.query("SELECT * FROM users WHERE login=? AND status='active'").get(name);
+ const users=byLogin?[byLogin]:ctx.db.query("SELECT * FROM users WHERE lower(email)=? AND status='active' LIMIT 5").all(name);
+ const now=Date.now(),origin=selfOrigin(ctx.request,ctx.config);
+ ctx.db.query('DELETE FROM password_resets WHERE expires<?').run(now-86400000);
+ for(const u of users){
+  if(!u.email||u.id.startsWith('demo-'))continue;
+  // Three letters an hour per account, whichever name was typed; this limit is silent so it reveals nothing.
+  if(ctx.db.query('SELECT count(*) n FROM password_resets WHERE user_id=? AND created>?').get(u.id,new Date(now-3600000).toISOString()).n>=3)continue;
+  const raw=token(32);
+  ctx.db.transaction(()=>{
+   ctx.db.query('UPDATE password_resets SET used_at=? WHERE user_id=? AND used_at IS NULL').run(nowIso(),u.id);
+   ctx.db.query('INSERT INTO password_resets(id,user_id,token_hash,email,expires,created) VALUES(?,?,?,?,?,?)').run(newId('pwr'),u.id,sha256(raw),u.email,now+RESET_MINUTES*60000,nowIso());
+   audit(ctx.db,null,'user.reset_request','user',u.id,{});
+  })();
+  // Not awaited: the answer takes the same time whether or not a letter goes out.
+  sendMail(ctx.config,resetLetter(ctx.config,u,`${origin}/#/account/reset?token=${raw}`));
+ }
+ return json({ok:true,mail});
+}
+
+/** The link from the letter: a new password, every other session ends, the address counts as verified, signed in. */
+export async function confirmReset(ctx){
+ const body=await readJson(ctx.request);
+ rateLimit(ctx.db,'reset-confirm-ip:'+ctx.ip,30,3600);
+ const raw=typeof body.token==='string'?body.token.trim().slice(0,100):'';
+ const password=validPassword(body.newPassword);
+ const row=raw&&ctx.db.query("SELECT r.id,r.user_id,r.email FROM password_resets r JOIN users u ON u.id=r.user_id WHERE r.token_hash=? AND r.used_at IS NULL AND r.expires>? AND u.status='active'").get(sha256(raw),Date.now());
+ if(!row)fail(400,'RESET_INVALID');
+ const hash=await hashPassword(password),now=nowIso();
+ const used=ctx.db.transaction(()=>{
+  if(!ctx.db.query('UPDATE password_resets SET used_at=? WHERE id=? AND used_at IS NULL').run(now,row.id).changes)return false;
+  ctx.db.query('UPDATE password_credentials SET hash=?,updated=? WHERE user_id=?').run(hash,now,row.user_id);
+  // Every session of the account ends, and so does whoever was signed in on this browser.
+  ctx.db.query('UPDATE sessions SET revoked_at=? WHERE (user_id=? OR id=?) AND revoked_at IS NULL').run(now,row.user_id,ctx.session?.id||'');
+  ctx.db.query('UPDATE users SET email_verified=1,updated=? WHERE id=? AND email=?').run(now,row.user_id,row.email);
+  audit(ctx.db,row.user_id,'user.password_reset','user',row.user_id,{});
+  return true;
+ })();
+ if(!used)fail(400,'RESET_INVALID');
+ const session=createSession(ctx,row.user_id);
+ const user=ctx.user=ctx.db.query('SELECT * FROM users WHERE id=?').get(row.user_id);
  const left=ctx.db.query('SELECT count(*) n FROM recovery_codes WHERE user_id=? AND used_at IS NULL').get(user.id).n;
  return json({user:publicUser(user),csrf:session.csrf,recoveryCodesLeft:left});
 }

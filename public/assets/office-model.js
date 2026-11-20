@@ -1,9 +1,12 @@
 'use strict';
 const OFFICE_VERSION=1;
 const OFFICE_STORAGE_KEY='bird-office-prototype-v1';
-const OFFICE_STAGES=['idea','discovery','prototype','pilot'];
+// The shared project stage list (account-i18n.js, server/stages.mjs). A prototype saved with the old office keys is mapped.
+const OFFICE_STAGES=(typeof window!=='undefined'&&window.BIRD_STAGES)||['idea','prototype','mvp','product','first_customer','revenue','scaling'];
+const OFFICE_OLD_STAGE={discovery:'idea',research:'idea',pilot:'mvp',launched:'product'};
+const officeMapStages=value=>{if(value&&Array.isArray(value.projects))for(const p of value.projects)if(p&&OFFICE_OLD_STAGE[p.stage])p.stage=OFFICE_OLD_STAGE[p.stage];return value;};
 const officeSeed=()=>({version:OFFICE_VERSION,projects:[
- {id:'demo-sprout',name:'Sprout Lab',description:{en:'A fictional team testing ways to make urban gardening easier.',hr:'Izmišljeni tim koji ispituje kako olakšati urbano vrtlarstvo.',ru:'Вымышленная команда изучает, как упростить городское садоводство.'},stage:'discovery',demo:true,color:'#6b886c',members:[{id:'demo-ana',avatar:'woman',name:'Ana',role:'Founder'},{id:'demo-leo',avatar:'man',name:'Leo',role:'Product designer'},{id:'demo-mira',avatar:'woman',name:'Mira',role:'Developer'}],tasks:[],milestones:[],achievements:[]},
+ {id:'demo-sprout',name:'Sprout Lab',description:{en:'A fictional team testing ways to make urban gardening easier.',hr:'Izmišljeni tim koji ispituje kako olakšati urbano vrtlarstvo.',ru:'Вымышленная команда изучает, как упростить городское садоводство.'},stage:'idea',demo:true,color:'#6b886c',members:[{id:'demo-ana',avatar:'woman',name:'Ana',role:'Founder'},{id:'demo-leo',avatar:'man',name:'Leo',role:'Product designer'},{id:'demo-mira',avatar:'woman',name:'Mira',role:'Developer'}],tasks:[],milestones:[],achievements:[]},
  {id:'demo-luma',name:'Luma Studio',description:{en:'A fictional project exploring short lessons for people learning a new language.',hr:'Izmišljeni projekt s kratkim lekcijama za učenje jezika.',ru:'Вымышленный проект с короткими уроками для изучающих новый язык.'},stage:'prototype',demo:true,color:'#b17957',members:[{id:'demo-ivan',avatar:'man',name:'Ivan',role:'Founder'},{id:'demo-sofia',avatar:'woman',name:'Sofia',role:'Developer'}],tasks:[],milestones:[],achievements:[]},
  {id:'demo-north',name:'North Notes',description:{en:'A fictional team building a simple planning tool for small creative teams.',hr:'Izmišljeni tim razvija jednostavan alat za planiranje u malim kreativnim timovima.',ru:'Вымышленная команда делает простой планировщик для небольших творческих команд.'},stage:'idea',demo:true,color:'#708ba5',members:[{id:'demo-noah',avatar:'man',name:'Noah',role:'Founder'},{id:'demo-ema',avatar:'woman',name:'Ema',role:'Researcher'},{id:'demo-luka',avatar:'man',name:'Luka',role:'Developer'},{id:'demo-nika',avatar:'woman',name:'Nika',role:'Designer'}],tasks:[],milestones:[],achievements:[]}
 ]});
@@ -14,7 +17,7 @@ function officeValidateState(value){
  return true;
 }
 class OfficeStore{
- constructor(storage){if(typeof window!=='undefined'&&window.BirdProjects){this.real=true;this.storage=storage;this.warning=null;this.state={version:OFFICE_VERSION,projects:window.BirdProjects.officeProjects('en')};return;}this.storage=storage;this.warning=null;this.state=officeSeed();let raw;try{raw=storage.getItem(OFFICE_STORAGE_KEY);}catch{this.warning='unavailable';return;}if(raw){try{const parsed=JSON.parse(raw);if(officeValidateState(parsed))this.state=parsed;else this.warning='invalid';}catch{this.warning='invalid';}}}
+ constructor(storage){if(typeof window!=='undefined'&&window.BirdProjects){this.real=true;this.storage=storage;this.warning=null;this.state={version:OFFICE_VERSION,projects:window.BirdProjects.officeProjects('en')};return;}this.storage=storage;this.warning=null;this.state=officeSeed();let raw;try{raw=storage.getItem(OFFICE_STORAGE_KEY);}catch{this.warning='unavailable';return;}if(raw){try{const parsed=officeMapStages(JSON.parse(raw));if(officeValidateState(parsed))this.state=parsed;else this.warning='invalid';}catch{this.warning='invalid';}}}
  addProject(input){
  const name=String(input.name||'').trim(),description=String(input.description||'').trim();
  if(!name||name.length>100||!description||description.length>1000||!OFFICE_STAGES.includes(input.stage)||!Array.isArray(input.members)||input.members.length<1||input.members.length>40)throw Error('invalid');

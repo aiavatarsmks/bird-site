@@ -3,8 +3,9 @@ import {fail,json,readJson,text,oneOf,int,newId,page} from './http.mjs';
 import {nowIso} from './db.mjs';
 import {audit,requireAdmin,requireProject} from './permissions.mjs';
 import {requireUser} from './auth.mjs';
-import {award,projectXp,userXp} from './progress.mjs';
-import {isoWeek} from './tasks.mjs';
+import {award,projectXp,userXp,teamPoints,teamMembers,PROGRAMME_TEAM} from './progress.mjs';
+import {isoWeek,examplesOn} from './tasks.mjs';
+import {stageOf} from './stages.mjs';
 
 const CHECKIN_XP=10,START_SCORE=10;
 const weekBefore=(week,n=1)=>{const [y,w]=week.split('-W').map(Number);const d=new Date(Date.UTC(y,0,4+(w-1)*7-n*7));return isoWeek(d);};
@@ -159,17 +160,21 @@ export function teamPercent(db,projectId,memberIds){
 }
 
 /**
- * Team ranking by fair percentage. Every active (not archived) team of the cohort takes part, draft or published;
- * guests see only published teams. Personal tasks and private metrics stay out.
+ * Team ranking by fair percentage. Every team of the programme takes part (PROGRAMME_TEAM); guests see none.
+ * teamXp is the team's one points number (teamPoints), the same as on every other screen. Private metrics stay out.
  * place: shared by equal results (1, 2, 2, 4); teams that have earned nothing share the place after every team that has,
  * and when nobody has earned anything yet nobody has a place.
  */
 export function teamRanking(ctx){
  const week=isoWeek(),since=new Date(Date.now()-7*86400000).toISOString();
- const rows=ctx.db.query(`SELECT p.id,coalesce(json_extract(p.published,'$.name'),json_extract(p.draft,'$.name')) name FROM projects p WHERE ${ctx.user?"p.status<>'archived'":"p.status='published' AND p.published IS NOT NULL"}`).all();
+ // Signed-out visitors see no ranking. Signed in: the teams of the programme, whether or not they ever published
+ // their card (that is not shown anywhere here); never a test project one person made alone.
+ if(!ctx.user)return json({week,items:[],rules:{checkinXp:CHECKIN_XP}});
+ const rows=ctx.db.query(`SELECT p.id,coalesce(json_extract(p.published,'$.name'),json_extract(p.draft,'$.name')) name FROM projects p WHERE ${PROGRAMME_TEAM}`).all();
  const items=rows.filter(r=>r.id).map(p=>{
   const members=ctx.db.query("SELECT user_id FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").all(p.id).map(m=>m.user_id);
-  const team=projectXp(ctx.db,p.id),weekGain=ctx.db.query("SELECT coalesce(sum(amount),0) n FROM xp_ledger WHERE beneficiary_type='project' AND beneficiary_id=? AND created>=?").get(p.id,since).n;
+  const team=teamPoints(ctx.db,p.id).total,own=teamMembers(ctx.db,p.id);
+  const weekGain=ctx.db.query(`SELECT coalesce(sum(amount),0) n FROM xp_ledger WHERE created>=? AND ((beneficiary_type='project' AND beneficiary_id=?) ${own.length?`OR (beneficiary_type='user' AND beneficiary_id IN (${own.map(()=>'?').join(',')}))`:''})`).get(since,p.id,...own).n;
   const earned=members.length?teamScore(ctx.db,p.id,members).earned:0;
   return {projectId:p.id,name:p.name||'',percent:teamPercent(ctx.db,p.id,members),teamXp:team,weekGain,streak:streak(ctx.db,p.id),members:members.length,scored:earned>0||team>0};
  }).sort((a,b)=>(b.scored-a.scored)||(b.percent??-1)-(a.percent??-1)||b.teamXp-a.teamXp||b.weekGain-a.weekGain||a.name.localeCompare(b.name,'hr'));
@@ -206,7 +211,7 @@ export const csvCell=v=>{const s=String(v??'');return /[",\n;]/.test(s)||/^[=+\-
 /** Funder report: one row per team. Opens in Google Sheets / Excel. */
 export function exportCsv(ctx){
  requireAdmin(ctx);
- const head=['project','status','stage','members','team_points','personal_points','tasks_done','tasks_total','attendance_verified','attendance_self','checkins','checkin_streak','last_checkin_week','funding_grant_eur','funding_equity_eur','funding_loan_eur','funding_prize_eur','funding_other_eur','revenue_eur','hires','customers','company_registered','risk'];
+ const head=['project','status','stage','raised_eur','raising_eur','funding_round','members','team_points','personal_points','tasks_done','tasks_total','attendance_verified','attendance_self','checkins','checkin_streak','last_checkin_week','funding_grant_eur','funding_equity_eur','funding_loan_eur','funding_prize_eur','funding_other_eur','revenue_eur','hires','customers','company_registered','risk'];
  const lines=[head.join(',')];
  for(const p of ctx.db.query("SELECT * FROM projects WHERE status<>'archived' ORDER BY json_extract(draft,'$.name')").all()){
   const c=JSON.parse(p.draft),members=ctx.db.query("SELECT user_id FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").all(p.id).map(m=>m.user_id),marks=members.map(()=>'?').join(',');
@@ -215,7 +220,7 @@ export function exportCsv(ctx){
   const sum=(kind,type)=>ctx.db.query('SELECT coalesce(sum(amount),0) n FROM project_outcomes WHERE project_id=? AND kind=? AND (?=\'\' OR funding_type=?)').get(p.id,kind,type||'',type||'').n;
   const count=kind=>ctx.db.query('SELECT coalesce(sum(coalesce(amount,1)),0) n FROM project_outcomes WHERE project_id=? AND kind=?').get(p.id,kind).n;
   const last=ctx.db.query('SELECT week FROM checkins WHERE project_id=? ORDER BY week DESC LIMIT 1').get(p.id)?.week||'';
-  lines.push([c.name,p.status,c.stage,members.length,projectXp(ctx.db,p.id),members.reduce((n,u)=>n+userXp(ctx.db,u),0),tasks.filter(t=>t.st==='accepted').length,tasks.length,att.find(a=>a.kind==='verified_by_admin')?.n||0,att.find(a=>a.kind==='self_reported')?.n||0,ctx.db.query('SELECT count(*) n FROM checkins WHERE project_id=?').get(p.id).n,streak(ctx.db,p.id),last,sum('funding','grant'),sum('funding','equity'),sum('funding','loan'),sum('funding','prize'),sum('funding','other'),sum('revenue'),count('hire'),count('customer'),ctx.db.query("SELECT 1 FROM project_outcomes WHERE project_id=? AND kind='company'").get(p.id)?'yes':'no',riskSignals(ctx.db,p.id,members).level].map(csvCell).join(','));
+  lines.push([c.name,p.status,stageOf(c.stage),p.raised_eur??'',p.raising_eur??'',p.funding_round||'',members.length,projectXp(ctx.db,p.id),members.reduce((n,u)=>n+userXp(ctx.db,u),0),tasks.filter(t=>t.st==='accepted').length,tasks.length,att.find(a=>a.kind==='verified_by_admin')?.n||0,att.find(a=>a.kind==='self_reported')?.n||0,ctx.db.query('SELECT count(*) n FROM checkins WHERE project_id=?').get(p.id).n,streak(ctx.db,p.id),last,sum('funding','grant'),sum('funding','equity'),sum('funding','loan'),sum('funding','prize'),sum('funding','other'),sum('revenue'),count('hire'),count('customer'),ctx.db.query("SELECT 1 FROM project_outcomes WHERE project_id=? AND kind='company'").get(p.id)?'yes':'no',riskSignals(ctx.db,p.id,members).level].map(csvCell).join(','));
  }
  return new Response('﻿'+lines.join('\r\n')+'\r\n',{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="${brandSlug(ctx.config)}-report-${nowIso().slice(0,10)}.csv"`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 }
@@ -259,7 +264,8 @@ function questView(db,q){
  const done=db.query("SELECT count(*) n FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.task_id=? AND s.status='accepted'").get(q.task_id).n;
  return {id:q.id,title:JSON.parse(q.title),target:q.target,done:Math.min(done,q.target),complete:done>=q.target,closed:!!q.closed_at,created:q.created};
 }
-export function listQuests(ctx){return json({items:ctx.db.query('SELECT * FROM cohort_quests WHERE closed_at IS NULL ORDER BY created DESC LIMIT 5').all().map(q=>questView(ctx.db,q))});}
+// The seeded shared goal rides on an example task; where examples stay templates, it stays out too (the organiser's own goals show).
+export function listQuests(ctx){return json({items:ctx.db.query("SELECT q.* FROM cohort_quests q WHERE q.closed_at IS NULL AND (?1=1 OR q.created_by<>'system' OR NOT EXISTS(SELECT 1 FROM task_templates t WHERE t.id=q.task_id AND t.example=1)) ORDER BY q.created DESC LIMIT 5").all(examplesOn(ctx.db)?1:0).map(q=>questView(ctx.db,q))});}
 export async function createQuest(ctx){
  const admin=requireAdmin(ctx),body=await readJson(ctx.request);
  const title={en:text(body.title?.en,{min:1,max:120},'title.en'),hr:text(body.title?.hr??'',{max:120},'title.hr'),ru:text(body.title?.ru??'',{max:120},'title.ru')};

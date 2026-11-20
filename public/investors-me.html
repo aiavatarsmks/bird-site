@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="hr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f4f1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='13' width='5' height='8' fill='%23b5371a'/%3E%3Crect x='10' y='8' width='5' height='13' fill='%239a6200'/%3E%3Crect x='17' y='3' width='5' height='18' fill='%232b7a4b'/%3E%3C/svg%3E">
+<title>Kabinet investitora · {{site}}</title>
+<meta name="description" content="Kabinet investitora u Hubversu: startupi iz povezanih hubova s filtrima i kartom, profil fonda i poruke.">
+<meta name="robots" content="noindex"><link rel="canonical" href="{{origin}}/investors/me">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400..600&amp;display=swap">
+<link rel="stylesheet" href="/assets/site-page.css"><link rel="stylesheet" href="/assets/network.css"><link rel="stylesheet" href="/assets/investor.css">
+<link rel="stylesheet" href="/assets/messenger.css"><script src="/assets/account-i18n.js" defer></script><script src="/assets/messenger.js" defer></script>
+<script src="/assets/investor.js" defer></script>
+<meta name="bird-release" content="bird-61ba191a513cae46"></head><body data-page="invme">
+<a class="skip" href="#main" data-m="skip">Preskoči na sadržaj</a>
+{{menu}}
+<main id="main">
+<section class="page-head net-head"><div class="wrap">
+ <p class="eyebrow" data-m="meEyebrow">Kabinet investitora</p>
+ <h1 data-inv-hello data-m="meTitle">Startupi za vas</h1>
+ <p class="net-head-links"><span class="net-pill" data-inv-status hidden></span> <button class="net-link" type="button" data-inv-logout hidden data-m="signOut">Odjava</button></p>
+</div></section>
+<div class="wrap net-gate" data-net-gate hidden></div>
+<section class="net-cab" data-inv-cab hidden><div class="wrap">
+ <nav class="net-tabs" aria-label="Kabinet" data-m-aria="cabLabel">
+  <a href="#startups" data-tab="startups" data-m="tabStartups">Startupi</a>
+  <a href="#profile" data-tab="profile" data-m="tabProfile">Profil fonda</a>
+  <a href="#messages" data-tab="messages"><span data-m="tabMessages">Poruke</span> <span class="net-badge" data-msgr-count hidden></span></a>
+ </nav>
+ <div class="net-pane" data-pane="startups">
+  <div class="inv-wait" data-inv-wait hidden></div>
+  <div data-inv-dash hidden>
+   <form class="net-filters inv-filters" data-inv-filters aria-label="Filtri" data-m-aria="filtersLabel">
+    <fieldset class="net-cats"><legend data-m="fStages">Stadij</legend><div class="chips" data-inv-stages></div></fieldset>
+    <div class="inv-ranges">
+     <fieldset class="inv-range"><legend data-m="fRaising">Traže (EUR)</legend><label><span class="sr" data-m="from">od</span><input name="raisingMin" type="number" min="0" step="1000" inputmode="numeric" placeholder="od" data-m-ph="fromPh"></label><span aria-hidden="true">–</span><label><span class="sr" data-m="to">do</span><input name="raisingMax" type="number" min="0" step="1000" inputmode="numeric" placeholder="do" data-m-ph="toPh"></label></fieldset>
+     <fieldset class="inv-range"><legend data-m="fRaised">Već prikupili (EUR)</legend><label><span class="sr" data-m="from">od</span><input name="raisedMin" type="number" min="0" step="1000" inputmode="numeric" placeholder="od" data-m-ph="fromPh"></label><span aria-hidden="true">–</span><label><span class="sr" data-m="to">do</span><input name="raisedMax" type="number" min="0" step="1000" inputmode="numeric" placeholder="do" data-m-ph="toPh"></label></fieldset>
+    </div>
+    <div class="net-selects inv-selects">
+     <label><span data-m="fRound">Runda</span><select name="round" data-inv-round></select></label>
+     <label><span data-m="fRegion">Regija</span><select name="region" data-inv-region></select></label>
+     <label><span data-m="fCountry">Zemlja</span><select name="country" data-inv-country></select></label>
+     <label><span data-m="fHub">Hub</span><select name="hub" data-inv-hub></select></label>
+     <label><span data-m="fSort">Poredak</span><select name="sort" data-inv-sort></select></label>
+    </div>
+    <div class="net-bar">
+     <p class="net-count" data-inv-count aria-live="polite"></p>
+     <button class="net-reset" type="reset" data-m="reset">Očisti filtre</button>
+     <div class="net-view" role="group" aria-label="Prikaz" data-m-aria="viewLabel"><button type="button" data-view="list" aria-pressed="true" data-m="viewList">Popis</button><button type="button" data-view="map" aria-pressed="false" data-m="viewMap">Karta</button></div>
+    </div>
+   </form>
+   <div class="net-list" data-inv-list></div>
+   <div class="net-mapview" data-inv-mapview hidden>
+    <figure class="net-map">{{europe}}<figcaption id="net-map-cap" class="fine" data-m="mapCap">Karta Europe: broj u točki je broj projekata u tom hubu koji odgovaraju filtrima. Odaberite točku.</figcaption></figure>
+    <aside class="net-side" data-inv-side aria-live="polite" hidden></aside>
+   </div>
+  </div>
+ </div>
+ <div class="net-pane" data-pane="profile" hidden></div>
+ <div class="net-pane net-msgr" data-pane="messages" hidden></div>
+</div></section>
+</main>
+{{footer}}
+</body></html>

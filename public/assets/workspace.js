@@ -26,8 +26,8 @@ const W={
  seeMapText:{en:'Incubators and accelerators in Croatia, with their next programmes.',hr:'Inkubatori i akceleratori u Hrvatskoj i njihovi sljedeći programi.',ru:'Инкубаторы и акселераторы Хорватии и их ближайшие программы.'},
  invented:{en:'Teams, people and numbers in this demo are invented.',hr:'Timovi, osobe i brojke u ovom demu su izmišljeni.',ru:'Команды, люди и цифры в этом демо выдуманы.'},
  toDash:{en:'Dashboard',hr:'Nadzorna ploča',ru:'Панель'},todayNav:{en:'Today',hr:'Danas',ru:'Сегодня'},myDash:{en:'My dashboard',hr:'Moja ploča',ru:'Моя панель'},tasksNav:{en:'Tasks',hr:'Zadaci',ru:'Задания'},toToday:{en:'Today: morning briefing',hr:'Danas: jutarnji pregled',ru:'Сегодня: утренняя сводка'},teamsOnly:{en:'Teams only',hr:'Samo timovi',ru:'Только команды'},withOffice:{en:'Dashboard with the office',hr:'Nadzorna ploča s uredom',ru:'Панель с офисом'},
- join:{en:'Join as yourself',hr:'Uđi kao ti',ru:'Войти как вы'},roleSelf:{en:'Yourself',hr:'Ti',ru:'Вы'},
- joinText:{en:'Make your own character, name it, and join a team or start one. Under a minute.',hr:'Složi svoj lik, daj mu ime i pridruži se timu ili osnuj novi. Manje od minute.',ru:'Соберите своего персонажа, назовите его и присоединитесь к команде или создайте новую. Меньше минуты.'},
+ join:{en:'Join as yourself',hr:'Uđi sa svojim likom',ru:'Войти как вы'},roleSelf:{en:'Yourself',hr:'Vi',ru:'Вы'},
+ joinText:{en:'Make your own character, name it, and join a team or start one. Under a minute.',hr:'Složite svoj lik, dajte mu ime i pridružite se timu ili osnujte novi. Traje manje od minute.',ru:'Соберите своего персонажа, назовите его и присоединитесь к команде или создайте новую. Меньше минуты.'},
  loading:{en:'Loading…',hr:'Učitavanje…',ru:'Загрузка…'},failed:{en:'Could not load. Reload the page.',hr:'Nije učitano. Osvježite stranicu.',ru:'Не загрузилось. Обновите страницу.'},
 };
 const w=key=>W[key][lang]||W[key].en;

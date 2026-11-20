@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="hr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f4f1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='13' width='5' height='8' fill='%23b5371a'/%3E%3Crect x='10' y='8' width='5' height='13' fill='%239a6200'/%3E%3Crect x='17' y='3' width='5' height='18' fill='%232b7a4b'/%3E%3C/svg%3E">
+<title>Obavijest o privatnosti · {{site}}</title>
+<meta name="description" content="Koje osobne podatke prikupljaju web-stranica i platforma {{site}}, zašto, koliko ih čuvamo i kako zatražiti brisanje.">
+<link rel="canonical" href="{{origin}}/privacy">
+<meta property="og:type" content="website"><meta property="og:site_name" content="{{site}}"><meta property="og:title" content="Obavijest o privatnosti · {{site}}"><meta property="og:url" content="{{origin}}/privacy">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400..600&amp;display=swap">
+<link rel="stylesheet" href="assets/site-page.css">
+<script src="assets/privacy.js" defer></script>
+<meta name="bird-release" content="bird-61ba191a513cae46"></head><body data-page="privacy">
+<!-- LEGAL REVIEW REQUIRED: a lawyer must review this notice before the BIRD/Zicer pilot contract is signed.
+     Written from the code on 20 Nov 2026 (server/leads.mjs, auth.mjs, demo-visit.mjs, demo-join.mjs, mail.mjs,
+     offsite.mjs, http.mjs rateLimit). There is no legal entity yet, so the controller is "the Hubvers team"; no personal
+     name or email on purpose. When the code starts collecting something new, update this page and the date.
+     Croatian is here; English and Russian are in assets/privacy.js. -->
+<a class="skip" href="#main" data-m="skip">Preskoči na sadržaj</a>
+{{menu}}
+<main id="main">
+<section class="page-head"><div class="wrap">
+ <p class="eyebrow" data-m="pEyebrow">Privatnost</p>
+ <h1 data-m="pTitle">Obavijest o privatnosti</h1>
+ <p class="lead" data-m="pLead">Koje osobne podatke prikupljaju web-stranica i platforma {{site}}, zašto, koliko ih čuvamo i kako zatražiti njihovo brisanje. Opisujemo samo ono što softver stvarno radi.</p>
+ <p class="updated" data-m="pUpdated">Posljednje ažuriranje: 20. studenoga 2026.</p>
+</div></section>
+
+<section class="section"><div class="wrap prose-wrap"><div class="prose">
+ <section>
+  <h2 data-m="s1h">Tko smo</h2>
+  <div data-m="s1b"><p>{{site}} je platforma za startup inkubatore i akceleratore, nastala u Zagrebu, u Hrvatskoj. {{site}} još nije registrirana tvrtka. Dok to ne postane, voditelj obrade podataka opisanih ovdje je tim {{site}}. Kad tvrtka bude osnovana, ovdje ćemo navesti njezine podatke.</p><p>Za pitanja o vašim podacima koristite <a href="/contact">obrazac za kontakt</a>.</p></div>
+ </section>
+ <section>
+  <h2 data-m="s2h">Obrasci na web-stranici</h2>
+  <div data-m="s2b"><p>Obrazac za pilot na početnoj stranici, liste čekanja na /mentors i /investors te obrazac na /contact spremaju:</p><ul><li>vaše ime i prezime te adresu e-pošte;</li><li>vašu organizaciju (za mentore neobavezno);</li><li>samo u obrascu za pilot: broj telefona i broj timova u ciklusu, oboje neobavezno;</li><li>vašu poruku, ako je napišete;</li><li>pišete li kao inkubator, mentor ili investitor, jezik stranice i vrijeme kad ste pristali da vas kontaktiramo.</li></ul><p>Te podatke koristimo samo da vam odgovorimo o pilotu, listi čekanja ili vašem pitanju. U platformi ih vidi samo vlasnik platforme. Kad upit stigne, kratka obavijest s vašim imenom i organizacijom (nikad e-poštom ni telefonom) može otići u interni chat našeg tima, da ga brzo primijetimo.</p></div>
+ </section>
+ <section>
+  <h2 data-m="s3h">Računi u prostorima inkubatora</h2>
+  <div data-m="s3b"><p>Svaki inkubator na platformi ima svoj zaseban prostor. Ako u njemu imate račun, on sadrži:</p><ul><li>korisničko ime i ime koje se prikazuje;</li><li>lozinku, spremljenu samo kao jednosmjerni sažetak (Argon2id), nikad u čitljivom obliku;</li><li>adresu e-pošte ako je dodate (neobavezno) i željeni jezik;</li><li>po želji profilnu sliku, izgled vašeg lika u uredu i poveznice koje dodate u profil;</li><li>vaše aktivnosti u programu: tim i projekte, zadatke i odgovore, dolaske, termine kod mentora, poruke, datoteke koje učitate i bodove;</li><li>za svaku prijavu: kad je počela, kad je zadnji put korištena i kratku oznaku uređaja, npr. „Chrome · macOS”, da možete vidjeti i zatvoriti svoje prijave.</li></ul><p>Voditelji vašeg inkubatora vide vaše aktivnosti u svojem programu; za to platforma i služi. Prostori su odvojeni: jedan inkubator ne vidi ljude ni projekte drugoga. Ako je u prostoru uključena e-pošta (npr. za ponovno postavljanje lozinke), pisma šaljemo preko servisa za transakcijsku e-poštu (Brevo ili Resend).</p></div>
+ </section>
+ <section>
+  <h2 data-m="s3ih">Investitori</h2>
+  <div data-m="s3ib"><p>Ako se na /investors prijavite kao investitor, uz račun spremamo: ime, poslovnu e-poštu i njezinu domenu, naziv i web-stranicu fonda, sjedište (zemlja i grad), stadije, sektore, iznos ulaganja i regije koje vas zanimaju te po želji LinkedIn i kratki opis. Te podatke vidi vlasnik platforme kako bi ručno provjerio fond; drugim korisnicima ne prikazujemo vaš profil. Kad iskažete interes za projekt, tim ili organizatori njegova huba vide vaše ime, fond, web-stranicu, LinkedIn i poslovnu e-poštu, kako bi vam mogli odgovoriti.</p><p>Odobreni investitori vide samo projekte čiji je tim uključio prikaz investitorima, i to samo objavljeni opis, stadij i podatke o financiranju. Imena, e-pošta i telefoni članova timova investitorima se nikad ne prikazuju. Račun i profil investitora možete obrisati u kabinetu.</p></div>
+ </section>
+ <section>
+  <h2 data-m="s4h">Javni demo</h2>
+  <div data-m="s4b"><p>Demo na /demo prikazuje izmišljeni inkubator. Možete ga razgledati kao izmišljeni voditelj ili tim, ili mu se pridružiti sa svojim likom. Ulazak u demo otvara prijavu koja traje četiri sata. Ako se pridružite, spremamo ime koje upišete, lik koji nacrtate i tim koji odaberete ili imenujete. To brišemo nakon što vaš posjet završi, najkasnije pri sljedećem osvježavanju demoa. Sve ostalo u demou je izmišljeno i posjetitelji ga ne mogu promijeniti.</p></div>
+ </section>
+ <section>
+  <h2 data-m="s5h">Kolačići i spremište u pregledniku</h2>
+  <div data-m="s5b"><ul><li>Jedan kolačić, <code>bird_session</code>, koji vas drži prijavljenima. Postavlja se tek kad se prijavite ili uđete u demo, skripte na stranici ga ne mogu čitati, a prestaje vrijediti kad se odjavite, nakon 30 dana ili, za posjet demou, nakon četiri sata.</li><li>Odabrani jezik i nekoliko postavki sučelja čuvaju se u lokalnom spremištu vašeg preglednika, na vašem uređaju.</li></ul><p>Ne koristimo analitičke, oglašivačke ni kolačiće za praćenje, niti skripte trećih strana za analitiku ili oglase.</p></div>
+ </section>
+ <section>
+  <h2 data-m="s6h">Tko još dobiva podatke</h2>
+  <div data-m="s6b"><ul><li><b>Smještaj (hosting):</b> web-stranica, platforma i baza podataka rade na usluzi u oblaku tvrtke Railway, Inc. Kao svaki pružatelj smještaja, ona obrađuje svaki zahtjev, uključujući vašu IP adresu, i može voditi tehničke zapise radi rada i zaštite usluge.</li><li><b>Fontovi:</b> stranice učitavaju pismo Onest s Google Fontsa, pa se vaš preglednik spaja na Googleove poslužitelje, koji vide vašu IP adresu.</li><li><b>E-pošta:</b> samo ako je u prostoru uključena, preko Breva ili Resenda (vidi gore).</li><li><b>Sigurnosne kopije:</b> svaki dan izrađujemo kopiju baze; može se čuvati i u zasebnom spremištu u oblaku.</li></ul><p>Naš poslužitelj ne sprema IP adrese. Da spriječi zlouporabu obrazaca, kratko čuva samo nečitljiv sažetak adrese s brojačem, koji se briše najkasnije za jedan dan.</p><p>Osobne podatke ne prodajemo, ne dijelimo ih s oglašivačima i ne prikazujemo oglase.</p></div>
+ </section>
+ <section>
+  <h2 data-m="s7h">Koliko dugo čuvamo podatke</h2>
+  <div data-m="s7b"><ul><li>Upite iz obrazaca: dok smo s vama u kontaktu o pilotu, listi čekanja ili vašem pitanju, ili dok ne zatražite brisanje.</li><li>Račune i aktivnosti u programu: dok postoje račun i prostor inkubatora. Vaš inkubator može račun isključiti; ako želite da ga izbrišemo, pišite nam preko obrasca za kontakt.</li><li>Posjete demou: kako je opisano gore.</li><li>Sigurnosne kopije: izbrisani podaci mogu ostati u starijim dnevnim kopijama dok se te kopije ne zamijene.</li></ul></div>
+ </section>
+ <section>
+  <h2 data-m="s8h">Vaša prava i kako ih ostvariti</h2>
+  <div data-m="s8b"><p>Možete zatražiti uvid u podatke koje o vama imamo, njihov ispravak ili brisanje, a privolu za kontakt možete povući u svakom trenutku. Zahtjev pošaljite preko <a href="/contact">obrasca za kontakt</a> i upišite istu adresu e-pošte koju ste nam dali, da vaše podatke možemo pronaći. Za račun u prostoru inkubatora možete se obratiti i voditeljima tog inkubatora.</p><p>Ako smatrate da vaše podatke obrađujemo pogrešno, možete podnijeti pritužbu Agenciji za zaštitu osobnih podataka (AZOP).</p></div>
+ </section>
+ <section>
+  <h2 data-m="s9h">Promjene</h2>
+  <div data-m="s9b"><p>Kad se promijeni ono što web-stranica ili platforma prikupljaju, ažurirat ćemo ovu stranicu i datum na vrhu.</p></div>
+ </section>
+</div></div></section>
+</main>
+{{footer}}
+</body></html>

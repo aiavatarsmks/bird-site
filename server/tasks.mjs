@@ -4,12 +4,16 @@ import {nowIso} from './db.mjs';
 import {audit,isAdmin,membership,requireAdmin} from './permissions.mjs';
 import {requireUser} from './auth.mjs';
 import {notify} from './notifications.mjs';
-import {award,reverse,badgeForRule} from './progress.mjs';
+import {award,reverse,badgeForRule,PROGRAMME_TEAM} from './progress.mjs';
 import {canReadFile} from './files.mjs';
 import {reportAttendance} from './lectures.mjs';
 
 export const TYPES=['checklist','counter','text','link','attachment','attendance','team_result'];
 const LANGS=['en','hr','ru'];
+// What a team can hand in as proof; a task names one or several (file and/or link and/or text).
+export const PROOF=['file','link','text'];
+/** Example tasks reach teams by themselves only in a demo; a real workspace keeps them as templates to copy from. */
+export const examplesOn=db=>!!db.query("SELECT 1 FROM settings WHERE (key='example_tasks' AND value='assign') OR key='demo_filled'").get();
 
 /** ISO week in Europe/Zagreb, for example 2026-W45. */
 export function isoWeek(date=new Date()){
@@ -37,20 +41,23 @@ function cleanTranslations(input){
  if(!LANGS.some(l=>out[l].title&&out[l].instructions))fail(400,'INVALID_FIELDS',{field:'instructions'});
  return out;
 }
-function cleanTask(body){
- const type=oneOf(body.type,TYPES,'type'),scope=oneOf(body.scope,['personal','team'],'scope');
+function cleanTask(body,current=null){
+ const scope=oneOf(body.scope,['personal','team'],'scope');
+ const proof=[...new Set((Array.isArray(body.proof)?body.proof:[]).map(String))].filter(k=>PROOF.includes(k));
+ // Proof kinds pick the type (checklist stays a checklist): only text, only a link, otherwise a file with the rest.
+ const type=body.type==='checklist'||!proof.length?oneOf(body.type,TYPES,'type'):proof.length===1&&proof[0]!=='file'?proof[0]:'attachment';
  const checklist=type==='checklist'?(Array.isArray(body.checklist)?body.checklist:[]).slice(0,12).map((item,i)=>Object.fromEntries(LANGS.map(l=>[l,text(item?.[l]??'',{max:200},'checklist.'+i)]))).filter(item=>LANGS.some(l=>item[l])):[];
  if(type==='checklist'&&!checklist.length)fail(400,'INVALID_FIELDS',{field:'checklist'});
  const due=body.dueAt?text(body.dueAt,{max:40},'dueAt'):null;
  if(due&&Number.isNaN(Date.parse(due)))fail(400,'INVALID_FIELDS',{field:'dueAt'});
  return {
-  type,scope,xp:int(body.xp??0,{min:0,max:1000},'xp'),
+  type,scope,xp:int(body.xp??0,{min:0,max:1000},'xp'),proof:proof.length?JSON.stringify(PROOF.filter(k=>proof.includes(k))):'',
   counter_target:['counter','attendance'].includes(type)?int(body.counterTarget??1,{min:1,max:100},'counterTarget'):0,
   requires_review:body.requiresReview?1:0,self_report:body.selfReport===false?0:1,
   repeat_rule:oneOf(body.repeatRule||'once',['once','weekly_reward','per_week'],'repeatRule'),
   checklist:JSON.stringify(checklist),translations:JSON.stringify(cleanTranslations(body.translations)),
   audience:oneOf(body.audience||'all_participants',['all_participants','selected'],'audience'),
-  due_at:due?new Date(due).toISOString():null,timezone:'Europe/Zagreb',
+  due_at:pastDue(due,current),timezone:'Europe/Zagreb',
   reviewer_user_id:body.reviewerUserId?text(body.reviewerUserId,{max:80},'reviewerUserId'):null,
   visibility:oneOf(body.visibility||'participants',['participants','team'],'visibility'),
   week_id:body.weekId?text(body.weekId,{max:80},'weekId'):null,
@@ -58,26 +65,47 @@ function cleanTask(body){
   pick_mode:oneOf(body.pickMode||'assigned',['assigned','catalog'],'pickMode'),
  };
 }
-export function taskView(t){return {id:t.id,key:t.key,type:t.type,scope:t.scope,xp:t.xp,counterTarget:t.counter_target,requiresReview:!!t.requires_review,selfReport:!!t.self_report,repeatRule:t.repeat_rule,checklist:JSON.parse(t.checklist),translations:JSON.parse(t.translations),status:t.status,audience:t.audience,dueAt:t.due_at,timezone:t.timezone,reviewerUserId:t.reviewer_user_id,visibility:t.visibility,official:!!t.official,weekId:t.week_id,completionMode:t.completion_mode||'participant',pickMode:t.pick_mode||'assigned',version:t.version,updated:t.updated};}
+// A deadline in the past is refused when it is new; an existing one may stay (a task can be edited after its date).
+function pastDue(due,current){
+ if(!due)return null;const at=new Date(due).toISOString();
+ if(Date.parse(at)<Date.now()-60000&&at!==current?.due_at)fail(400,'INVALID_FIELDS',{field:'dueAt',reason:'past'});
+ return at;
+}
+const proofOf=t=>{try{return t.proof?JSON.parse(t.proof):[];}catch{return [];}};
+export function taskView(t){return {id:t.id,key:t.key,type:t.type,scope:t.scope,xp:t.xp,counterTarget:t.counter_target,requiresReview:!!t.requires_review,selfReport:!!t.self_report,repeatRule:t.repeat_rule,checklist:JSON.parse(t.checklist),translations:JSON.parse(t.translations),status:t.status,audience:t.audience,dueAt:t.due_at,timezone:t.timezone,reviewerUserId:t.reviewer_user_id,visibility:t.visibility,official:!!t.official,weekId:t.week_id,completionMode:t.completion_mode||'participant',pickMode:t.pick_mode||'assigned',proof:proofOf(t),example:!!t.example,version:t.version,updated:t.updated};}
 
 // Admin: templates -----------------------------------------------------------
+/**
+ * New task. With publish:true it is published and handed to its teams in the same step (one screen, one button):
+ * audience all_participants reaches every team, selected reaches projectIds (teams without accounts wait for them).
+ */
 export async function createTask(ctx){
  const admin=requireAdmin(ctx),body=await readJson(ctx.request);
  const t=cleanTask(body),id=newId('task'),now=nowIso();
  const key=body.key?text(body.key,{max:60},'key'):null;
  if(key&&!/^[a-z0-9-]+$/.test(key))fail(400,'INVALID_FIELDS',{field:'key'});
- try{ctx.db.query(`INSERT INTO task_templates(id,key,week_id,type,scope,xp,counter_target,requires_review,self_report,repeat_rule,checklist,translations,status,audience,due_at,timezone,reviewer_user_id,visibility,completion_mode,pick_mode,created_by,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'draft',?,?,?,?,?,?,?,?,?,?)`).run(id,key,t.week_id,t.type,t.scope,t.xp,t.counter_target,t.requires_review,t.self_report,t.repeat_rule,t.checklist,t.translations,t.audience,t.due_at,t.timezone,t.reviewer_user_id,t.visibility,t.completion_mode,t.pick_mode,admin.id,now,now);}
- catch(e){if(String(e.message).includes('UNIQUE'))fail(409,'CONFLICT');throw e;}
- audit(ctx.db,admin.id,'task.create','task',id,{});
- return json({task:taskView(ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(id))},201);
+ const publish=body.publish===true;
+ if(publish&&t.audience==='selected'&&!(body.projectIds?.length||body.userIds?.length))fail(400,'INVALID_FIELDS',{field:'projectIds'});
+ let created=0;
+ ctx.db.transaction(()=>{
+  try{ctx.db.query(`INSERT INTO task_templates(id,key,week_id,type,scope,xp,counter_target,requires_review,self_report,repeat_rule,checklist,translations,status,audience,due_at,timezone,reviewer_user_id,visibility,completion_mode,pick_mode,proof,created_by,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id,key,t.week_id,t.type,t.scope,t.xp,t.counter_target,t.requires_review,t.self_report,t.repeat_rule,t.checklist,t.translations,publish?'published':'draft',t.audience,t.due_at,t.timezone,t.reviewer_user_id,t.visibility,t.completion_mode,t.pick_mode,t.proof,admin.id,now,now);}
+  catch(e){if(String(e.message).includes('UNIQUE'))fail(409,'CONFLICT');throw e;}
+  audit(ctx.db,admin.id,'task.create','task',id,{publish});
+  if(publish&&t.pick_mode==='assigned'){const task=ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(id),period=periodFor(task);
+   created=assignAll(ctx.db,task,targets(ctx.db,task,{userIds:body.userIds,projectIds:body.projectIds}),period);
+   audit(ctx.db,admin.id,'task.assign','task',id,{period,created});}
+ })();
+ return json({task:taskView(ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(id)),assigned:created},201);
 }
 export async function updateTask(ctx,id){
  const admin=requireAdmin(ctx),body=await readJson(ctx.request);
  const current=ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(id);if(!current)fail(404,'NOT_FOUND');
  if(Number(body.version)!==current.version)fail(409,'CONFLICT',{currentVersion:current.version});
- if(current.status!=='draft'&&(body.type!==current.type||body.scope!==current.scope))fail(409,'INVALID_STATE');
- const t=cleanTask({audience:current.audience,...body});
- ctx.db.query('UPDATE task_templates SET week_id=?,type=?,scope=?,xp=?,counter_target=?,requires_review=?,self_report=?,repeat_rule=?,checklist=?,translations=?,audience=?,due_at=?,reviewer_user_id=?,visibility=?,completion_mode=?,pick_mode=?,version=version+1,updated=? WHERE id=? AND version=?').run(t.week_id,t.type,t.scope,t.xp,t.counter_target,t.requires_review,t.self_report,t.repeat_rule,t.checklist,t.translations,t.audience,t.due_at,t.reviewer_user_id,t.visibility,t.completion_mode,t.pick_mode,nowIso(),id,current.version);
+ if(current.status!=='draft'&&body.scope!==current.scope)fail(409,'INVALID_STATE');
+ const t=cleanTask({audience:current.audience,...body},current);
+ if(current.status!=='draft'&&t.type!==current.type)fail(409,'INVALID_STATE');
+ // An edited example is the organiser's own task from now on (example=0).
+ ctx.db.query('UPDATE task_templates SET week_id=?,type=?,scope=?,xp=?,counter_target=?,requires_review=?,self_report=?,repeat_rule=?,checklist=?,translations=?,audience=?,due_at=?,reviewer_user_id=?,visibility=?,completion_mode=?,pick_mode=?,proof=?,example=0,version=version+1,updated=? WHERE id=? AND version=?').run(t.week_id,t.type,t.scope,t.xp,t.counter_target,t.requires_review,t.self_report,t.repeat_rule,t.checklist,t.translations,t.audience,t.due_at,t.reviewer_user_id,t.visibility,t.completion_mode,t.pick_mode,t.proof,nowIso(),id,current.version);
  audit(ctx.db,admin.id,'task.update','task',id,{});
  return json({task:taskView(ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(id))});
 }
@@ -94,13 +122,56 @@ export async function setTaskStatus(ctx,id){
 export function adminTasks(ctx){
  requireAdmin(ctx);const {limit,offset}=page(ctx.url,100);
  const status=ctx.url.searchParams.get('status');
+ // library=1: the example tasks to copy from. Otherwise a real workspace lists the organiser's own tasks and any
+ // example that teams already work on; a demo lists everything.
+ const library=ctx.url.searchParams.get('library')==='1'?1:0,all=examplesOn(ctx.db)?1:0;
  const rows=ctx.db.query(`SELECT t.*,(SELECT count(*) FROM assignments a WHERE a.task_id=t.id) assigned,(SELECT count(*) FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.task_id=t.id AND s.status='submitted') waiting,
   (SELECT count(*) FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.task_id=t.id AND s.status='accepted') accepted,
   (SELECT count(*) FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.task_id=t.id AND s.status='changes_requested') changes,
-  (SELECT count(*) FROM assignments a LEFT JOIN submissions s ON s.assignment_id=a.id WHERE a.task_id=t.id AND t.due_at IS NOT NULL AND t.due_at<?4 AND coalesce(s.status,'not_started') NOT IN ('submitted','accepted')) overdue
-  FROM task_templates t WHERE (?1 IS NULL OR t.status=?1) ORDER BY t.created LIMIT ?2 OFFSET ?3`).all(status,limit+1,offset,nowIso());
+  (SELECT count(*) FROM assignments a LEFT JOIN submissions s ON s.assignment_id=a.id WHERE a.task_id=t.id AND t.due_at IS NOT NULL AND t.due_at<?4 AND coalesce(s.status,'not_started') NOT IN ('submitted','accepted')) overdue,
+  (SELECT count(*) FROM assignments a JOIN task_responses r ON r.assignment_id=a.id WHERE a.task_id=t.id AND r.decision='accepted') said_yes,
+  (SELECT count(*) FROM assignments a JOIN task_responses r ON r.assignment_id=a.id WHERE a.task_id=t.id AND r.decision='declined') said_no,
+  (SELECT count(*) FROM assignments a WHERE a.task_id=t.id AND NOT EXISTS(SELECT 1 FROM task_responses r WHERE r.assignment_id=a.id) AND NOT EXISTS(SELECT 1 FROM submissions s WHERE s.assignment_id=a.id)) unanswered
+  FROM task_templates t WHERE (?1 IS NULL OR t.status=?1) AND (CASE WHEN ?5=1 THEN t.example=1 ELSE (?6=1 OR t.example=0 OR EXISTS(SELECT 1 FROM assignments a WHERE a.task_id=t.id)) END) ORDER BY t.created LIMIT ?2 OFFSET ?3`).all(status,limit+1,offset,nowIso(),library,all);
  // Counts for the organiser's progress bar: accepted, waiting for review, sent back, and late (not handed in after the due date).
- return json({items:rows.slice(0,limit).map(t=>({...taskView(t),assigned:t.assigned,waiting:t.waiting,accepted:t.accepted,changes:t.changes,overdue:t.overdue})),hasMore:rows.length>limit});
+ // Teams' answers to an assigned task: accepted (said yes or started), declined, not answered yet.
+ return json({items:rows.slice(0,limit).map(t=>({...taskView(t),assigned:t.assigned,waiting:t.waiting,accepted:t.accepted,changes:t.changes,overdue:t.overdue,responses:{accepted:t.assigned-t.said_no-t.unanswered,declined:t.said_no,unanswered:t.unanswered}})),hasMore:rows.length>limit});
+}
+
+/**
+ * Homework overview: every team of the programme against every live task, one status per cell.
+ * A personal task shows the state of the team's members taken together (the one most in need of attention).
+ */
+export function matrix(ctx){
+ requireAdmin(ctx);
+ const now=nowIso();
+ const teams=ctx.db.query(`SELECT p.id,json_extract(p.draft,'$.name') name,(SELECT count(*) FROM memberships m WHERE m.project_id=p.id AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member')) members FROM projects p WHERE ${PROGRAMME_TEAM} ORDER BY name COLLATE NOCASE`).all();
+ const tasks=ctx.db.query("SELECT * FROM task_templates t WHERE t.status IN ('published','closed') AND t.pick_mode='assigned' AND EXISTS(SELECT 1 FROM assignments a WHERE a.task_id=t.id) ORDER BY t.due_at IS NULL,t.due_at,t.created LIMIT 60").all();
+ const rows=ctx.db.query(`SELECT a.id,a.task_id,a.project_id,a.user_id,coalesce(s.status,'') sub,r.decision,r.reason,(SELECT m.project_id FROM memberships m WHERE m.user_id=a.user_id AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') ORDER BY m.created LIMIT 1) member_of
+  FROM assignments a LEFT JOIN submissions s ON s.assignment_id=a.id LEFT JOIN task_responses r ON r.assignment_id=a.id WHERE a.task_id IN (SELECT id FROM task_templates WHERE status IN ('published','closed') AND pick_mode='assigned')`).all();
+ const byTask=new Map(tasks.map(t=>[t.id,t]));
+ const state=(t,x)=>{
+  if(x.decision==='declined')return 'declined';
+  if(x.sub==='accepted')return 'done';
+  if(x.sub==='submitted')return 'submitted';
+  if(x.sub==='changes_requested'||x.sub==='rejected')return 'changes';
+  if(t.due_at&&t.due_at<now)return 'overdue';
+  if(x.sub==='draft')return 'working';
+  return x.decision==='accepted'?'accepted':needsAnswer(t,null)?'unanswered':'accepted';
+ };
+ // Most in need of attention first, for a cell that holds several people.
+ const RANK=['submitted','overdue','changes','unanswered','working','accepted','declined','done'];
+ const cells={};
+ for(const x of rows){const t=byTask.get(x.task_id);if(!t)continue;const team=x.project_id||x.member_of;if(!team)continue;
+  const k=team+'|'+t.id,st=state(t,x),c=cells[k]||(cells[k]={status:st,assignmentId:x.id,people:0,done:0,reason:''});
+  c.people++;if(st==='done')c.done++;
+  if(RANK.indexOf(st)<RANK.indexOf(c.status)){c.status=st;c.assignmentId=x.id;}
+  if(st==='declined'&&x.reason)c.reason=x.reason;
+ }
+ // All members done or all declined: the personal cell says so; otherwise it keeps the most urgent state.
+ for(const c of Object.values(cells))if(c.people>1&&c.done===c.people)c.status='done';
+ return json({teams:teams.map(t=>({id:t.id,name:t.name||'',members:t.members})),tasks:tasks.map(t=>({id:t.id,title:JSON.parse(t.translations),scope:t.scope,dueAt:t.due_at,xp:t.xp,status:t.status})),
+  cells:Object.fromEntries(Object.entries(cells).map(([k,c])=>[k,{status:c.status,assignmentId:c.assignmentId,people:c.people,done:c.done,reason:c.reason}]))});
 }
 
 // Assignment -------------------------------------------------------------------
@@ -116,7 +187,9 @@ function targets(db,task,{userIds,projectIds}={}){
   }
   return db.query("SELECT id,display_name name FROM users WHERE status='active' AND role='member' ORDER BY created").all();
  }
- const base="SELECT p.id,json_extract(p.draft,'$.name') name FROM projects p WHERE p.status<>'archived' AND EXISTS(SELECT 1 FROM memberships m WHERE m.project_id=p.id AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member'))";
+ // Teams of the programme get it even before anyone has an account (the assignment waits for them), and so does any
+ // project people already work in.
+ const base=`SELECT p.id,json_extract(p.draft,'$.name') name FROM projects p WHERE p.status<>'archived' AND (${PROGRAMME_TEAM} OR EXISTS(SELECT 1 FROM memberships m WHERE m.project_id=p.id AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member')))`;
  if(task.audience==='selected'){const ids=(projectIds||[]).slice(0,500);return ids.length?db.query(base+` AND p.id IN (${ids.map(()=>'?').join(',')})`).all(...ids):[];}
  return db.query(base+' ORDER BY p.created').all();
 }
@@ -157,13 +230,19 @@ export async function nudgeOpen(ctx,id){
 
 /** Gives a new or newly linked participant the active tasks of their set. */
 export function assignForUser(db,user){
- const tasks=db.query("SELECT * FROM task_templates WHERE status='published' AND audience='all_participants' AND pick_mode='assigned' AND (due_at IS NULL OR due_at>?)").all(nowIso());
+ const tasks=db.query("SELECT * FROM task_templates WHERE status='published' AND audience='all_participants' AND pick_mode='assigned' AND (due_at IS NULL OR due_at>?) AND (example=0 OR ?)").all(nowIso(),examplesOn(db)?1:0);
  const projects=db.query("SELECT p.id FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') AND p.status<>'archived'").all(user.id);
  for(const task of tasks){
   const period=periodFor(task);
   if(task.scope==='team')assignAll(db,task,projects,period);
   else if(user.role==='member')assignAll(db,task,[{id:user.id}],period);
  }
+}
+
+/** A team the organiser just added gets the team tasks meant for every team, before anyone joins it. */
+export function assignForProject(db,projectId){
+ const tasks=db.query("SELECT * FROM task_templates WHERE status='published' AND audience='all_participants' AND pick_mode='assigned' AND scope='team' AND (due_at IS NULL OR due_at>?) AND (example=0 OR ?)").all(nowIso(),examplesOn(db)?1:0);
+ for(const task of tasks)assignAll(db,task,[{id:projectId}],periodFor(task));
 }
 
 // Participant side ------------------------------------------------------------------
@@ -186,9 +265,14 @@ function canReview(db,user,task,a){
  return !!(a.project_id&&membership(db,a.project_id,user.id)==='reviewer');
 }
 
+// An assigned task asks the team to accept or decline it first; a task they picked themselves, one only organisers
+// mark, and one already started need no answer.
+const needsAnswer=(task,s)=>task.pick_mode!=='catalog'&&task.completion_mode!=='admin_only'&&task.key!=='project-update'&&!s;
 function assignmentView(db,a,task,{full=false,lang}={}){
  const s=db.query('SELECT * FROM submissions WHERE assignment_id=?').get(a.id);
- const out={id:a.id,period:a.period,projectId:a.project_id||null,projectName:a.project_id?JSON.parse(db.query('SELECT draft FROM projects WHERE id=?').get(a.project_id)?.draft||'{}').name:null,task:taskView(task),status:s?.status||'not_started',revision:s?.revision||0,updated:s?.updated||a.created};
+ const r=db.query('SELECT decision,reason,updated FROM task_responses WHERE assignment_id=?').get(a.id);
+ const out={id:a.id,period:a.period,projectId:a.project_id||null,projectName:a.project_id?JSON.parse(db.query('SELECT draft FROM projects WHERE id=?').get(a.project_id)?.draft||'{}').name:null,task:taskView(task),status:s?.status||'not_started',revision:s?.revision||0,updated:s?.updated||a.created,
+  response:r?{decision:r.decision,reason:r.reason,at:r.updated}:needsAnswer(task,s)?null:{decision:'accepted',reason:'',at:null}};
  // Counters and checklists show how far the saved draft got, so the quest board can draw a bar.
  if(task.type==='counter'||task.type==='checklist'){let d={};try{d=JSON.parse(s?.draft||'{}')||{};}catch{}
   out.progress=task.type==='counter'?{done:Math.max(0,Math.min(Number(d.count)||0,task.counter_target)),total:task.counter_target}:{done:(Array.isArray(d.checked)?d.checked:[]).filter(Boolean).length,total:JSON.parse(task.checklist).length};}
@@ -206,7 +290,8 @@ export function myTasks(ctx){
  const user=requireUser(ctx);
  // New weekly assignments appear when a week starts, without a restart.
  assignForUser(ctx.db,user);const projects=myProjectIds(ctx.db,user.id);
- const rows=ctx.db.query(`SELECT a.* FROM assignments a JOIN task_templates t ON t.id=a.task_id WHERE t.status IN ('published','closed') AND (a.user_id=? ${projects.length?`OR a.project_id IN (${projects.map(()=>'?').join(',')})`:''}) ORDER BY t.due_at IS NULL,t.due_at,a.created LIMIT 200`).all(user.id,...projects);
+ // A declined task leaves the list until an organiser reopens it.
+ const rows=ctx.db.query(`SELECT a.* FROM assignments a JOIN task_templates t ON t.id=a.task_id WHERE t.status IN ('published','closed') AND (a.user_id=? ${projects.length?`OR a.project_id IN (${projects.map(()=>'?').join(',')})`:''}) AND NOT EXISTS(SELECT 1 FROM task_responses r WHERE r.assignment_id=a.id AND r.decision='declined') ORDER BY t.due_at IS NULL,t.due_at,a.created LIMIT 200`).all(user.id,...projects);
  const tasks=new Map();
  return json({items:rows.map(a=>{if(!tasks.has(a.task_id))tasks.set(a.task_id,ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(a.task_id));return assignmentView(ctx.db,a,tasks.get(a.task_id));})});
 }
@@ -215,10 +300,60 @@ export function getAssignment(ctx,id){
  return json({assignment:assignmentView(ctx.db,assignment,task,{full:true})});
 }
 
+/** The team accepts or declines an assigned task; a decline may carry a short reason and hides the task. */
+export async function respond(ctx,id){
+ const {user,assignment,task}=loadAssignment(ctx,id,{forWrite:true});
+ const body=await readJson(ctx.request);
+ const decision=oneOf(body.decision,['accepted','declined'],'decision');
+ const reason=decision==='declined'?text(body.reason??'',{max:300,multiline:true},'reason'):'';
+ const s=ctx.db.query('SELECT status FROM submissions WHERE assignment_id=?').get(assignment.id);
+ // Work already handed in cannot be declined; a declined task comes back only through an organiser.
+ if(decision==='declined'&&s&&s.status!=='draft')fail(409,'INVALID_STATE');
+ if(task.pick_mode==='catalog'&&decision==='declined')fail(409,'INVALID_STATE');
+ const prior=ctx.db.query('SELECT decision FROM task_responses WHERE assignment_id=?').get(assignment.id);
+ if(prior?.decision==='declined')fail(409,'INVALID_STATE',{reason:'declined'});
+ const now=nowIso();
+ ctx.db.query('INSERT INTO task_responses(assignment_id,decision,reason,user_id,created,updated) VALUES(?,?,?,?,?,?) ON CONFLICT(assignment_id) DO UPDATE SET decision=excluded.decision,reason=excluded.reason,user_id=excluded.user_id,updated=excluded.updated').run(assignment.id,decision,reason,user.id,now,now);
+ audit(ctx.db,user.id,'task.'+decision,'assignment',assignment.id,{reason:reason.slice(0,100)});
+ return json({assignment:assignmentView(ctx.db,assignment,task,{full:true})});
+}
+/** Organiser: a declined task goes back to the team's list, unanswered again; the team hears about it. */
+export async function reopen(ctx,id){
+ const admin=requireAdmin(ctx);
+ const a=ctx.db.query('SELECT * FROM assignments WHERE id=?').get(id);if(!a)fail(404,'NOT_FOUND');
+ const task=ctx.db.query('SELECT * FROM task_templates WHERE id=?').get(a.task_id);
+ const r=ctx.db.query("DELETE FROM task_responses WHERE assignment_id=? AND decision='declined'").run(id);
+ if(!r.changes)fail(409,'INVALID_STATE');
+ const people=a.user_id?[a.user_id]:ctx.db.query("SELECT user_id FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").all(a.project_id).map(m=>m.user_id);
+ for(const uid of people)notify(ctx.db,uid,'task.reopened',{assignmentId:id,...taskNote(task)});
+ audit(ctx.db,admin.id,'task.reopen','assignment',id,{});
+ return json({ok:true});
+}
+
 /** Checks the content of one answer against the task type. `final` means submit. */
+function proofFile(ctx,a,fileId){
+ const f=ctx.db.query("SELECT * FROM files WHERE id=? AND status='active'").get(fileId);
+ const owned=f&&(a.project_id?f.project_id===a.project_id:f.owner_user_id===ctx.user.id);
+ if(!owned||!canReadFile(ctx.db,ctx.user,f)||f.purpose==='reference')fail(400,'INVALID_FIELDS',{field:'fileId'});
+}
+/** Proof of the kinds the task names: any one of them is enough to hand in, the team may add the others. */
+function cleanProof(ctx,task,a,c,final){
+ const kinds=proofOf(task),out={};
+ if(kinds.includes('file')&&c.fileId){out.fileId=text(c.fileId,{max:80},'fileId');proofFile(ctx,a,out.fileId);}
+ if(kinds.includes('link')&&c.url)out.url=httpUrl(c.url,'url');
+ if(kinds.includes('text'))out.text=text(c.text??'',{max:5000,multiline:true},'text');
+ if(final&&!out.fileId&&!out.url&&!out.text)fail(400,'INVALID_FIELDS',{field:kinds[0]==='file'?'fileId':kinds[0]==='link'?'url':'text'});
+ return out;
+}
 function cleanAnswer(ctx,task,a,input,final){
  const c=input&&typeof input==='object'?input:{};
  const note=text(c.note??'',{max:2000,multiline:true},'note');
+ if(proofOf(task).length){
+  const proof=cleanProof(ctx,task,a,c,final&&task.type!=='checklist');
+  if(task.type!=='checklist')return {...proof,note};
+  const items=JSON.parse(task.checklist),checked=items.map((_,i)=>!!c.checked?.[i]);if(final&&!checked.every(Boolean))fail(400,'INVALID_FIELDS',{field:'checked'});
+  return {checked,...proof,note};
+ }
  switch(task.type){
   case 'checklist':{const items=JSON.parse(task.checklist);const checked=items.map((_,i)=>!!c.checked?.[i]);if(final&&!checked.every(Boolean))fail(400,'INVALID_FIELDS',{field:'checked'});return {checked,note};}
   case 'counter':{const count=int(c.count??0,{min:0,max:task.counter_target},'count');if(final&&count<task.counter_target)fail(400,'INVALID_FIELDS',{field:'count'});if(final&&!note)fail(400,'INVALID_FIELDS',{field:'note'});return {count,note};}
@@ -228,9 +363,7 @@ function cleanAnswer(ctx,task,a,input,final){
    // A video is too big to upload: a link (YouTube, Drive) counts as the proof instead of a file.
    const fileId=c.fileId?text(c.fileId,{max:80},'fileId'):'',url=c.url?httpUrl(c.url,'url'):'';
    if(final&&!fileId&&!url)fail(400,'INVALID_FIELDS',{field:'fileId'});
-   if(fileId){const f=ctx.db.query("SELECT * FROM files WHERE id=? AND status='active'").get(fileId);
-    const owned=f&&(a.project_id?f.project_id===a.project_id:f.owner_user_id===ctx.user.id);
-    if(!owned||!canReadFile(ctx.db,ctx.user,f)||f.purpose==='reference')fail(400,'INVALID_FIELDS',{field:'fileId'});}
+   if(fileId)proofFile(ctx,a,fileId);
    return url?{fileId,url,note}:{fileId,note};}
   case 'attendance':{
    const lectureIds=[...new Set((Array.isArray(c.lectureIds)?c.lectureIds:[]).slice(0,50).map(x=>String(x).slice(0,80)))];
@@ -240,6 +373,12 @@ function cleanAnswer(ctx,task,a,input,final){
  fail(400,'INVALID_FIELDS');
 }
 
+/** Starting work answers "yes"; a declined task must be reopened by an organiser first. */
+function startWork(db,a,userId){
+ const r=db.query('SELECT decision FROM task_responses WHERE assignment_id=?').get(a.id);
+ if(r?.decision==='declined')fail(409,'INVALID_STATE',{reason:'declined'});
+ if(!r){const now=nowIso();db.query("INSERT OR IGNORE INTO task_responses(assignment_id,decision,user_id,created,updated) VALUES(?,'accepted',?,?,?)").run(a.id,userId,now,now);}
+}
 function ensureSubmission(db,a,userId){
  let s=db.query('SELECT * FROM submissions WHERE assignment_id=?').get(a.id);
  if(!s){const now=nowIso();db.query("INSERT OR IGNORE INTO submissions(id,assignment_id,submitted_by,status,created,updated) VALUES(?,?,?,'draft',?,?)").run(newId('sub'),a.id,userId,now,now);s=db.query('SELECT * FROM submissions WHERE assignment_id=?').get(a.id);}
@@ -252,6 +391,7 @@ export async function saveAnswerDraft(ctx,id){
  if(task.completion_mode==='admin_only')fail(403,'FORBIDDEN');
  const body=await readJson(ctx.request);
  const content=cleanAnswer(ctx,task,assignment,body.content,false);
+ startWork(ctx.db,assignment,user.id);
  const s=ensureSubmission(ctx.db,assignment,user.id);
  if(!editable(task,s))fail(409,'INVALID_STATE');
  ctx.db.query('UPDATE submissions SET draft=?,updated=? WHERE id=?').run(JSON.stringify(content),nowIso(),s.id);
@@ -266,6 +406,7 @@ export async function submitAnswer(ctx,id){
  const idem=ctx.request.headers.get('idempotency-key');
  if(idem&&!/^[A-Za-z0-9_-]{8,80}$/.test(idem))fail(400,'BAD_REQUEST');
  if(task.completion_mode==='admin_only'||task.key==='project-update')fail(403,'FORBIDDEN');
+ startWork(ctx.db,assignment,user.id);
  const s0=ensureSubmission(ctx.db,assignment,user.id);
  if(idem){const prior=ctx.db.query('SELECT revision FROM submission_revisions WHERE submission_id=? AND idem_key=?').get(s0.id,idem);if(prior)return json({assignment:assignmentView(ctx.db,assignment,task,{full:true}),replayed:true});}
  const content=cleanAnswer(ctx,task,assignment,body.content,true);
@@ -418,7 +559,7 @@ export function onProjectUpdate(db,{userId,projectId,visibility}){
 // Catalogue: participants pick optional tasks for themselves or their team --------------
 export function catalog(ctx){
  const user=requireUser(ctx),projects=myProjectIds(ctx.db,user.id);
- const tasks=ctx.db.query("SELECT * FROM task_templates WHERE status='published' AND pick_mode='catalog' AND audience='all_participants' AND (due_at IS NULL OR due_at>?) ORDER BY xp DESC,created").all(nowIso());
+ const tasks=ctx.db.query("SELECT * FROM task_templates WHERE status='published' AND pick_mode='catalog' AND audience='all_participants' AND (due_at IS NULL OR due_at>?) AND (example=0 OR ?) ORDER BY xp DESC,created").all(nowIso(),examplesOn(ctx.db)?1:0);
  return json({items:tasks.map(t=>{
   const taken=t.scope==='personal'?ctx.db.query("SELECT id FROM assignments WHERE task_id=? AND user_id=?").all(t.id,user.id):projects.length?ctx.db.query(`SELECT id,project_id FROM assignments WHERE task_id=? AND project_id IN (${projects.map(()=>'?').join(',')})`).all(t.id,...projects):[];
   return {...taskView(t),taken:taken.map(a=>({assignmentId:a.id,projectId:a.project_id||null})),projects:t.scope==='team'?projects.map(id=>({id,name:JSON.parse(ctx.db.query('SELECT draft FROM projects WHERE id=?').get(id).draft).name})):[]};
@@ -426,7 +567,7 @@ export function catalog(ctx){
 }
 export async function takeTask(ctx,taskId){
  const user=requireUser(ctx),body=await readJson(ctx.request);
- const task=ctx.db.query("SELECT * FROM task_templates WHERE id=? AND status='published' AND pick_mode='catalog' AND audience='all_participants'").get(taskId);if(!task)fail(404,'NOT_FOUND');
+ const task=ctx.db.query("SELECT * FROM task_templates WHERE id=? AND status='published' AND pick_mode='catalog' AND audience='all_participants' AND (example=0 OR ?)").get(taskId,examplesOn(ctx.db)?1:0);if(!task)fail(404,'NOT_FOUND');
  let target;
  if(task.scope==='team'){const pid=text(body.projectId,{max:80},'projectId');if(!['owner','editor','member'].includes(membership(ctx.db,pid,user.id)))fail(403,'FORBIDDEN');target={id:pid};}
  else target={id:user.id};

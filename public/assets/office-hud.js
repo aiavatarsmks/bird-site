@@ -31,6 +31,7 @@
   linkedIn:{en:'LinkedIn',hr:'LinkedIn',ru:'LinkedIn'},
   messages:{en:'Messages and reminders',hr:'Poruke i podsjetnici',ru:'Сообщения и напоминания'},
   reminder:{en:'Reminder',hr:'Podsjetnik',ru:'Напоминание'},
+  chat:{en:'Messages',hr:'Poruke',ru:'Сообщения'},
   dmLink:{en:'Private messages',hr:'Privatne poruke',ru:'Личные сообщения'},dmNew:{en:'new',hr:'nove poruke',ru:'новые'},
   signIn:{en:'Sign in',hr:'Prijava',ru:'Войти'},
   register:{en:'Create account',hr:'Izradi račun',ru:'Создать аккаунт'},
@@ -110,7 +111,7 @@
   const flagged=attentionTeams().length;
   return `<div class="hud-dock" role="toolbar" aria-label="BIRD">
    ${me?`<button class="hud-btn hud-face ${myCharacter()?'hud-face-char':''}" data-hud="profile" aria-pressed="${open==='profile'}" aria-label="${t('profile')}">${myCharacter()?sprite(myCharacter().img,'hud-sprite-dock'):face(me,44)}</button>${data.messages.some(n=>!n.read)||data.dm?`<b class="hud-badge hud-badge-face" aria-label="${t('messages')}">${data.messages.filter(n=>!n.read).length+data.dm}</b>`:''}`:`<button class="hud-btn hud-guest" data-hud="profile" aria-pressed="${open==='profile'}"><span aria-hidden="true">${window.BirdIcon?.('person')||''}</span><small>${t('signIn')}</small></button>`}
-   ${data?.today?`<button class="hud-btn" data-hud="attention" aria-pressed="${open==='attention'}"><span aria-hidden="true">!</span><small>${t('attention')}</small>${flagged?`<b class="hud-badge">${flagged}</b>`:''}</button>`:''}${BUTTONS.map(([k,icon])=>`<button class="hud-btn" data-hud="${k}" aria-pressed="${open===k}"><span aria-hidden="true">${icon}</span><small>${t(k)}</small>${k==='tasks'&&me&&count?`<b class="hud-badge">${count}</b>`:''}</button>`).join('')}
+   ${me?`<button class="hud-btn hud-chat" data-hud="chat" aria-pressed="${open==='chat'}"><span aria-hidden="true">${window.BirdIcon?.('chat')||'✉'}</span><small>${t('chat')}</small><b class="hud-badge" data-msgr-count ${data.dm?'':'hidden'}>${data.dm}</b></button>`:''}${data?.today?`<button class="hud-btn" data-hud="attention" aria-pressed="${open==='attention'}"><span aria-hidden="true">!</span><small>${t('attention')}</small>${flagged?`<b class="hud-badge">${flagged}</b>`:''}</button>`:''}${BUTTONS.map(([k,icon])=>`<button class="hud-btn" data-hud="${k}" aria-pressed="${open===k}"><span aria-hidden="true">${icon}</span><small>${t(k)}</small>${k==='tasks'&&me&&count?`<b class="hud-badge">${count}</b>`:''}</button>`).join('')}
   </div>`;
  }
  const attentionTeams=()=>(data?.today?.teams||[]).filter(x=>x.members&&(x.level!=='ok'||x.waiting||x.inactive));
@@ -124,7 +125,7 @@
   const character=p?.character&&context.member?.(p.character.personId);
   const earned=p?p.badges.filter(b=>b.earned):[];
   return `<div class="hud-profile">${character?sprite(character.img,'hud-sprite-lg'):''}<div class="hud-profile-main"><label class="hud-photo">${face(me,56)}<input type="file" accept="image/*" data-hud-photo hidden><span>${t(me.hasAvatar?'photo':'addPhoto')}</span></label><div><strong>${esc(me.displayName)}</strong>${p?`<small>${p.xp} ${tp('points',p.xp)}</small>`:''}</div></div></div>
-   <a class="hud-link hud-dm" href="#/account/messages">✉ ${t('dmLink')}${data.dm?` · <b>${t('dmNew')}: ${data.dm}</b>`:''}</a>
+   <button class="hud-link hud-dm" data-hud="chat">${window.BirdIcon?.('chat')||'✉'} ${t('dmLink')}${data.dm?` · <b>${t('dmNew')}: ${data.dm}</b>`:''}</button>
    ${data.messages.length?`<ul class="hud-list hud-messages">${data.messages.map(n=>n.kind==='reminder'?`<li class="hud-reminder"><strong>${window.BirdIcon?.('bell')||''} ${t('reminder')}</strong><p>${n.payload.link?`<a href="${esc(n.payload.link)}">${esc(n.payload.text?.[lang]||n.payload.text?.en||'')}</a>`:esc(n.payload.text?.[lang]||n.payload.text?.en||'')}</p></li>`:`<li><strong>${esc(n.payload.from)}</strong><p>${esc(n.payload.message)}</p></li>`).join('')}</ul>`:''}
    ${p?`<div class="hud-stats"><div><b>${p.xp}</b><small>${tp('points',p.xp)}</small></div><div><b>${p.lectures.verified+p.lectures.selfReported}/${p.lectures.held}</b><small>${t('lecturesAttended')}</small></div><div><b>${p.tasks.done}</b><small>${t('tasksDone')}</small></div></div><a class="hud-link" href="#/account/mentors">${window.BirdIcon?.('gift')||''} ${t('spendPoints')}</a>
    <h3>${t('badges')} · ${earned.length}/${p.badges.length}</h3><ul class="hud-badges">${p.badges.map(b=>`<li class="${b.earned?'is-earned':''}" title="${esc(b.title[lang]||b.title.en)}"><span aria-hidden="true">${b.earned?'★':'☆'}</span>${esc(b.title[lang]||b.title.en)}</li>`).join('')}</ul>
@@ -152,6 +153,8 @@
   if(!open||!data)return '';
   const me=data.me;
   const body=open==='attention'?attentionPanel():open==='profile'?profilePanel():open==='tasks'?(me?(data.tasks.length?`<ul class="hud-list">${data.tasks.slice(0,8).map(x=>`<li><a href="#/account/task/${esc(x.id)}"><strong>${esc(title(x.task.translations))}</strong><small>${x.task.xp} ${tp('points',x.task.xp)} · ${t('st_'+x.status)}</small></a></li>`).join('')}</ul>`:`<p>${t('noTasks')}</p>`)+`<div class="hud-actions"><a class="hud-primary" href="#/account/tasks">${t('allTasks')}</a></div>`:guest()):open==='teams'?teamsPanel():open==='lectures'?lecturesPanel():mentorsPanel();
+  // Messages: the messenger (messenger.js) lives in the panel; paint() moves the same element in, so it keeps its place.
+  if(open==='chat')return `<section class="hud-panel is-chat" role="dialog" aria-label="${t('chat')}"><header><h2>${t('chat')}</h2><button data-hud-close aria-label="${t('close')}">×</button></header><div class="hud-body"><div data-hud-msgr></div></div></section>`;
   return `<section class="hud-panel" role="dialog" aria-label="${t(open)}"><header><h2>${t(open)}</h2><button data-hud-close aria-label="${t('close')}">×</button></header><div class="hud-body">${body}</div></section>`;
  }
  function paint(){
@@ -159,7 +162,13 @@
   let el=host.querySelector(':scope > .office-hud');
   if(!el){el=document.createElement('div');el.className='office-hud';host.append(el);bindTo(el);}
   el.innerHTML=dock()+panel();
+  const slot=el.querySelector('[data-hud-msgr]');
+  if(slot&&window.BirdMessenger){if(!messenger||messenger.lang!==lang){messenger?.stop();const box=document.createElement('div');box.className='hud-msgr-box';messenger={box,lang,stop:window.BirdMessenger.panel(box,{lang})};}slot.replaceWith(messenger.box);}
+  else if(slot)slot.outerHTML=`<p><a class="hud-primary" href="#/account/messages">${t('chat')}</a></p>`;
  }
+ let messenger=null;
+ // The unread count comes from messenger.js every 20 s; the dock keeps it for its next paint.
+ addEventListener('bird:messages',e=>{if(data)data.dm=e.detail?.unread||0;});
  function bindTo(el){
   // Keep taps on the dock away from the map's pan and zoom handlers.
   for(const type of ['pointerdown','wheel','dblclick','touchstart'])el.addEventListener(type,e=>e.stopPropagation(),{passive:true});

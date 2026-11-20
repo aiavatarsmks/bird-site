@@ -171,6 +171,8 @@ export async function adminCreateTeam(ctx){
   ctx.db.query("INSERT INTO projects(id,team_id,source,status,created_by,draft,draft_version,created,updated) VALUES(?,?,'user','draft',?,?,1,?,?)").run(projectId,teamId,admin.id,JSON.stringify(content),now,now);
   ctx.db.query("INSERT INTO project_revisions(project_id,version,kind,content,author,created) VALUES(?,1,'draft',?,?,?)").run(projectId,JSON.stringify(content),admin.id,now);
   audit(ctx.db,admin.id,'team.create','project',projectId,{name});
+  // Tasks meant for every team reach the new one at once; they wait there until its people join.
+  ctx.hooks?.onEvent?.(ctx,{type:'team.created',projectId});
  })();
  return json({projectId,teamId,name},201);
 }
@@ -234,7 +236,8 @@ export async function createInvite(ctx){
  const days=Math.max(1,Math.min(30,Number(body.days)||7));
  let projectId=null,personId=null,role=null;
  if(kind==='project'){
-  projectId=text(body.projectId,{max:80},'projectId');requireProject(ctx.db,user,projectId,'manage');
+  // Any editor brings teammates in (roster teams have no owner); only the owner or an organiser changes roles or removes.
+  projectId=text(body.projectId,{max:80},'projectId');requireProject(ctx.db,user,projectId,'edit');
   role=oneOf(body.role,['editor','member','reviewer'],'role');
   if(role==='reviewer'&&!isAdmin(user))fail(403,'FORBIDDEN');
  }else if(kind==='person'){
@@ -248,14 +251,14 @@ export async function createInvite(ctx){
 }
 export function listInvites(ctx){
  const user=requireUser(ctx),projectId=ctx.url.searchParams.get('projectId');
- if(projectId)requireProject(ctx.db,user,projectId,'manage');else requireAdmin(ctx);
+ if(projectId)requireProject(ctx.db,user,projectId,'edit');else requireAdmin(ctx);
  const rows=projectId?ctx.db.query('SELECT * FROM invites WHERE project_id=? ORDER BY created DESC LIMIT 50').all(projectId):ctx.db.query("SELECT * FROM invites WHERE kind<>'platform_owner' ORDER BY created DESC LIMIT 50").all();
  return json({items:rows.map(r=>({id:r.id,kind:r.kind,projectId:r.project_id,personId:r.person_id,role:r.role,created:r.created,expires:new Date(r.expires).toISOString(),used:!!r.used_at,revoked:!!r.revoked_at}))});
 }
 export function revokeInvite(ctx,id){
  const user=requireUser(ctx),invite=ctx.db.query('SELECT * FROM invites WHERE id=?').get(id);
  if(!invite||invite.kind==='platform_owner')fail(404,'NOT_FOUND');
- if(invite.project_id)requireProject(ctx.db,user,invite.project_id,'manage');else requireAdmin(ctx);
+ if(invite.project_id)requireProject(ctx.db,user,invite.project_id,'edit');else requireAdmin(ctx);
  ctx.db.query('UPDATE invites SET revoked_at=? WHERE id=? AND revoked_at IS NULL').run(nowIso(),id);
  audit(ctx.db,user.id,'invite.revoke','invite',id,{});
  return json({ok:true});

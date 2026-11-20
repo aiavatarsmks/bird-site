@@ -1,0 +1,40 @@
+/* /hubs: the map of Europe beside the list of hubs by region, the chosen hub's card under the list. */
+.hubs{padding-bottom:clamp(40px,6vw,80px)}
+.hubs-grid{display:grid;gap:28px}
+.hubs-map{margin:0;background:var(--panel);border-radius:var(--r-xl);padding:10px}
+.hubs-map svg{display:block;width:100%;height:auto;background:#e6eaf2;border-radius:var(--r-l)}
+.hubs-map figcaption{padding:10px 8px 4px}
+.hubs-land{fill:#fff;stroke:#c3c6d3;stroke-width:.8;stroke-linejoin:round}
+.hubs-pin{cursor:pointer;outline:none}
+.hubs-pin circle{fill:var(--watch);stroke:#fff;stroke-width:2.5}
+.hubs-pin.is-live circle{fill:var(--ok)}
+.hubs-pin .hubs-ring{fill:none;stroke:var(--ok);stroke-width:2;opacity:0}
+.hubs-pin.is-on .hubs-ring,.hubs-pin:hover .hubs-ring,.hubs-pin:focus-visible .hubs-ring{opacity:1}
+.hubs-pin:focus-visible .hubs-ring{stroke:var(--tram);stroke-width:3}
+.hubs-pin text{font:600 18px/1 var(--sans);fill:var(--ink);paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.hubs-h{font-size:28px;margin-bottom:10px}
+.hubs-regions{list-style:none;margin:0;padding:0}
+.hubs-region{border-top:1px solid var(--rule);padding:14px 0}
+.hubs-region h3{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:18px}
+.hubs-region abbr{text-decoration:none;margin-left:6px}
+.hubs-region.is-empty h3{color:var(--muted);font-weight:600}
+.hubs-region>.fine{margin:4px 0 0}
+.hubs-countries,.hubs-items{list-style:none;margin:0;padding:0}
+.hubs-items{display:grid;gap:6px}
+.hubs-country{margin:10px 0 6px;font:600 12px/1.3 var(--sans);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.hubs-item{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:10px 14px;border:1px solid transparent;border-radius:var(--r-m);background:var(--panel);text-align:left;cursor:pointer;transition:border-color .15s ease}
+.hubs-item:hover{border-color:var(--rule-strong)}
+.hubs-item[aria-pressed=true]{border-color:var(--tram);box-shadow:inset 0 0 0 1px var(--tram)}
+.hubs-item b{font-size:17px;font-weight:600}
+.hubs-item .fine{margin-left:auto}
+.hubs-dot{width:10px;height:10px;border-radius:50%;background:var(--watch);flex:none}
+.hubs-dot.is-live{background:var(--ok)}
+.hub-card{margin-top:20px;background:var(--panel);border-radius:var(--r-l);padding:clamp(20px,3vw,28px);display:grid;gap:10px;justify-items:start}
+.hub-card h3{font-size:30px}
+.hub-card p{margin:0}
+.hub-card .btn{margin-top:8px}
+.hubs-add-in{display:grid;gap:20px;align-items:end}
+@media(min-width:960px){
+ .hubs-grid{grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr);align-items:start}
+ .hubs-add-in{grid-template-columns:1fr auto}
+}

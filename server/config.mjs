@@ -38,6 +38,8 @@ export function loadConfig(env=process.env,overrides={}){
    pageSize:50,
   },
   mailer:env.BIRD_MAIL_TRANSPORT||'disabled',
+  // Outgoing mail (server/mail.mjs): the provider's API key and the sender address it has verified.
+  mailKey:env.BIRD_MAIL_API_KEY||'',mailFrom:env.BIRD_MAIL_FROM||'',mailFromName:env.BIRD_MAIL_FROM_NAME||'',
   // single: every address opens the default workspace (the BIRD service). multi: the address chooses the workspace.
   platformMode:env.PLATFORM_MODE==='multi'?'multi':'single',
   platformDbPath:join(dataDir,'platform.sqlite'),

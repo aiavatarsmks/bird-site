@@ -8,15 +8,12 @@ import {nowIso} from './db.mjs';
 import {audit,isAdmin,membership,requireAdmin} from './permissions.mjs';
 import {requireUser} from './auth.mjs';
 import {notify} from './notifications.mjs';
-import {projectXp,userXp} from './progress.mjs';
+import {projectXp,userXp,teamMembers} from './progress.mjs';
 
 export const DEFAULT_SESSION_PRICE=30;
 const TEAM=['owner','editor','member'];
 export const onTeam=(db,projectId,userId)=>TEAM.includes(membership(db,projectId,userId));
-// A person's own points count for one team only, so nobody can spend them twice: their programme team
-// if they have one, otherwise their earliest project. Archiving does not move them.
-const PRIMARY=`(CASE WHEN p.source='user' THEN 1 ELSE 0 END)`;
-const members=(db,projectId)=>db.query(`SELECT m.user_id FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.project_id=?1 AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') AND NOT EXISTS(SELECT 1 FROM memberships o JOIN projects q ON q.id=o.project_id WHERE o.user_id=m.user_id AND o.revoked_at IS NULL AND o.role IN ('owner','editor','member') AND o.project_id<>?1 AND ((CASE WHEN q.source='user' THEN 1 ELSE 0 END)<${PRIMARY} OR ((CASE WHEN q.source='user' THEN 1 ELSE 0 END)=${PRIMARY} AND (o.created<m.created OR (o.created=m.created AND o.project_id<?1)))))`).all(projectId).map(r=>r.user_id);
+const members=teamMembers;
 
 export function wallet(db,projectId){
  const earned=projectXp(db,projectId)+members(db,projectId).reduce((n,id)=>n+userXp(db,id),0);

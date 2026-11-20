@@ -454,3 +454,32 @@ details.m-more[open]>summary{margin-bottom:10px}
 .m-mentor-char .cs-stage{gap:0;padding:0;background:none}
 .acc-m .m-mentor:hover .m-mentor-char .cs-mover{animation:cs-hop .45s ease-out}
 .is-before .m-dot{background:transparent;border:1px dashed currentColor;opacity:.45}
+
+/* Pilot phase 2: first steps, accept/decline, writing to the programme manager, recovery codes notice. */
+.m-first .m-steps-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:2px}
+.m-first .m-steps-list a{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 4px;color:var(--ink);text-decoration:none;border-top:1px solid var(--line)}
+.m-first .m-steps-list a:hover span:nth-child(2){text-decoration:underline}
+.m-step-box{display:grid;place-items:center;width:20px;height:20px;flex:none;border:1.5px solid var(--ink)}
+.m-step-box svg{width:14px;height:14px}
+.m-first .is-done .m-step-box{background:var(--ok);border-color:var(--ok);color:#fff}
+.m-first .is-done a>span:nth-child(2){color:var(--muted);text-decoration:line-through}
+.m-first .m-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
+.m-own{display:block;margin-top:6px;color:var(--muted);font-size:13px}
+.m-ask{margin:16px 0;padding:14px 16px;border-left:4px solid var(--info,#2c5b8c);background:var(--info-soft,#dce7f3)}
+.m-ask p{margin:0 0 10px;font-weight:600}
+.m-ask .acc-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start}
+.m-decline{flex:1 1 220px}
+.m-decline>summary{list-style:none;display:inline-flex;cursor:pointer}
+.m-decline>summary::-webkit-details-marker{display:none}
+.m-decline[open]>summary{margin-bottom:8px}
+.m-decline form{display:grid;gap:6px;max-width:460px}
+.m-tag.is-new{background:var(--info,#2c5b8c);color:#fff}
+.m-lane.is-ask h2 i{background:var(--info,#2c5b8c)}
+.m-write{margin:12px 0}
+.m-write-btn{display:inline-flex;align-items:center;gap:8px}
+.m-managers{margin-top:8px;padding:10px 12px;border:1px solid var(--line);background:var(--white)}
+.m-managers p{margin:0 0 6px}
+.m-managers ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.m-codes .acc-codes{columns:2;margin:8px 0 12px}
+.m-codes code{font-size:14px}
+@media (max-width:480px){.m-codes .acc-codes{columns:1}}

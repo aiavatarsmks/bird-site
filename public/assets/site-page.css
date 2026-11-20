@@ -1,0 +1,83 @@
+/* Base of the section pages of the public site (/hubs, /mentors, /investors, /privacy, /contact): the landing's "Warm room" look in a few
+   lines, without the landing's stylesheet. Warm off-white ground, white rounded panels, ink-navy text, brand blue for
+   the primary action, pill tags; one family (Onest 400/600). Buttons keep their rectangle shape. Nothing moves on its own. */
+:root{
+ --ground:#f6f4f1;--panel:#fff;--tray:#eeebe6;--ink:#252a47;--ink-soft:#3d4260;--muted:#5d6280;--rule:#e4e1dc;--rule-strong:#8b8fa6;
+ --tram:#2c44d0;--tram-deep:#1f33a6;--tram-wash:#e3e7fb;--ok:#0b8a5c;--ok-soft:#dcf2e6;--watch:#a86a00;--watch-soft:#fbefd2;--risk:#cf3a21;
+ --sans:"Onest",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;--mono:var(--sans);--gut:16px;--r-xl:28px;--r-l:20px;--r-m:14px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:80px}
+body{margin:0;background:var(--ground);color:var(--ink);font:17px/1.6 var(--sans);overflow-x:hidden}
+a{color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--tram);outline-offset:3px}
+.wrap{max-width:1232px;margin:0 auto;padding:0 var(--gut)}
+.skip{position:absolute;left:-9999px;top:8px;z-index:50;background:var(--ink);color:#fff;padding:12px 16px}
+.skip:focus{left:8px}
+h1,h2,h3{font-weight:600;letter-spacing:-.035em;margin:0;text-wrap:balance}
+h1{font-size:clamp(38px,6vw,64px);line-height:1.04;letter-spacing:-.04em}
+h2{font-size:clamp(28px,4vw,46px);line-height:1.06}
+h3{font-size:22px;line-height:1.2;letter-spacing:-.02em}
+p{text-wrap:pretty}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;margin:0 0 18px;padding:5px 12px 5px 10px;border-radius:999px;background:var(--panel);border:1px solid var(--rule);font:600 13px/1.25 var(--sans);color:var(--ink-soft)}
+.eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:#12a36d}
+.lead{font-size:clamp(18px,1.6vw,20px);color:var(--muted);max-width:62ch;margin:22px 0 0}
+.page-head{padding:clamp(40px,7vw,96px) 0 clamp(28px,4vw,48px)}
+.section{padding:clamp(24px,4vw,40px) 0}
+.section>.wrap{background:var(--panel);border-radius:var(--r-xl);padding-block:clamp(24px,4vw,48px);width:min(1232px,calc(100% - 2 * var(--gut)));max-width:none;padding-inline:clamp(20px,4vw,48px)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:14px 26px;border:2px solid var(--tram);background:var(--tram);color:#fff;font:600 16px/1.2 var(--sans);text-decoration:none;cursor:pointer;transition:background-color .15s ease,border-color .15s ease,color .15s ease}
+.btn:hover{background:var(--tram-deep);border-color:var(--tram-deep)}
+.btn>[aria-hidden]{display:inline-block;transition:transform .15s ease}
+.btn:hover>[aria-hidden]{transform:translateX(4px)}
+.btn-ghost{background:transparent;color:var(--ink);border-color:var(--ink)}
+.btn-ghost:hover{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn[disabled]{opacity:.6;cursor:progress}
+.status{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--watch-soft);font:600 13px/1.3 var(--sans);color:var(--ink)}
+.status.is-live{background:var(--ok-soft)}
+.status::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--watch)}
+.status.is-live::before{background:var(--ok)}
+.fine{font:400 13px/1.5 var(--sans);color:var(--muted)}
+/* Feature list: numbered rows on hairlines, the number in a tinted tile. */
+.gets{list-style:none;margin:0;padding:0;display:grid;gap:0;counter-reset:g}
+.gets li{display:grid;grid-template-columns:48px 1fr;gap:4px 16px;padding:22px 0;border-top:1px solid var(--rule);counter-increment:g}
+.gets li::before{content:counter(g);grid-row:span 2;display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--tram-wash);font:600 15px/1 var(--sans);color:var(--tram-deep)}
+.gets b{font-size:19px;font-weight:600;letter-spacing:-.01em}
+.gets span{color:var(--muted)}
+/* Waitlist form (showcase.js): the landing's pilot form, smaller. */
+.wl{display:grid;gap:16px;background:var(--ground);border-radius:var(--r-l);padding:clamp(20px,3vw,32px)}
+.wl label{display:grid;gap:6px;font-weight:600;font-size:15px}
+.wl input,.wl textarea,.wl select{width:100%;min-height:48px;padding:10px 14px;border:1.5px solid var(--rule-strong);border-radius:10px;background:#fff;font-size:16px}
+.wl textarea{min-height:96px;resize:vertical}
+.wl select{appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23252a47' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 14px center;padding-right:40px;cursor:pointer}
+.wl input[aria-invalid=true],.wl textarea[aria-invalid=true]{border-color:var(--risk);box-shadow:inset 0 0 0 1px var(--risk)}
+.wl .opt{font-weight:400;color:var(--muted)}
+.wl .check{display:flex;gap:10px;align-items:flex-start;font-weight:400}
+.wl .check input{width:20px;min-height:20px;height:20px;margin:3px 0 0;flex:none}
+.wl-err{margin:0;color:var(--risk);font-size:14px}
+.wl-hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.wl-done{background:var(--ok-soft);border-radius:var(--r-l);padding:24px}
+.wl-done h3{margin-bottom:8px}
+.note{background:var(--tram-wash);border-radius:var(--r-m);padding:16px 18px;margin:0}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.wl-grid{display:grid;gap:28px}
+.page-head .status,.wl-grid .note{margin-top:24px}
+.section>.wrap>h2{margin-bottom:24px}
+@media(min-width:960px){.wl-grid{grid-template-columns:1fr minmax(380px,1fr);align-items:start}}
+/* /contact: who we are, as label/value rows on hairlines. */
+.facts{margin:0;display:grid}
+.facts>div{display:grid;gap:4px 24px;padding:18px 0;border-top:1px solid var(--rule)}
+.facts dt{font-weight:600}
+.facts dd{margin:0;color:var(--muted)}
+@media(min-width:720px){.facts>div{grid-template-columns:220px 1fr}}
+/* /privacy: plain reading text in one column; headings smaller than on the section pages. */
+.prose{max-width:72ch}
+.section>.wrap.prose-wrap{padding-block:clamp(24px,4vw,40px)}
+.prose h2{font-size:clamp(22px,2.4vw,28px);line-height:1.2;letter-spacing:-.02em;margin:0 0 12px}
+.prose section+section{margin-top:36px;padding-top:28px;border-top:1px solid var(--rule)}
+.prose p{margin:0 0 12px}
+.prose ul{margin:0 0 12px;padding-left:1.2em}
+.prose li{margin:6px 0}
+.prose li::marker{color:var(--tram)}
+.prose code{font:600 15px/1 var(--sans);background:var(--tray);padding:2px 6px;border-radius:6px}
+.updated{margin:18px 0 0;font:600 14px/1.4 var(--sans);color:var(--ink-soft)}

@@ -11,7 +11,8 @@ import {audit,isAdmin,requireAdmin} from './permissions.mjs';
 import {requireUser} from './auth.mjs';
 import {notify} from './notifications.mjs';
 import {onTeam} from './wallet.mjs';
-import {onlyDemoPeople} from './demo-visit.mjs';
+import {onlyDemoPeople,isDemo} from './demo-visit.mjs';
+import {connected,DAILY_REQUESTS} from './network.mjs';
 
 const PAGE=50;
 const person=(db,id)=>db.query("SELECT u.id,u.display_name name,u.role,u.status,(SELECT json_extract(p.draft,'$.name') FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=u.id AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') ORDER BY m.created LIMIT 1) team FROM users u WHERE u.id=?").get(id);
@@ -71,39 +72,57 @@ export function directory(ctx){
  const user=requireUser(ctx),q=(ctx.url.searchParams.get('q')||'').trim().toLowerCase().slice(0,60);
  const like='%'+q.replace(/[\\%_]/g,m=>'\\'+m)+'%';
  const rows=ctx.db.query(`SELECT u.id FROM users u WHERE u.status='active' AND u.id<>?1 AND (?3=0 OR u.id LIKE 'demo-user-%') AND (?2='%%' OR lower(u.display_name) LIKE ?2 ESCAPE '\\' OR EXISTS(SELECT 1 FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=u.id AND m.revoked_at IS NULL AND lower(coalesce(json_extract(p.draft,'$.name'),'')) LIKE ?2 ESCAPE '\\')) ORDER BY u.display_name COLLATE NOCASE LIMIT 100`).all(user.id,like,onlyDemoPeople(ctx)?1:0);
- const roster=ctx.db.query(`SELECT p.id FROM people p WHERE p.kind='participant' AND p.status='active' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.person_id=p.id) AND (?1='%%' OR lower(p.display_name) LIKE ?1 ESCAPE '\\' OR EXISTS(SELECT 1 FROM team_people tp JOIN teams t ON t.id=tp.team_id WHERE tp.person_id=p.id AND lower(t.name) LIKE ?1 ESCAPE '\\')) ORDER BY p.display_name COLLATE NOCASE LIMIT 100`).all(like);
+ const roster=ctx.db.query(`SELECT p.id FROM people p WHERE p.kind='participant' AND p.status='active' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.person_id=p.id) AND (?1='%%' OR lower(p.display_name) LIKE ?1 ESCAPE '\\' OR EXISTS(SELECT 1 FROM team_people tp JOIN teams t ON t.id=tp.team_id WHERE tp.person_id=p.id AND lower(t.name) LIKE ?1 ESCAPE '\\')) AND (?2=0 OR p.id LIKE 'demo-%') ORDER BY p.display_name COLLATE NOCASE LIMIT 100`).all(like,onlyDemoPeople(ctx)?1:0);
  return json({items:[...rows.map(r=>view(person(ctx.db,r.id))),...roster.map(r=>waitingView(waitingPerson(ctx.db,r.id)))].sort((a,b)=>a.name.localeCompare(b.name)).slice(0,100)});
 }
 /** The account of a person on the office map, if they have one. */
 export function forPerson(ctx,personId){
- requireUser(ctx);
+ requireUser(ctx);demoGuard(ctx,personId);
  const id=accountOf(ctx.db,personId);if(id)return json({person:view(person(ctx.db,id))});
  const p=waitingPerson(ctx.db,personId);if(!p)fail(404,'NOT_FOUND');
  return json({person:waitingView(p)});
 }
+/** Unread count and the time of the newest message the user can see: a poll every few seconds costs two small queries. */
+export function unreadSummary(ctx){
+ const user=requireUser(ctx),unread=unreadMessages(ctx.db,user.id);
+ const dm=ctx.db.query('SELECT max(created) t FROM direct_messages WHERE recipient_id=?1 OR sender_id=?1').get(user.id).t||'';
+ const group=ctx.db.query('SELECT max(c.created) t FROM chat_messages c JOIN chat_members m ON m.group_id=c.group_id AND m.user_id=? AND m.left_at IS NULL').get(user.id).t||'';
+ return json({unread,latest:dm>group?dm:group});
+}
+// A demo visitor talks to invented people only; a real account's id answers as if it did not exist.
+const demoGuard=(ctx,id)=>{if(onlyDemoPeople(ctx)&&!String(id).startsWith('demo-'))fail(404,'NOT_FOUND');};
+// ?after=<message id> returns only what came later, so an open conversation polls cheaply.
+const afterDm=(db,id)=>id?db.query('SELECT rowid r,created FROM direct_messages WHERE id=?').get(id):null;
 /** One conversation; opening it marks incoming messages as read. */
 export function thread(ctx,otherId){
- const user=requireUser(ctx);
+ const user=requireUser(ctx);demoGuard(ctx,otherId);
  const joined=accountOf(ctx.db,otherId);if(joined)otherId=joined;
  else{const p=waitingPerson(ctx.db,otherId);if(p)return waitingThread(ctx,user,p);}
  const other=person(ctx.db,otherId);if(!other||other.id===user.id)fail(404,'NOT_FOUND');
  if(other.status!=='active'&&!talked(ctx.db,user.id,otherId))fail(404,'NOT_FOUND');
- const before=ctx.url.searchParams.get('before')||'9999';
- const rows=ctx.db.query('SELECT * FROM (SELECT rowid r,* FROM direct_messages WHERE ((sender_id=?1 AND recipient_id=?2) OR (sender_id=?2 AND recipient_id=?1)) AND created<?3 ORDER BY created DESC,rowid DESC LIMIT ?4) ORDER BY created,r').all(user.id,otherId,before,PAGE+1);
- const more=rows.length>PAGE;if(more)rows.shift();
+ const before=ctx.url.searchParams.get('before')||'9999',after=afterDm(ctx.db,ctx.url.searchParams.get('after'));
+ const pair='((sender_id=?1 AND recipient_id=?2) OR (sender_id=?2 AND recipient_id=?1))';
+ const rows=after?ctx.db.query(`SELECT rowid r,* FROM direct_messages WHERE ${pair} AND (created>?3 OR (created=?3 AND rowid>?4)) ORDER BY created,rowid LIMIT 200`).all(user.id,otherId,after.created,after.r)
+  :ctx.db.query(`SELECT * FROM (SELECT rowid r,* FROM direct_messages WHERE ${pair} AND created<?3 ORDER BY created DESC,rowid DESC LIMIT ?4) ORDER BY created,r`).all(user.id,otherId,before,PAGE+1);
+ const more=!after&&rows.length>PAGE;if(more)rows.shift();
  const reported=new Set(ctx.db.query('SELECT message_id FROM message_reports WHERE reporter_id=?').all(user.id).map(r=>r.message_id));
  ctx.db.query('UPDATE direct_messages SET read_at=? WHERE sender_id=? AND recipient_id=? AND read_at IS NULL').run(nowIso(),otherId,user.id);
  // canSend does not say which side blocked, so a block cannot be traced to the person who set it.
  return json({person:view(other),blocked:blocked(ctx.db,user.id,otherId),canSend:other.status==='active'&&!blocked(ctx.db,user.id,otherId)&&!blocked(ctx.db,otherId,user.id),hasMore:more,
+  // readUpTo: my messages sent up to this time are read, so ticks on bubbles already shown can turn without refetching them.
+  readUpTo:ctx.db.query('SELECT max(created) t FROM direct_messages WHERE sender_id=? AND recipient_id=? AND read_at IS NOT NULL').get(user.id,otherId).t||'',
   items:rows.map(m=>({id:m.id,mine:m.sender_id===user.id,body:m.body,file:fileOf(ctx.db,m.file_id),created:m.created,read:!!m.read_at,reported:reported.has(m.id)}))});
 }
 export async function send(ctx,otherId){
- const user=requireUser(ctx);
+ const user=requireUser(ctx);demoGuard(ctx,otherId);
  const joined=accountOf(ctx.db,otherId);if(joined)otherId=joined;
  else{const p=waitingPerson(ctx.db,otherId);if(p)return waitingSend(ctx,user,p);}
  const other=person(ctx.db,otherId);if(!other||other.id===user.id||other.status!=='active')fail(404,'NOT_FOUND');
  // Either side's block stops the message; the sender is not told who blocked whom.
  if(blocked(ctx.db,user.id,otherId)||blocked(ctx.db,otherId,user.id))fail(403,'FORBIDDEN');
+ // Against spam: a first message to someone one has never talked to and is not connected with counts towards a daily
+ // limit (the network's mentors are open to any signed-in account). Organisers write to their cohort freely.
+ if(!isAdmin(user)&&!talked(ctx.db,user.id,otherId)&&!connected(ctx.db,user.id,otherId))rateLimit(ctx.db,'dm-new:'+user.id,DAILY_REQUESTS,86400);
  const {body,file}=await readMessage(ctx,user);
  const id=newId('dm'),created=nowIso();
  ctx.db.transaction(()=>{
@@ -114,9 +133,11 @@ export async function send(ctx,otherId){
 }
 // Only the sender sees a waiting conversation; there is nobody yet to block, report or read it.
 function waitingThread(ctx,user,p){
- const rows=ctx.db.query('SELECT * FROM (SELECT rowid r,* FROM waiting_messages WHERE sender_id=? AND person_id=? ORDER BY created DESC,rowid DESC LIMIT ?) ORDER BY created,r').all(user.id,p.id,PAGE+1);
- const more=rows.length>PAGE;if(more)rows.shift();
- return json({person:waitingView(p),blocked:false,canSend:true,waiting:true,hasMore:more,items:rows.map(m=>({id:m.id,mine:true,body:m.body,file:fileOf(ctx.db,m.file_id),created:m.created,read:false,reported:false}))});
+ const after=ctx.url.searchParams.get('after')&&ctx.db.query('SELECT rowid r,created FROM waiting_messages WHERE id=?').get(ctx.url.searchParams.get('after'));
+ const rows=after?ctx.db.query('SELECT rowid r,* FROM waiting_messages WHERE sender_id=?1 AND person_id=?2 AND (created>?3 OR (created=?3 AND rowid>?4)) ORDER BY created,rowid LIMIT 200').all(user.id,p.id,after.created,after.r)
+  :ctx.db.query('SELECT * FROM (SELECT rowid r,* FROM waiting_messages WHERE sender_id=? AND person_id=? ORDER BY created DESC,rowid DESC LIMIT ?) ORDER BY created,r').all(user.id,p.id,PAGE+1);
+ const more=!after&&rows.length>PAGE;if(more)rows.shift();
+ return json({person:waitingView(p),blocked:false,canSend:true,waiting:true,hasMore:more,readUpTo:'',items:rows.map(m=>({id:m.id,mine:true,body:m.body,file:fileOf(ctx.db,m.file_id),created:m.created,read:false,reported:false}))});
 }
 async function waitingSend(ctx,user,p){
  const {body,file}=await readMessage(ctx,user);
@@ -191,11 +212,14 @@ function syncTeam(db,g){
  for(const id of now)if(!team.has(id))db.query('UPDATE chat_members SET left_at=? WHERE group_id=? AND user_id=?').run(nowIso(),g.id,id);
 }
 // Someone who joins later starts with the whole history unread, so they see what was said before them.
+// In the demo workspace (the public Hubvers site) the chat holds the invented cohort and the staff only:
+// mentors and startups who sign up on the site are strangers to each other and write one to one.
 function everyone(db,userId){
+ const inChat=isDemo(db)?"status='active' AND (id LIKE 'demo-%' OR role<>'member')":"status='active'";
  db.query('INSERT OR IGNORE INTO chat_groups(id,title,created_by,created) VALUES(?,?,?,?)').run(EVERYONE,'Everyone',userId,nowIso());
- db.query("INSERT OR IGNORE INTO chat_members(group_id,user_id,role,joined,last_read) SELECT ?1,u.id,'member',?2,0 FROM users u WHERE u.status='active'").run(EVERYONE,nowIso());
- db.query("UPDATE chat_members SET left_at=NULL WHERE group_id=? AND left_at IS NOT NULL AND user_id IN (SELECT id FROM users WHERE status='active')").run(EVERYONE);
- db.query("UPDATE chat_members SET left_at=? WHERE group_id=? AND left_at IS NULL AND user_id IN (SELECT id FROM users WHERE status<>'active')").run(nowIso(),EVERYONE);
+ db.query(`INSERT OR IGNORE INTO chat_members(group_id,user_id,role,joined,last_read) SELECT ?1,id,'member',?2,0 FROM users WHERE ${inChat}`).run(EVERYONE,nowIso());
+ db.query(`UPDATE chat_members SET left_at=NULL WHERE group_id=? AND left_at IS NOT NULL AND user_id IN (SELECT id FROM users WHERE ${inChat})`).run(EVERYONE);
+ db.query(`UPDATE chat_members SET left_at=? WHERE group_id=? AND left_at IS NULL AND user_id NOT IN (SELECT id FROM users WHERE ${inChat})`).run(nowIso(),EVERYONE);
 }
 function syncMyTeams(db,userId){
  for(const g of db.query("SELECT DISTINCT g.* FROM chat_groups g WHERE g.project_id IS NOT NULL AND (g.id IN (SELECT group_id FROM chat_members WHERE user_id=?1 AND left_at IS NULL) OR g.project_id IN (SELECT project_id FROM memberships WHERE user_id=?1 AND revoked_at IS NULL))").all(userId))syncTeam(db,g);
@@ -236,13 +260,16 @@ export function teamChat(ctx,projectId){
 }
 export function groupThread(ctx,groupId){
  const user=requireUser(ctx),{g,m}=memberGroup(ctx.db,user,groupId);
- const before=ctx.url.searchParams.get('before')||'9999';
- const rows=ctx.db.query('SELECT * FROM (SELECT c.*,u.display_name name FROM chat_messages c JOIN users u ON u.id=c.sender_id WHERE c.group_id=? AND c.created<? ORDER BY c.seq DESC LIMIT ?) ORDER BY seq').all(g.id,before,PAGE+1);
- const more=rows.length>PAGE;if(more)rows.shift();
+ const before=ctx.url.searchParams.get('before')||'9999',after=ctx.url.searchParams.get('after');
+ const from=after&&ctx.db.query('SELECT seq FROM chat_messages WHERE id=? AND group_id=?').get(after,g.id);
+ const rows=from?ctx.db.query('SELECT c.*,u.display_name name FROM chat_messages c JOIN users u ON u.id=c.sender_id WHERE c.group_id=? AND c.seq>? ORDER BY c.seq LIMIT 200').all(g.id,from.seq)
+  :ctx.db.query('SELECT * FROM (SELECT c.*,u.display_name name FROM chat_messages c JOIN users u ON u.id=c.sender_id WHERE c.group_id=? AND c.created<? ORDER BY c.seq DESC LIMIT ?) ORDER BY seq').all(g.id,before,PAGE+1);
+ const more=!from&&rows.length>PAGE;if(more)rows.shift();
  const reported=new Set(ctx.db.query('SELECT message_id FROM chat_reports WHERE reporter_id=?').all(user.id).map(r=>r.message_id));
  const hidden=new Set(ctx.db.query('SELECT blocked_id FROM message_blocks WHERE user_id=?').all(user.id).map(r=>r.blocked_id));
  ctx.db.query('UPDATE chat_members SET last_read=? WHERE group_id=? AND user_id=?').run(lastSeq(ctx.db,g.id),g.id,user.id);
- const members=ctx.db.query('SELECT user_id,role FROM chat_members WHERE group_id=? AND left_at IS NULL ORDER BY joined,rowid').all(g.id).filter(r=>!onlyDemoPeople(ctx)||r.user_id.startsWith('demo-user-')).map(r=>({...view(person(ctx.db,r.user_id)),owner:r.role==='owner'}));
+ // A poll (?after) skips the member list: in the everyone chat that is one lookup per account.
+ const members=from?undefined:ctx.db.query('SELECT user_id,role FROM chat_members WHERE group_id=? AND left_at IS NULL ORDER BY joined,rowid').all(g.id).filter(r=>!onlyDemoPeople(ctx)||r.user_id.startsWith('demo-user-')).map(r=>({...view(person(ctx.db,r.user_id)),owner:r.role==='owner'}));
  return json({group:groupView(ctx.db,g,onlyDemoPeople(ctx)),owner:m.role==='owner'&&!fixed(g),members,hasMore:more,
   // A blocked person's messages stay out of sight in shared chats too.
   items:rows.map(r=>hidden.has(r.sender_id)?{id:r.id,mine:false,hidden:true,created:r.created}:{id:r.id,mine:r.sender_id===user.id,sender:{id:r.sender_id,name:r.name},body:r.body,file:fileOf(ctx.db,r.file_id),created:r.created,reported:reported.has(r.id)})});
@@ -294,4 +321,17 @@ export function groupReport(ctx,messageId){
  if(r.changes){for(const a of ctx.db.query("SELECT id,role FROM users WHERE status='active'").all().filter(isAdmin))if(a.id!==msg.sender_id)notify(ctx.db,a.id,'message.reported',{});
   audit(ctx.db,user.id,'message.report','chat_message',messageId,{});}
  return json({ok:true});
+}
+
+/**
+ * Whom "Write to the programme manager" opens: organisers marked as programme managers, otherwise every organiser.
+ * One name opens the conversation at once; several make a short chooser.
+ */
+export function managers(ctx){
+ const user=requireUser(ctx);
+ const demo=onlyDemoPeople(ctx)?1:0;
+ const q=`SELECT id,display_name name FROM users WHERE status='active' AND role IN ('program_admin','platform_owner') AND id<>?1 AND (?2=0 OR id LIKE 'demo-%') %s ORDER BY role='platform_owner',display_name COLLATE NOCASE LIMIT 20`;
+ let rows=ctx.db.query(q.replace('%s','AND programme_manager=1')).all(user.id,demo);
+ if(!rows.length)rows=ctx.db.query(q.replace('%s','')).all(user.id,demo);
+ return json({items:rows});
 }

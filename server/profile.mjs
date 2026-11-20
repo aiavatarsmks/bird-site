@@ -31,3 +31,20 @@ export async function saveLinks(ctx){
  ctx.db.query('UPDATE users SET linkedin=?,website=?,updated=? WHERE id=?').run(linkedin,website,nowIso(),user.id);
  return json({ok:true,links:{linkedin,website}});
 }
+
+/**
+ * First steps of a team member, each ticked from real data: the team card (description, problem, solution),
+ * the pitch deck (a PDF or PPTX in the project), teammates (a second member or an invitation sent) and the first
+ * task (answered or started). The team is the person's first active project.
+ */
+export function firstSteps(ctx){
+ const user=requireUser(ctx),db=ctx.db;
+ const p=db.query("SELECT p.id,p.draft FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') AND p.status<>'archived' ORDER BY p.source='user',m.created LIMIT 1").get(user.id);
+ if(!p)return json({projectId:null,steps:[]});
+ let c={};try{c=JSON.parse(p.draft)||{};}catch{}
+ const filled=['short','problem','solution'].every(k=>String(c[k]||'').trim().length>=3);
+ const deck=!!db.query("SELECT 1 FROM files WHERE project_id=? AND status='active' AND purpose='document' AND (lower(filename) LIKE '%.pdf' OR lower(filename) LIKE '%.pptx' OR lower(filename) LIKE '%.ppt' OR lower(filename) LIKE '%.odp')").get(p.id);
+ const mates=db.query("SELECT count(*) n FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").get(p.id).n>1||!!db.query("SELECT 1 FROM invites WHERE project_id=? AND kind='project' AND revoked_at IS NULL").get(p.id);
+ const task=!!db.query("SELECT 1 FROM assignments a WHERE (a.project_id=?1 OR a.user_id=?2) AND (EXISTS(SELECT 1 FROM task_responses r WHERE r.assignment_id=a.id) OR EXISTS(SELECT 1 FROM submissions s WHERE s.assignment_id=a.id))").get(p.id,user.id);
+ return json({projectId:p.id,steps:[{key:'card',done:filled},{key:'deck',done:deck},{key:'invite',done:mates},{key:'task',done:task}]});
+}

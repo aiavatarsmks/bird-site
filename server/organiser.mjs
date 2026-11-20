@@ -3,7 +3,7 @@ import {fail,json,readJson,text,oneOf,int,newId} from './http.mjs';
 import {nowIso} from './db.mjs';
 import {audit,requireAdmin} from './permissions.mjs';
 import {addRecoveryCode} from './auth.mjs';
-import {award,projectXp,userXp} from './progress.mjs';
+import {award,projectXp,userXp,teamPoints} from './progress.mjs';
 import {notify} from './notifications.mjs';
 import {riskSignals,streak,teamScore,teamPercent,csvCell,brandSlug,personSince,teamSince,attendanceSince} from './cohort.mjs';
 import {lastSeen,pitchOf} from './admin.mjs';
@@ -11,6 +11,7 @@ import {assignForUser,localText} from './tasks.mjs';
 import {wallet} from './wallet.mjs';
 import {onlyDemoPeople} from './demo-visit.mjs';
 import {canReadFile} from './files.mjs';
+import {stageOf,fundingOf,stageHistory} from './stages.mjs';
 
 const TEAM_ROLES="('owner','editor','member')";
 const nameOf=project=>JSON.parse(project.draft||'{}').name||project.id;
@@ -77,7 +78,7 @@ export function teamRecord(ctx,id){
  const held=db.query("SELECT count(*) n FROM lectures WHERE status='published' AND date<=?").get(zagrebToday()).n;
  const ledger=db.query(`SELECT beneficiary_type type,amount,reason,created FROM xp_ledger WHERE (beneficiary_type='project' AND beneficiary_id=?) ${ids.length?`OR (beneficiary_type='user' AND beneficiary_id IN (${marks}))`:''} ORDER BY id DESC LIMIT 30`).all(id,...ids);
  return json({
-  id,name:nameOf(p),status:p.status,project:JSON.parse(p.draft||'{}'),score:{...teamScore(db,id,ids),percent:teamPercent(db,id,ids)},wallet:wallet(db,id),risk:riskSignals(db,id,ids),streak:streak(db,id),teamXp:projectXp(db,id),pitch:pitchOf(db,id),lectures:held,seats:attendanceSince(db,ids).seats,
+  id,name:nameOf(p),status:p.status,project:(c=>({...c,stage:stageOf(c.stage)}))(JSON.parse(p.draft||'{}')),funding:fundingOf(p),stageHistory:stageHistory(db,id),score:{...teamScore(db,id,ids),percent:teamPercent(db,id,ids)},wallet:wallet(db,id),risk:riskSignals(db,id,ids),streak:streak(db,id),teamXp:teamPoints(db,id).total,pitch:pitchOf(db,id),lectures:held,seats:attendanceSince(db,ids).seats,
   members:members.map(m=>({id:m.id,personId:m.person_id||null,name:m.display_name,role:m.role,status:m.status,lastSeen:lastSeen(db,m.id),xp:userXp(db,m.id),attended:db.query('SELECT count(*) n FROM attendance WHERE user_id=?').get(m.id).n,lastNudge:lastNudge(db,[m.id])})),
   noAccount:roster.filter(r=>!r.linked).map(r=>({id:r.id,name:r.display_name})),
   tasks:assignmentList(db,`(a.project_id=? ${ids.length?`OR a.user_id IN (${marks})`:''})`,id,...ids),

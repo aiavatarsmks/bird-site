@@ -9,6 +9,7 @@
  *   workspace list            every workspace with its addresses
  *   workspace create --slug <slug> --name <name> [--host <host>] [--profile blank] [--city <city>] [--country <code>]
  *   workspace host --slug <slug> --host <host>
+ *   workspace place --slug <slug> --city <city> --country <code>   where the hub sits on the investor map
  *   demo-fill --workspace <slug>   invented teams, mentors and activity for a demo; never for a real programme
  * Every command except "workspace" works on the default workspace, or on --workspace <slug>.
  * A running server finds a new workspace or address on the next request; no restart is needed.
@@ -37,7 +38,8 @@ if(command==='workspace'){
   // Only the location of the owner invitation is printed, never the code.
   else if(args[0]==='create')out(platform.createWorkspace({slug:flag('slug'),name:flag('name'),host:flag('host'),profile:flag('profile')||'blank',city:flag('city')||'',country:flag('country')||''}));
   else if(args[0]==='host')out({slug:flag('slug'),host:platform.addHost(flag('slug'),flag('host'))});
-  else{console.log('Usage: workspace list | workspace create --slug <slug> --name <name> [--host <host>] | workspace host --slug <slug> --host <host>');process.exitCode=1;}
+  else if(args[0]==='place'){platform.setPlace(flag('slug'),{city:flag('city')||'',country:(flag('country')||'').toUpperCase()});out({slug:flag('slug'),city:flag('city')||'',country:(flag('country')||'').toUpperCase()});}
+  else{console.log('Usage: workspace list | workspace create --slug <slug> --name <name> [--host <host>] [--city <city>] [--country <code>] | workspace host --slug <slug> --host <host> | workspace place --slug <slug> --city <city> --country <code>');process.exitCode=1;}
  }finally{platform.close();}
  process.exit();
 }

@@ -368,3 +368,74 @@ details[open]>summary.tk-group::after{content:"−"}
 @media(prefers-reduced-motion:reduce){
  .tk-first .tk-row,.tk-first .tk-kpi{animation:mo-fade .3s ease both!important}
 }
+
+/* Pilot phase 2 ---------------------------------------------------------------------------------
+   One-screen task form, homework overview (teams × tasks), one team's answer. Square corners, rules, no pills. */
+.tkc .tk-chips{max-height:none}
+.tkc .tk-chip span{gap:6px}
+.tkc .tk-chip .tk-i{width:14px;height:14px}
+.tkc-template{display:grid;gap:4px;padding:12px 16px;background:var(--paper,#f7f5f0);border:1px dashed var(--line)}
+.tkc-template .acc-field{margin:0}
+.tkc-template .acc-field>span{display:inline-flex;align-items:center;gap:6px}
+.tkc-proof,.tkc-who{border:0;padding:0;margin:14px 0 0;min-width:0}
+.tkc-proof+.tk-row3{margin-top:14px}
+.tkc-proof legend,.tkc-who legend{padding:0;margin:0 0 6px;font-size:14px;font-weight:600}
+.tkc-who .tk-seg{margin:0 0 8px}
+.tkc-who .tk-seg legend{display:none}
+.tkc-teams{display:none}
+.tkc:has(input[name=audience][value=selected]:checked) .tkc-teams{display:block}
+.tkc-wait{font-size:12px;color:var(--muted)}
+.tk-chip input:checked+span .tkc-wait{color:inherit;opacity:.8}
+.tkc .tk-adv .tk-btn{margin-top:4px}
+.tk-btn.is-big{min-height:48px;padding:0 28px;font-size:16px}
+.tk-save .tk-btn.is-big{width:100%;justify-content:center}
+@media (min-width:720px){.tk-save .tk-btn.is-big{width:auto}}
+
+/* Status colours of the matrix: one hue per state, the same in the cells, the legend and the pills. */
+.tk{--mx-unanswered:#8b8f86;--mx-accepted:#2c5b8c;--mx-working:#5a7fa8;--mx-submitted:var(--tk-wait);--mx-changes:#c0761c;--mx-done:var(--tk-ok);--mx-declined:#6b4a63;--mx-overdue:var(--tk-late)}
+.mx-wrap{position:relative;overflow-x:auto;max-width:100%;border:1px solid var(--line);background:var(--white);-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.mx-wrap:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mx{border-collapse:separate;border-spacing:0;font-size:13px;width:auto}
+.mx th,.mx td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:0;text-align:left;vertical-align:top}
+.mx thead th{position:sticky;top:0;background:var(--white);padding:8px 10px;min-width:130px;max-width:180px;font-weight:600;z-index:1}
+.mx thead th a{color:var(--ink);text-decoration:none}
+.mx thead th a:hover .mx-t{text-decoration:underline}
+.mx-t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3}
+.mx thead small{display:block;margin-top:4px;font-weight:400;color:var(--muted);font-size:12px}
+.mx-sum b{font-weight:600;font-variant-numeric:tabular-nums;margin-right:4px}
+.mx tbody th{position:sticky;left:0;background:var(--white);padding:8px 10px;min-width:120px;max-width:180px;font-weight:600;z-index:1;box-shadow:1px 0 0 var(--line)}
+.mx .mx-corner{left:0;z-index:2;position:sticky}
+.mx tbody th a{color:var(--ink);text-decoration:none}
+.mx tbody th small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+.mx-c a{display:flex;align-items:center;gap:7px;min-height:44px;padding:6px 10px;color:var(--ink);text-decoration:none;white-space:nowrap}
+.mx-c a:hover,.mx-c a:focus-visible{background:var(--paper,#f7f5f0)}
+.mx-c a:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.mx-c i,.mx-legend i,.mx-pill i{display:inline-block;width:10px;height:10px;flex:none;background:var(--mx-unanswered)}
+.mx-c.is-none{color:var(--muted);text-align:center;vertical-align:middle;padding:6px}
+.is-unanswered>i,.mx-c.is-unanswered i,.mx-legend .is-unanswered i{background:transparent;border:1.5px solid var(--mx-unanswered)}
+.is-accepted i{background:var(--mx-accepted)}
+.is-working i{background:var(--mx-working)}
+.is-submitted i{background:var(--mx-submitted)}
+.is-changes i{background:var(--mx-changes)}
+.is-done i{background:var(--mx-done)}
+.is-declined i{background:var(--mx-declined)}
+.is-overdue i{background:var(--mx-overdue)}
+.mx-c.is-submitted a{font-weight:600}
+.mx-c.is-overdue a{color:var(--mx-overdue)}
+.mx-c.is-declined a,.mx-c.is-unanswered a{color:var(--muted)}
+.mx-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 0;padding:0;list-style:none;font-size:12px;color:var(--muted)}
+.mx-legend li{display:inline-flex;align-items:center;gap:6px}
+.mx-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.mx-list{list-style:none;margin:8px 0 0;padding:0;display:grid}
+.mx-list a{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:13px}
+.mx-list a:hover span:first-child{text-decoration:underline}
+.tk-answers{font-size:12px;color:var(--muted);white-space:nowrap;min-width:84px}
+.tk-ans .tk-rv{margin-top:12px}
+.tk-ans .tk-rv-answer>.tk-btn{margin-top:10px}
+@media (max-width:719px){
+ .tk-answers{display:none}
+ .mx thead th{min-width:110px}
+ .mx tbody th{min-width:96px;max-width:120px}
+}
+.tk-mx{min-width:0;max-width:100%}
+.acc-body:has(.tk-mx){min-width:0}

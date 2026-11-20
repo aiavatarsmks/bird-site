@@ -10,6 +10,7 @@ import {audit,requireAdmin} from './permissions.mjs';
 import {isoWeek} from './tasks.mjs';
 import {csvCell} from './cohort.mjs';
 import {isDemoUser} from './demo-visit.mjs';
+import {stageOf,STAGE_LABEL,ROUND_LABEL} from './stages.mjs';
 
 const L=(en,hr,ru)=>({en,hr,ru});
 const LANGS=['en','hr','ru'];
@@ -70,7 +71,9 @@ export function buildReport(db,{from,to,basis='custom'},{workspace='BIRD',canVer
   const members=db.query("SELECT u.id,u.person_id FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.project_id=? AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member')").all(p.id);
   const roster=p.team_id?db.query('SELECT person_id FROM team_people WHERE team_id=?').all(p.team_id).map(r=>r.person_id):[];
   const people=new Set([...roster.map(id=>'p:'+id),...members.map(m=>m.person_id?'p:'+m.person_id:'u:'+m.id)]);
-  return {id:p.id,name:nameOf(p),status:p.status,userIds:members.map(m=>m.id),people};
+  // Stage and financing as the team states them now (not limited to the period): the funder sees where each team is.
+  let stage='idea';try{stage=stageOf(JSON.parse(p.draft).stage);}catch{}
+  return {id:p.id,name:nameOf(p),status:p.status,userIds:members.map(m=>m.id),people,stage,raisedEur:p.raised_eur??null,raisingEur:p.raising_eur??null,round:p.funding_round||null};
  });
  const projectIds=teams.map(t=>t.id),byId=new Map(teams.map(t=>[t.id,t]));
  const allUsers=[...new Set(teams.flatMap(t=>t.userIds))];
@@ -136,7 +139,7 @@ export function buildReport(db,{from,to,basis='custom'},{workspace='BIRD',canVer
  const perTeam=teams.map(t=>{
   const mine=outcomes.filter(o=>o.project_id===t.id),f=type=>sum(mine.filter(o=>o.kind==='funding'&&o.funding_type===type));
   const myAtt=att.filter(a=>t.userIds.includes(a.user_id)).length,myExp=lectures.length*t.userIds.length;
-  return {id:t.id,name:t.name,people:t.people.size,accounts:t.userIds.length,company:mine.some(o=>o.kind==='company'),jobs:mine.filter(o=>o.kind==='hire').reduce((n,o)=>n+count(o),0),
+  return {id:t.id,name:t.name,stage:t.stage,raisedEur:t.raisedEur,raisingEur:t.raisingEur,round:t.round,people:t.people.size,accounts:t.userIds.length,company:mine.some(o=>o.kind==='company'),jobs:mine.filter(o=>o.kind==='hire').reduce((n,o)=>n+count(o),0),
    funding:{grant:f('grant'),equity:f('equity'),loan:f('loan'),prize:f('prize'),other:f('other'),total:sum(mine.filter(o=>o.kind==='funding'))},
    revenue:sum(mine.filter(o=>o.kind==='revenue')),customers:mine.filter(o=>o.kind==='customer').reduce((n,o)=>n+count(o),0),
    attendance:myExp?Math.round(myAtt/myExp*100):null,mentorSessions:sessions.filter(s=>s.project_id===t.id).length,
@@ -215,7 +218,10 @@ const W={
  provenance:L('Every number comes from records in the platform. Outcomes are reported by teams; “verified” means an organiser checked the evidence. Funder labels are an approximate mapping, not official form fields.','Svaki broj dolazi iz zapisa u platformi. Rezultate prijavljuju timovi; „provjereno” znači da je organizator provjerio dokaz. Nazivi pokazatelja financijera približna su usporedba, a ne službena polja obrasca.','Каждое число взято из записей платформы. Результаты сообщают команды; «проверено» значит, что организатор проверил подтверждение. Названия показателей фонда — приблизительное соответствие, а не официальные поля формы.'),
  outcomesProof:L('Outcomes in the period','Rezultati u razdoblju','Результаты за период'),
  notTracked:L('not tracked','ne prati se','не отслеживается'),
+ stage:L('Stage','Faza','Стадия'),raised:L('Raised to date (team)','Dosad prikupljeno (tim)','Привлечено (со слов команды)'),raising:L('Raising now','Trenutno prikuplja','Ищут сейчас'),round:L('Round','Runda','Раунд'),
 };
+const stageText=(k,lang)=>STAGE_LABEL[k]?.[lang]||k||'';
+const roundText=(k,lang)=>k?ROUND_LABEL[k]?.[lang]||k:'';
 const langOf=ctx=>LANGS.includes(ctx.url.searchParams.get('lang'))?ctx.url.searchParams.get('lang'):'en';
 const fmtNum=(n,lang)=>n===null||n===undefined?'—':new Intl.NumberFormat({en:'en-GB',hr:'hr-HR',ru:'ru-RU'}[lang],{maximumFractionDigits:1}).format(n);
 const proofText=(s,lang)=>[s.verified?`${s.verified} ${W.verified[lang]}`:'',s.organiser?`${s.organiser} ${W.organiser[lang]}`:'',s.self?`${s.self} ${W.self[lang]}`:''].filter(Boolean).join(', ');
@@ -229,8 +235,8 @@ function tableRows(r,lang){
  rows.push([],[W.funding[lang]],...['grant','equity','loan','prize','other','total'].map(k=>[W[k][lang],r.funding[k],'EUR']));
  rows.push([],[W.mapping[lang]],[W.code[lang],W.indicator[lang],W.value[lang],W.unit[lang],W.note[lang]]);
  for(const g of r.mappings){rows.push([g.title[lang]]);for(const x of g.rows)rows.push([x.code||'',x.label[lang],x.value??W.notTracked[lang],x.unit||'',[W.approx[lang],x.note?.[lang]].filter(Boolean).join('; ')]);}
- rows.push([],[W.teams[lang]],[W.team[lang],W.people[lang],W.company[lang],W.jobs[lang],W.grant[lang],W.equity[lang],W.loan[lang],W.prize[lang],W.other[lang],W.total[lang]+' EUR',W.revenue[lang]+' EUR',W.customers[lang],W.attendance[lang]+' %',W.mentor[lang],W.checkins[lang],W.tasks[lang],W.active[lang]]);
- for(const t of r.teams)rows.push([t.name,t.people,t.company?W.yes[lang]:W.no[lang],t.jobs,t.funding.grant,t.funding.equity,t.funding.loan,t.funding.prize,t.funding.other,t.funding.total,t.revenue,t.customers,t.attendance??'',t.mentorSessions,`${t.checkins}/${t.weeks}`,t.tasks,t.active?W.yes[lang]:W.no[lang]]);
+ rows.push([],[W.teams[lang]],[W.team[lang],W.stage[lang],W.raised[lang]+' EUR',W.raising[lang]+' EUR',W.round[lang],W.people[lang],W.company[lang],W.jobs[lang],W.grant[lang],W.equity[lang],W.loan[lang],W.prize[lang],W.other[lang],W.total[lang]+' EUR',W.revenue[lang]+' EUR',W.customers[lang],W.attendance[lang]+' %',W.mentor[lang],W.checkins[lang],W.tasks[lang],W.active[lang]]);
+ for(const t of r.teams)rows.push([t.name,stageText(t.stage,lang),t.raisedEur??'',t.raisingEur??'',roundText(t.round,lang),t.people,t.company?W.yes[lang]:W.no[lang],t.jobs,t.funding.grant,t.funding.equity,t.funding.loan,t.funding.prize,t.funding.other,t.funding.total,t.revenue,t.customers,t.attendance??'',t.mentorSessions,`${t.checkins}/${t.weeks}`,t.tasks,t.active?W.yes[lang]:W.no[lang]]);
  rows.push([],[W.outcomesProof[lang],r.outcomes.total,proofText(r.outcomes,lang)],[W.provenance[lang]]);
  return rows;
 }
@@ -251,7 +257,7 @@ const xmlEsc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const colName=i=>{let s='';i++;while(i){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26);}return s;};
 function sheetXml(rows){
  const body=rows.map((row,r)=>`<row r="${r+1}">${row.map((v,c)=>{const ref=colName(c)+(r+1);return typeof v==='number'&&Number.isFinite(v)?`<c r="${ref}"><v>${v}</v></c>`:v===''||v===null||v===undefined?'':`<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(v)}</t></is></c>`;}).join('')}</row>`).join('');
- return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="48" customWidth="1"/><col min="2" max="17" width="16" customWidth="1"/></cols><sheetData>${body}</sheetData></worksheet>`;
+ return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="48" customWidth="1"/><col min="2" max="21" width="16" customWidth="1"/></cols><sheetData>${body}</sheetData></worksheet>`;
 }
 export function zipStore(files){
  const enc=new TextEncoder(),local=[],central=[];let offset=0;
@@ -297,7 +303,7 @@ export function reportPrint(ctx){
 <section class="kpis">${ORDER.map(kpi).join('')}</section>
 <section><h2>${h(W.funding[lang])}</h2><table class="fund">${fund.map(k=>`<tr><th>${h(W[k][lang])}</th><td><i style="width:${(r.funding[k]/max*100).toFixed(1)}%"></i></td><td class="n">${n(r.funding[k])} €</td></tr>`).join('')}<tr class="sum"><th>${h(W.total[lang])}</th><td></td><td class="n">${n(r.funding.total)} €</td></tr></table></section>
 <section><h2>${h(W.mapping[lang])}</h2>${r.mappings.map(g=>`<h3>${h(g.title[lang])}</h3><table><thead><tr><th>${h(W.code[lang])}</th><th>${h(W.indicator[lang])}</th><th class="n">${h(W.value[lang])}</th><th>${h(W.note[lang])}</th></tr></thead><tbody>${g.rows.map(x=>`<tr><td>${h(x.code||'')}</td><td>${h(x.label[lang])}</td><td class="n">${x.value===null?h(W.notTracked[lang]):n(x.value)+unit(x.unit)}</td><td><em>${h(W.approx[lang])}</em>${x.note?'; '+h(x.note[lang]):''}</td></tr>`).join('')}</tbody></table>`).join('')}</section>
-<section class="teams"><h2>${h(W.teams[lang])}</h2><table><thead><tr><th>${h(W.team[lang])}</th><th class="n">${h(W.people[lang])}</th><th>${h(W.company[lang])}</th><th class="n">${h(W.jobs[lang])}</th><th class="n">${h(W.total[lang])} €</th><th class="n">${h(W.revenue[lang])} €</th><th class="n">${h(W.customers[lang])}</th><th class="n">${h(W.attendance[lang])}</th><th class="n">${h(W.mentor[lang])}</th><th class="n">${h(W.checkins[lang])}</th><th class="n">${h(W.tasks[lang])}</th></tr></thead><tbody>${r.teams.map(t=>`<tr><td>${h(t.name)}</td><td class="n">${t.people}</td><td>${h(t.company?W.yes[lang]:W.no[lang])}</td><td class="n">${t.jobs}</td><td class="n">${n(t.funding.total)}</td><td class="n">${n(t.revenue)}</td><td class="n">${t.customers}</td><td class="n">${t.attendance===null?'—':t.attendance+' %'}</td><td class="n">${t.mentorSessions}</td><td class="n">${t.checkins}/${t.weeks}</td><td class="n">${t.tasks}</td></tr>`).join('')}</tbody></table></section>
+<section class="teams"><h2>${h(W.teams[lang])}</h2><table><thead><tr><th>${h(W.team[lang])}</th><th>${h(W.stage[lang])}</th><th class="n">${h(W.raised[lang])} / ${h(W.raising[lang])} €</th><th class="n">${h(W.people[lang])}</th><th>${h(W.company[lang])}</th><th class="n">${h(W.jobs[lang])}</th><th class="n">${h(W.total[lang])} €</th><th class="n">${h(W.revenue[lang])} €</th><th class="n">${h(W.customers[lang])}</th><th class="n">${h(W.attendance[lang])}</th><th class="n">${h(W.mentor[lang])}</th><th class="n">${h(W.checkins[lang])}</th><th class="n">${h(W.tasks[lang])}</th></tr></thead><tbody>${r.teams.map(t=>`<tr><td>${h(t.name)}</td><td>${h(stageText(t.stage,lang))}${t.round?`<br><small>${h(roundText(t.round,lang))}</small>`:''}</td><td class="n">${t.raisedEur===null&&t.raisingEur===null?'—':`${t.raisedEur===null?'—':n(t.raisedEur)} / ${t.raisingEur===null?'—':n(t.raisingEur)}`}</td><td class="n">${t.people}</td><td>${h(t.company?W.yes[lang]:W.no[lang])}</td><td class="n">${t.jobs}</td><td class="n">${n(t.funding.total)}</td><td class="n">${n(t.revenue)}</td><td class="n">${t.customers}</td><td class="n">${t.attendance===null?'—':t.attendance+' %'}</td><td class="n">${t.mentorSessions}</td><td class="n">${t.checkins}/${t.weeks}</td><td class="n">${t.tasks}</td></tr>`).join('')}</tbody></table></section>
 <p class="note">${h(W.provenance[lang])} ${h(W.outcomesProof[lang])}: ${r.outcomes.total}${r.outcomes.total?' ('+h(proofText(r.outcomes,lang))+')':''}.</p>
 <footer class="sign"><div><span>${h(W.sign[lang])}</span></div><div><span>${h(W.signature[lang])}</span></div><div><span>${h(W.date[lang])}</span></div><div class="stamp"><span>${h(W.stamp[lang])}</span></div></footer>`;
  const css=`@page{size:A4;margin:16mm 14mm}*{box-sizing:border-box}body{margin:0;font:12px/1.45 Inter,-apple-system,"Segoe UI",Arial,sans-serif;color:#242a26;background:#f7f5f0}
@@ -308,7 +314,7 @@ main{max-width:210mm;margin:24px auto;background:#fff;padding:16mm 14mm;border:1
 h1{font:400 30px/1.1 Georgia,serif;margin:18px 0 14px;letter-spacing:-.5px}h2{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:#a63c15;margin:18px 0 8px}h3{font-size:12px;margin:12px 0 4px}
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #dcded4;border-left:1px solid #dcded4}.k{border-right:1px solid #dcded4;border-bottom:1px solid #dcded4;padding:8px 9px;break-inside:avoid}.k span{display:block;font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;color:#62685f;font-weight:700}.k b{display:block;font-size:20px;margin:3px 0 2px;font-variant-numeric:tabular-nums}.k small{font-size:9px;color:#62685f}
 table{width:100%;border-collapse:collapse;font-size:10.5px}th,td{text-align:left;padding:4px 6px;border-bottom:1px solid #dcded4;vertical-align:top}thead th{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#62685f}.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}tr{break-inside:avoid}
-.fund th{width:22%}.fund td:nth-child(2){width:58%}thead th.n{white-space:normal}.teams table{font-size:9.5px;table-layout:fixed}.teams td,.teams th{padding:4px 3px;overflow-wrap:anywhere}.teams th:first-child{width:16%}.teams thead th{overflow-wrap:normal;hyphens:auto;letter-spacing:.2px;font-size:8px}.fund td i{display:block;height:9px;background:#a63c15;-webkit-print-color-adjust:exact;print-color-adjust:exact}.fund .sum th,.fund .sum td{font-weight:700;border-top:2px solid #242a26}
+.fund th{width:22%}.fund td:nth-child(2){width:58%}thead th.n{white-space:normal}.teams table{font-size:9.5px;table-layout:fixed}.teams td,.teams th{padding:4px 3px;overflow-wrap:anywhere}.teams th:first-child{width:13%}.teams th:nth-child(2){width:10%}.teams td small{color:#62685f}.teams thead th{overflow-wrap:normal;hyphens:auto;letter-spacing:.2px;font-size:8px}.fund td i{display:block;height:9px;background:#a63c15;-webkit-print-color-adjust:exact;print-color-adjust:exact}.fund .sum th,.fund .sum td{font-weight:700;border-top:2px solid #242a26}
 em{font-style:normal;color:#9a6200;font-weight:600}.note{font-size:10px;color:#62685f;margin-top:14px;border-left:3px solid #a63c15;padding-left:8px}
 .sign{display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;gap:18px;margin-top:34px;break-inside:avoid}.sign div{border-top:1px solid #242a26;padding-top:4px;min-height:44px;font-size:10px;color:#62685f}.stamp{border:1px dashed #9a9e94!important;min-height:64px!important;padding:4px}
 @media print{body{background:#fff}main{margin:0;padding:0;border:0;max-width:none}.bar{display:none}.mark{-webkit-print-color-adjust:exact;print-color-adjust:exact}}

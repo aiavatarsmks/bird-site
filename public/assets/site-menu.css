@@ -1,0 +1,59 @@
+/* The shared top menu of the public site (server/site.mjs renders the markup, site-menu.js switches language and opens
+   it on a phone). Loaded on the landing too, so everything is scoped to .sm and its colours are its own: the landing's
+   stylesheet and this one never fight. Landing look "Warm room": warm off-white bar without a rule, ink-navy text, quiet
+   links that darken on hover, the current page underlined in brand blue; controls keep their rectangle shape. */
+.sm{--sm-ink:#252a47;--sm-muted:#5d6280;--sm-rule:#e4e1dc;--sm-tram:#2c44d0;--sm-panel:#fff;--sm-ground:#f6f4f1;
+ position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--sm-ground) 92%,transparent);backdrop-filter:saturate(1.2) blur(10px);-webkit-backdrop-filter:saturate(1.2) blur(10px);border-bottom:1px solid transparent;color:var(--sm-ink);font-family:"Onest",system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+.sm *{box-sizing:border-box}
+.sm-in{max-width:1232px;margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:12px;min-height:64px}
+.sm-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-right:auto}
+.sm-logo b{font:600 18px/1 "Onest",system-ui,sans-serif;letter-spacing:-.03em}
+.sm-mark{display:grid;grid-template-columns:repeat(3,6px);gap:3px;align-items:end;height:20px}
+.sm-mark i{display:block;width:6px;border-radius:2px}
+.sm-mark i:nth-child(1){height:9px;background:#e2462c}.sm-mark i:nth-child(2){height:14px;background:#f0a500}.sm-mark i:nth-child(3){height:20px;background:#12a36d}
+.sm a:focus-visible,.sm button:focus-visible{outline:3px solid var(--sm-tram);outline-offset:3px}
+.sm-nav{display:flex;gap:22px}
+.sm-nav a{font-size:15px;font-weight:600;text-decoration:none;color:var(--sm-muted);padding:9px 0;border-bottom:2px solid transparent;transition:color .15s ease,border-color .15s ease}
+.sm-nav a:hover{color:var(--sm-ink)}
+.sm-nav a[aria-current=page]{color:var(--sm-ink);border-bottom-color:var(--sm-tram)}
+.sm-langs{display:flex;border:1px solid var(--sm-rule);background:var(--sm-panel)}
+.sm-langs button{min-width:40px;min-height:34px;border:0;background:transparent;font:600 12px/1 "Onest",system-ui,sans-serif;letter-spacing:.06em;color:var(--sm-muted);cursor:pointer;transition:color .15s ease}
+.sm-langs button:hover{color:var(--sm-ink)}
+.sm-langs button[aria-pressed=true]{background:var(--sm-ink);color:#fff}
+.sm-signin{display:inline-flex;align-items:center;min-height:40px;padding:8px 16px;border:2px solid var(--sm-ink);font-size:14px;font-weight:600;text-decoration:none;color:var(--sm-ink);background:var(--sm-panel);white-space:nowrap;transition:background-color .15s ease,color .15s ease}
+.sm-signin:hover{background:var(--sm-ink);color:#fff}
+.sm-account{display:flex;align-items:center;min-width:0}
+.sm-toggle{display:none;align-items:center;gap:8px;min-height:44px;padding:8px 12px;border:1px solid var(--sm-rule);background:var(--sm-panel);font:600 14px/1 "Onest",system-ui,sans-serif;color:var(--sm-ink);cursor:pointer}
+.sm-burger{display:grid;gap:4px;width:18px}
+.sm-burger i{display:block;height:2px;background:currentColor;transition:transform .15s ease,opacity .15s ease}
+.sm-toggle[aria-expanded=true] .sm-burger i:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.sm-toggle[aria-expanded=true] .sm-burger i:nth-child(2){opacity:0}
+.sm-toggle[aria-expanded=true] .sm-burger i:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.sm-panel{display:flex;align-items:center;gap:22px}
+/* Phone and small tablet: logo and a menu button; the links, languages and sign-in drop down as one sheet.
+   Without the script (no .sm-js) the sheet simply stays open under the logo. */
+@media(max-width:959px){
+ .sm-in{flex-wrap:wrap;min-height:60px}
+ .sm-js .sm-toggle{display:inline-flex}
+ .sm-panel{flex-basis:100%;flex-direction:column;align-items:stretch;gap:14px;padding:4px 0 16px}
+ .sm-js .sm-panel{display:none}
+ .sm-js .sm-panel.is-open{display:flex}
+ .sm-nav{flex-direction:column;gap:0}
+ .sm-nav a{padding:13px 0;font-size:17px;border-bottom:1px solid var(--sm-rule)}
+ .sm-nav a[aria-current=page]{border-bottom-color:var(--sm-rule);box-shadow:inset 3px 0 0 var(--sm-tram);padding-left:12px}
+ .sm-langs{align-self:flex-start}
+ .sm-signin{justify-content:center;width:100%}
+ .sm-account>*{width:100%}
+}
+/* The shared footer (server/site.mjs renderFooter): a dark rounded slab at the foot of every public page, as the landing
+   had. What the site is on the left, the legal and section links on the right, the copyright under them. */
+.sf{padding:32px 0 0;font:400 14px/1.5 "Onest",system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+.sf-in{display:grid;grid-template-columns:1fr auto;gap:12px 24px;align-items:center;width:min(1232px,calc(100% - 16px));margin:0 auto;padding:32px clamp(16px,4vw,56px) 40px;background:#1d2140;color:#c3c8e4;border-radius:28px 28px 0 0}
+.sf p{margin:0}.sf b{color:#fff;font-weight:600}
+.sf-nav{display:flex;flex-wrap:wrap;gap:4px 20px}
+.sf-nav a{color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.4);padding:8px 0;transition:border-color .15s ease}
+.sf-nav a:hover{border-color:#fff}
+.sf a:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.sf-copy{grid-column:1/-1;color:#9aa0c4;font-size:13px}
+@media(max-width:719px){.sf-in{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.sm *,.sf *{transition:none!important}}

@@ -20,7 +20,7 @@
 .wm-item[data-wm-out]{border-top:1px solid #d8dad2}
 .office-page .site-header [data-account-menu]{margin-left:4px}
 /* Demo skin and landing: their own ink and brand blue. */
-.is-demo .wm-ini:not(.is-out),.top .wm-ini:not(.is-out){background:var(--tram,var(--brand,#1f3fc4))}
+.is-demo .wm-ini:not(.is-out),.top .wm-ini:not(.is-out),.sm .wm-ini:not(.is-out){background:var(--tram,var(--brand,#1f3fc4))}
 .top [data-account-menu]{order:5}
 @media(max-width:640px){
  [data-account-menu]{margin-left:4px}
@@ -75,3 +75,8 @@
 @media(max-width:640px){.office-page .wm-btn .wm-name{display:none}.office-page .wm-btn{padding-right:4px}.office-page .site-header [data-account-menu]{order:9;margin-left:auto}}
 @media(max-width:400px){.site-header .wm-btn{max-width:100px}}
 .wm-btn,.wm-in{background:var(--white,#fff)}
+
+/* Unread messages: a count on the corner button and in the menu, so the inbox is never hidden. */
+.wm-btn{position:relative}.wm-dot{position:absolute;top:-6px;left:22px;min-width:18px;height:18px;padding:0 5px;background:#b8432a;color:#fff;font-size:11px;line-height:18px;text-align:center}.wm-count{margin-left:auto;min-width:20px;padding:0 6px;background:#b8432a;color:#fff;font-size:12px;line-height:20px;text-align:center}
+/* An open account menu sits above the demo strip and sticky bars under the header. */
+header:has(.wm-pop:not([hidden])){position:relative;z-index:80}

@@ -1,10 +1,12 @@
 /** Public visit of a demo workspace: anyone can look around as the invented manager or a team, but nothing is saved. */
 import {fail,json,readJson,rateLimit} from './http.mjs';
 import {createSession} from './auth.mjs';
+import {stageOf} from './stages.mjs';
 
 const VISIT_HOURS=4;
-// Whose eyes a visitor borrows: the manager sees the admin pages, AgroBit has open tasks and asked for help.
-const ENTRIES={manager:'demo-user-manager',team:'demo-user-agrobit-1'};
+// Whose eyes a visitor borrows: the manager sees the admin pages, AgroBit has open tasks and asked for help, the invented
+// investor sees the investor dashboard (the invented projects only, server/investors.mjs).
+const ENTRIES={manager:'demo-user-manager',team:'demo-user-agrobit-1',investor:'demo-user-investor-adria'};
 
 export const isDemo=db=>Boolean(db.query("SELECT 1 FROM settings WHERE key='demo_filled'").get());
 // Every account the demo filler made has an id that starts like this; real accounts never do.
@@ -35,5 +37,5 @@ export function roster(ctx){
  if(!isDemo(ctx.db))fail(404,'NOT_FOUND');
  const projects=ctx.db.query("SELECT id,team_id,published FROM projects WHERE status='published' ORDER BY id").all();
  const members=ctx.db.query('SELECT tp.team_id,p.id,p.display_name FROM team_people tp JOIN people p ON p.id=tp.person_id ORDER BY p.id').all();
- return json({items:projects.map(p=>{const c=JSON.parse(p.published);return {id:p.id,teamId:p.team_id,name:c.name,short:c.short||'',stage:c.stage||'idea',members:members.filter(m=>m.team_id===p.team_id).map(m=>({id:m.id,name:m.display_name}))};})});
+ return json({items:projects.map(p=>{const c=JSON.parse(p.published);return {id:p.id,teamId:p.team_id,name:c.name,short:c.short||'',stage:stageOf(c.stage),members:members.filter(m=>m.team_id===p.team_id).map(m=>({id:m.id,name:m.display_name}))};})});
 }

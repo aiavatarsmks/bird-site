@@ -55,6 +55,8 @@ const inviteLink=code=>siteLink('#/account/register?invite='+encodeURIComponent(
 // A fresh invitation: the sign-up link to send (with a Copy button) and the bare code for someone who already has an account.
 const inviteBox=code=>code?`<div class="acc-flash acc-invite" role="status"><p>${tr('inviteLinkShow')}</p><span class="acc-copy"><input class="acc-copy-input" readonly value="${esc(inviteLink(code))}" aria-label="${esc(tr('inviteLinkLabel'))}"><button type="button" class="acc-secondary" data-act="copy">${tr('copy')}</button></span><small>${tr('inviteCodeToo')} <code class="acc-code">${esc(code)}</code></small></div>`:'';
 // Other parts of the page (header account menu, demo shell) learn about sign-in and sign-out at once.
+// messenger.js polls the unread count; the tabs start from it on their next draw.
+addEventListener('bird:messages',e=>{cache.messages=e.detail?.unread||0;});
 const announce=()=>dispatchEvent(new CustomEvent('bird:auth',{detail:{user:me||null,csrf}}));
 function isRoute(){return ['account','admin'].includes(parts()[0]);}
 const go=h=>{if(location.hash===h)render();else location.hash=h;};
@@ -62,7 +64,7 @@ const go=h=>{if(location.hash===h)render();else location.hash=h;};
 // Layout -------------------------------------------------------------------------
 function shell(active,body){
  const tabs=active==='admin'?[['#/account','← '+tr('nav'),'account'],['#/admin',tr('admin'),'admin']]:[['#/account',tr('overview'),'overview'],['#/account/tasks',tr('tasks'),'tasks'],['#/account/messages',tr('dmTab'),'messages'],['#/account/mentors',tr('mentors'),'mentors'],['#/account/progress',tr('progress'),'progress'],['#/account/character',tr('character'),'character'],['#/account/settings',tr('settings'),'settings'],...(isAdmin()?[['#/admin',tr('admin'),'admin']]:[])];
- return `<div class="acc ${active==='admin'?'acc-admin':'acc-m'} ${cache.intro?'is-intro':''}"><div class="acc-head"><div><span class="eyebrow">${esc(tr('urole_'+me.role))}</span><h1>${esc(me.displayName)}</h1></div><a class="acc-office" href="#/office">${tr('office')} ↗</a></div><nav class="acc-tabs" aria-label="${tr('nav')}">${tabs.map(([h,l,k])=>`<a href="${h}" ${k===active?'aria-current="page"':''}>${esc(l)}${k==='overview'&&cache.unread?` <b class="acc-dot">${cache.unread}</b>`:''}${k==='messages'&&cache.messages?` <b class="acc-dot">${cache.messages}</b>`:''}</a>`).join('')}</nav>${flashHtml()}<div class="acc-body">${body}</div></div>`;
+ return `<div class="acc ${active==='admin'?'acc-admin':'acc-m'} ${cache.intro?'is-intro':''}"><div class="acc-head"><div><span class="eyebrow">${esc(tr('urole_'+me.role))}</span><h1>${esc(me.displayName)}</h1></div><a class="acc-office" href="#/office">${tr('office')} ↗</a></div><nav class="acc-tabs" aria-label="${tr('nav')}">${tabs.map(([h,l,k])=>`<a href="${h}" ${k===active?'aria-current="page"':''}>${esc(l)}${k==='overview'&&cache.unread?` <b class="acc-dot">${cache.unread}</b>`:''}${k==='messages'||k==='admin'?` <b class="acc-dot" data-msgr-count title="${esc(pgPlural('msgUnread',cache.messages).replace('{n}',cache.messages))}" ${cache.messages?'':'hidden'}>${cache.messages}</b>`:''}</a>`).join('')}</nav>${flashHtml()}<div class="acc-body">${body}</div></div>`;
 }
 function flashHtml(){if(!flash)return '';const f=flash;flash=null;return `<p class="acc-flash ${f.error?'is-error':''}" role="${f.error?'alert':'status'}">${f.html}</p>`;}
 // The native date picker stays, but its empty mask follows the site language, not the phone's.
@@ -77,8 +79,22 @@ function authView(mode){
  const tabs=`<div class="acc-switch">${[['login',tr('signIn')],['register',tr('createAccount')],['recover',tr('recover')]].map(([m,l])=>`<a href="#/account/${m==='login'?'login':m}${hashParam('invite')?'?invite='+encodeURIComponent(hashParam('invite')):''}" ${m===mode?'aria-current="page"':''}>${esc(l)}</a>`).join('')}</div>`;
  const form=mode==='register'?`<form data-form="register">${field('login',tr('login'),{required:true,hint:tr('loginHint'),attrs:'autocomplete="username" maxlength="60" autocapitalize="none"'})}${field('password',tr('password'),{type:'password',required:true,hint:tr('passwordHint'),attrs:'autocomplete="new-password" minlength="10" maxlength="200"'})}${field('displayName',tr('displayName'),{required:true,attrs:'maxlength="80"'})}${field('email',tr('email'),{type:'email',hint:tr('emailNote'),attrs:'autocomplete="email" maxlength="200"'})}${field('invite',tr('inviteCodeOptional'),{value:hashParam('invite'),attrs:'maxlength="100" autocomplete="off"'})}<button class="acc-primary">${tr('createAccount')}</button></form>`
  :mode==='recover'?`<form data-form="recover"><p class="acc-muted">${tr('noEmail')}</p>${field('login',tr('login'),{required:true,attrs:'autocomplete="username" autocapitalize="none"'})}${field('code',tr('recoveryCode'),{required:true,attrs:'autocomplete="off"'})}${field('newPassword',tr('newPassword'),{type:'password',required:true,hint:tr('passwordHint'),attrs:'autocomplete="new-password" minlength="10"'})}<button class="acc-primary">${tr('recover')}</button></form>`
- :`<form data-form="login">${field('login',tr('login'),{required:true,attrs:'autocomplete="username" autocapitalize="none"'})}${field('password',tr('password'),{type:'password',required:true,attrs:'autocomplete="current-password"'})}<button class="acc-primary">${tr('signIn')}</button></form>`;
+ :`<form data-form="login">${field('login',tr('login'),{required:true,attrs:'autocomplete="username" autocapitalize="none"'})}${field('password',tr('password'),{type:'password',required:true,attrs:'autocomplete="current-password"'})}<button class="acc-primary">${tr('signIn')}</button></form><p class="acc-forgot"><a href="#/account/forgot">${tr('forgotPassword')}</a></p>`;
  return `<div class="acc acc-auth"><h1>${tr(mode==='register'?'createAccount':mode==='recover'?'recover':'signIn')}</h1>${tabs}${flashHtml()}${form}</div>`;
+}
+// Forgot password: the server answers the same for any name; `mail` says only whether letters can go out at all.
+function forgotView(){
+ const sent=cache.forgotSent;cache.forgotSent=null;
+ const body=sent?`<p class="acc-flash" role="status">${sent.mail?tr('forgotSent'):`${tr('forgotNoMail')} <a href="#/account/recover">${tr('recover')}</a>.`}</p><p><a href="#/account/login">← ${tr('backToSignIn')}</a></p>`
+ :`<form data-form="forgot"><p class="acc-muted">${tr('forgotNote')}</p>${field('login',tr('loginOrEmail'),{required:true,attrs:'autocomplete="username" autocapitalize="none" maxlength="200"'})}<button class="acc-primary">${tr('forgotSend')}</button></form><p class="acc-forgot"><a href="#/account/login">← ${tr('backToSignIn')}</a></p>`;
+ return `<div class="acc acc-auth"><h1>${tr('forgotTitle')}</h1>${flashHtml()}${body}</div>`;
+}
+// The link from the letter. It works signed in or out: the account it belongs to is the one that gets signed in.
+function resetView(){
+ const bad=cache.resetBad||!hashParam('token');cache.resetBad=false;
+ const body=bad?`<p class="acc-flash is-error" role="alert">${tr('e_RESET_INVALID')}</p><p><a class="acc-primary" href="#/account/forgot">${tr('resetAgain')}</a></p>`
+ :`<form data-form="reset">${field('newPassword',tr('newPassword'),{type:'password',required:true,hint:tr('passwordHint'),attrs:'autocomplete="new-password" minlength="10" maxlength="200"'})}${field('newPassword2',tr('repeatPassword'),{type:'password',required:true,attrs:'autocomplete="new-password" minlength="10" maxlength="200"'})}<button class="acc-primary">${tr('savePassword')}</button></form>`;
+ return `<div class="acc acc-auth"><h1>${tr('resetTitle')}</h1>${flashHtml()}${body}</div>`;
 }
 function codesView(codes,next){return `<div class="acc acc-auth"><h1>${tr('codesTitle')}</h1><p>${tr('codesText')}</p><ol class="acc-codes">${codes.map(c=>`<li><code>${esc(c)}</code></li>`).join('')}</ol><button class="acc-primary" data-act="codes-done" data-next="${esc(next)}">${tr('codesDone')}</button></div>`;}
 
@@ -113,11 +129,12 @@ function badgeGrid(p,small=false){
 }
 function questCard(t){
  const k=t.task,st=t.status,open=['not_started','draft','changes_requested'].includes(st),prog=open&&t.progress?.total?t.progress:null;
- const cta=st==='changes_requested'?tr('mFix'):st==='draft'||prog?.done?tr('mContinue'):st==='not_started'?tr('mStart'):tr('open');
+ const asking=!t.response&&st==='not_started';
+ const cta=asking?tr('st_awaiting'):st==='changes_requested'?tr('mFix'):st==='draft'||prog?.done?tr('mContinue'):st==='not_started'?tr('mStart'):tr('open');
  return `<li class="m-quest m-rise is-${esc(st)}"><a href="#/account/task/${esc(t.id)}">
   <span class="m-quest-icon" aria-hidden="true">${I(TYPE_ICON[k.type]||'star')}</span>
   <span class="m-quest-body"><strong>${authored(k.translations,'title')}</strong>
-   <span class="m-quest-meta"><span class="m-tag">${k.scope==='team'?I('team')+' '+esc(t.projectName||tr('team')):I('person')+' '+esc(tr('personal'))}</span>${t.period?`<span class="m-tag">${tr('week')} ${esc(t.period.split('-W')[1])}</span>`:''}${open&&k.dueAt?countdown(k.dueAt):''}${open?'':statusChip(st)}</span>
+   <span class="m-quest-meta">${asking?`<span class="m-tag is-new">${esc(tr('mNew'))}</span>`:''}<span class="m-tag">${k.scope==='team'?I('team')+' '+esc(t.projectName||tr('team')):I('person')+' '+esc(tr('personal'))}</span>${t.period?`<span class="m-tag">${tr('week')} ${esc(t.period.split('-W')[1])}</span>`:''}${open&&k.dueAt?countdown(k.dueAt):''}${open?'':statusChip(st)}</span>
    ${prog?`<span class="m-quest-prog">${bar(prog.done/prog.total*100)}<small>${prog.done}/${prog.total}</small></span>`:''}
   </span>
   <span class="m-pts" title="${k.xp} ${esc(pgPlural('xp',k.xp))}">+${k.xp}</span>
@@ -138,15 +155,19 @@ async function overviewView(){
  const missing=checks.filter(c=>c&&!c.r.items.some(i=>i.week===c.r.week));
  const unreadNews=news.items.filter(n=>!n.read);
  const character=await api('GET','/api/me/character');
+ const first=teamProjects.length?await api('GET','/api/me/first-steps').catch(()=>null):null;
  const open=tasks.items.filter(t=>['not_started','draft','changes_requested'].includes(t.status)&&t.task.status==='published');
- const claimBlock=character.person?.confirmed?'':await claimForm(claims.items);
- const lv=level(prog.xp),mine=new Set(prog.teams.map(t=>t.projectId)),place=rank.items.findIndex(t=>mine.has(t.projectId)),team=rank.items[place];
+ // "Are you a participant?" only for someone not linked to a card and not on a team yet.
+ const claimBlock=character.person?.confirmed||me.personId||teamProjects.length?'':await claimForm(claims.items);
+ // Team members see the team's points first (the same number as everywhere else); their own points come second.
+ const myTeam=prog.teams[0],big=myTeam?myTeam.xp:prog.xp;
+ const lv=level(big),mine=new Set(prog.teams.map(t=>t.projectId)),place=rank.items.findIndex(t=>mine.has(t.projectId)),team=rank.items[place];
  const streak=Math.max(0,...checks.filter(Boolean).map(c=>c.r.streak||0),team?.streak||0);
  const stage=window.BirdCharacter&&me.personId?BirdCharacter.html([{id:me.personId,name:''}],{size:'lg'}):`<span class="m-ava is-big">${esc(initialsOf(me.displayName))}</span>`;
  const hero=`<section class="m-hero m-rise">
   <a class="m-hero-stage" href="#/account/character" aria-label="${esc(tr('character'))}">${stage}<span class="m-lv-tag">${tr('mLevel')} ${lv.n}</span></a>
   <div class="m-hero-main">
-   <div class="m-xp"><div class="m-xp-top"><span>${mNum(prog.xp,'is-xp')} <small>${esc(pgPlural('xp',prog.xp))}</small></span><small>${esc(tr('mToNext').replace('{n}',lv.b-prog.xp).replace('{l}',lv.n+1))}</small></div>${bar(lv.pct,'is-xp',tr('mLevel')+' '+(lv.n+1))}</div>
+   <div class="m-xp"><div class="m-xp-top"><span>${mNum(big,'is-xp')} <small>${esc(pgPlural('xp',big))}${myTeam?' · '+esc(tr('teamPointsOf').replace('{team}',myTeam.name)):''}</small></span><small>${esc(tr('mToNext').replace('{n}',lv.b-big).replace('{l}',lv.n+1))}</small></div>${bar(lv.pct,'is-xp',tr('mLevel')+' '+(lv.n+1))}${myTeam?`<small class="m-own">${esc(tr('myOwnPoints').replace('{n}',prog.xp))}</small>`:''}</div>
    <ul class="m-stats">
     <li class="m-stat is-streak"><span class="m-stat-icon" aria-hidden="true">${I('flame')}</span>${mNum(streak)}<small>${esc(pgPlural('mStreakWeeks',streak))}</small></li>
     ${team?.place?`<li class="m-stat is-rank"><span class="m-stat-icon" aria-hidden="true">${I('trophy')}</span><b class="m-num">#${team.place}</b><small>${esc(team.name)} · ${esc(pgPlural('mRankOf',rank.items.length).replace('{n}',rank.items.length))}</small></li>`:''}
@@ -159,12 +180,20 @@ async function overviewView(){
  const helpBlock=help.items.length?`<section class="acc-card m-alert is-ok m-rise"><h2><span aria-hidden="true">${I('help')}</span> ${tr('helpRequests')}</h2><ul class="acc-list">${help.items.map(h=>`<li><div><strong>${esc(h.helperName)}</strong><small>${esc(h.note)}</small></div><span class="acc-actions"><button data-act="help" data-id="${esc(h.id)}" data-decision="confirmed" class="acc-secondary">${tr('confirmHelp')}</button><button data-act="help" data-id="${esc(h.id)}" data-decision="declined">${tr('decline')}</button></span></li>`).join('')}</ul></section>`:'';
  const questBlock=quests.items.map(q=>`<section class="acc-card acc-quest m-rise"><div class="m-quest-head"><span class="m-quest-icon" aria-hidden="true">${I('target')}</span><div><small class="m-label">${tr('quest')}</small><h2>${esc(pick(q.title))}</h2></div><b class="m-frac">${q.done}<small>/${q.target}</small></b></div>${bar(q.done/q.target*100,'is-quest')}<small class="acc-muted">${q.complete?tr('questDone'):tr('questNote')}</small></section>`).join('');
  const nextQuests=`<section class="acc-card m-rise"><div class="acc-card-head"><h2>${tr('mNextQuests')}</h2><a href="#/account/tasks">${tr('mAllTasks')} (${open.length}) →</a></div>${open.length?`<ul class="m-quests is-compact">${open.slice(0,4).map(questCard).join('')}</ul>`:empty()}</section>`;
- const projectsBlock=`<section class="acc-card m-rise"><div class="acc-card-head"><h2>${tr('myProjects')}</h2><a class="m-add" href="#/account/new-project" aria-label="${esc(tr('newProject'))}" title="${esc(tr('newProject'))}">+</a></div>${projects.items.length?`<ul class="m-projects">${projects.items.map(p=>`<li><a href="#/account/project/${esc(p.id)}"><span class="m-ava">${esc(initialsOf(p.name))}</span><span><strong>${esc(p.name)}</strong><small>${esc(tr('role_'+p.role))}</small></span>${statusChip(p.status)}</a></li>`).join('')}</ul>`:empty()}</section>`;
+ const projectsBlock=`<section class="acc-card m-rise"><div class="acc-card-head"><h2>${tr('myProjects')}</h2><a class="m-add" href="#/account/new-project" aria-label="${esc(tr('newProject'))}" title="${esc(tr('newProject'))}">+</a></div>${projects.items.length?`<ul class="m-projects">${projects.items.map(p=>`<li><a href="#/account/project/${esc(p.id)}"><span class="m-ava">${esc(initialsOf(p.name))}</span><span><strong>${esc(p.name)}</strong><small>${esc(tr('role_'+p.role))}</small></span>${p.status==='archived'?statusChip(p.status):''}</a></li>`).join('')}</ul>`:empty()}</section>`;
  const newsBlock=news.items.length?`<section class="acc-card acc-news m-rise ${unreadNews.length?'is-unread':''}"><div class="acc-card-head"><h2><span aria-hidden="true">${I('megaphone')}</span> ${tr('announcements')}</h2>${unreadNews.length?`<button class="m-mini" data-act="news-read">${tr('markRead')}</button>`:''}</div><ul class="acc-list">${news.items.slice(0,3).map(n=>`<li><div><strong>${n.pinned?I('pin')+' ':''}${esc(n.title)}</strong><p class="acc-pre">${esc(n.body)}</p><small>${esc(n.author)} · ${date(n.created,true)}</small></div></li>`).join('')}</ul></section>`:'';
  const icon=k=>I({nudge:'chat',reminder:'bell',badge:'medal'}[k]||(k.startsWith('submission')||k.startsWith('review')?'check':''))||'•';
  const notesBlock=`<section class="acc-card m-rise"><div class="acc-card-head"><h2>${tr('notifications')}${notes.unread?` <b class="acc-dot">${notes.unread}</b>`:''}</h2>${notes.unread?`<button class="m-mini" data-act="read">${tr('markRead')}</button>`:''}</div>${notes.items.length?`<ul class="m-feed">${notes.items.map(n=>`<li class="${n.read?'':'is-unread'}"><span class="m-feed-icon" aria-hidden="true">${icon(n.kind)}</span><span>${n.kind==='nudge'?`<strong>${esc(n.payload.from)}:</strong> ${esc(n.payload.message)}`:n.kind==='reminder'?(n.payload.link?`<a href="${esc(n.payload.link)}">${esc(pick(n.payload.text))}</a>`:esc(pick(n.payload.text))):noteText(n)}</span><small>${date(n.created,true)}</small></li>`).join('')}</ul>`:empty()}</section>`;
+ // First steps: four things a new team member does, each ticked from real data; hidden once all are done and closed.
+ let hidden=false;try{hidden=localStorage.getItem('bird-first-steps:'+me.id)==='hidden';}catch{}
+ const steps=first?.steps||[],doneN=steps.filter(x=>x.done).length,pid=esc(first?.projectId||'');
+ const stepHref={card:`#/account/project/${pid}/edit`,deck:`#/account/project/${pid}/files`,invite:`#/account/project/${pid}/team`,task:'#/account/tasks'};
+ const firstSteps=steps.length&&!(hidden&&doneN===steps.length)?`<section class="acc-card m-first m-rise"><div class="acc-card-head"><h2>${I('flag')} ${tr('fsTitle')}</h2><b class="m-frac">${esc(tr('fsCount').replace('{n}',doneN))}</b></div>${bar(doneN/steps.length*100,'is-ok')}<ol class="m-steps-list">${steps.map(x=>`<li class="${x.done?'is-done':''}"><a href="${stepHref[x.key]}"><span class="m-step-box" aria-hidden="true">${x.done?I('check'):''}</span><span>${esc(tr('fs_'+x.key))}</span><span class="m-sr">${tr(x.done?'mEarned':'mLocked')}</span></a></li>`).join('')}</ol>${doneN===steps.length?`<div class="m-row"><p class="acc-muted">${tr('fsDone')}</p><button class="m-mini" data-act="fs-hide">${tr('fsHide')}</button></div>`:''}</section>`:'';
+ // Recovery codes from sign-up: a calm notice on the overview, not a wall before it.
+ const codes=cache.codesNotice?`<section class="acc-card m-codes m-rise" role="status"><h2>${I('lock')} ${tr('codesTitle')}</h2><p class="acc-muted">${tr('codesCalm')}</p><ol class="acc-codes">${cache.codesNotice.map(c=>`<li><code>${esc(c)}</code></li>`).join('')}</ol><button class="acc-secondary" data-act="codes-ok">${tr('codesDone')}</button></section>`:'';
+ const write=teamProjects.length?`<div class="m-write">${writeBtn()}</div>`:'';
  const invite=`<details class="m-more acc-card m-rise" ${hashParam('invite')?'open':''}><summary>${I('ticket')} ${tr('acceptInvite')}</summary><form data-form="invite" class="acc-inline">${field('code',tr('inviteCode'),{required:true,value:hashParam('invite'),attrs:'autocomplete="off" maxlength="100"'})}<button class="acc-secondary">${tr('acceptInvite')}</button></form></details>`;
- return shell('overview',`${hero}${reminders}<div class="m-cols"><div class="m-col">${feedback}${helpBlock}${nextQuests}${questBlock}${newsBlock}</div><div class="m-col">${pointsCard(wallets,rewards)}${projectsBlock}${notesBlock}${invite}${claimBlock}</div></div>`);
+ return shell('overview',`${codes}${firstSteps}${hero}${write}${reminders}<div class="m-cols"><div class="m-col">${feedback}${helpBlock}${nextQuests}${questBlock}${newsBlock}</div><div class="m-col">${pointsCard(wallets,rewards)}${projectsBlock}${notesBlock}${invite}${claimBlock}</div></div>`);
 }
 // Team points with the way to a mentor meeting, and a window that says what points buy.
 // It opens by itself once, and again the first time a team can afford a meeting.
@@ -174,23 +203,25 @@ function pointsCard(wallets,rewards){
  const rows=wallets.items.map(w=>{const n=price?Math.floor(Math.max(0,w.balance)/price):0;return `<li><div class="m-coin-top"><strong>${esc(w.name)}</strong><span class="m-coin">${mNum(w.balance)}<small>${esc(pgPlural('xp',w.balance))}</small></span></div>${bar(price?w.balance/price*100:100,w.balance>=price?'is-ok':'',tr('pointsMeeting'))}<small>${w.balance>=price?`<span class="m-tickets" aria-hidden="true">${I('ticket').repeat(Math.min(n,5))}</span> ${esc(tr('mMeetings').replace('{n}',n))}`:esc(tr('pointsToMeeting').replace('{n}',price-Math.max(0,w.balance)))}</small></li>`;}).join('');
  const can=wallets.items.filter(w=>w.balance>=price).map(w=>w.projectId);
  let seen={};try{seen=JSON.parse(localStorage.getItem('bird-points:'+me.id)||'{}')||{};}catch{}
- // Demo visitors land here on every role switch: no window over the first screen, the "?" opens it.
- const auto=!String(me.id||'').startsWith('demo-user-')&&(!seen.intro||can.some(id=>!(seen.can||[]).includes(id)));
+ // Never by itself over the first screen: the "?" on the wallet opens it.
+ const auto=false;
  const offers=[`<li><div><strong>${I('calendar')} ${tr('pointsMeeting')}</strong><small>${tr('pointsMeetingNote')}</small></div><b>${pts(price)}</b></li>`,...rewards.items.slice(0,4).map(r=>`<li><div><strong>${I('gift')} ${esc(r.title)}</strong>${r.description?`<small>${esc(r.description)}</small>`:''}</div><b>${pts(r.price)}</b></li>`)].join('');
  return `<section class="acc-card acc-points m-wallet m-rise"><div class="acc-card-head"><h2><span aria-hidden="true">${I('coin')}</span> ${tr('walletTitle')}</h2><button class="m-mini" data-act="points-help" aria-label="${esc(tr('pointsWhat'))}" title="${esc(tr('pointsWhat'))}">?</button></div><ul class="m-coins">${rows}</ul><a class="acc-primary m-wide" href="#/account/mentors">${tr('pointsBook')} →</a></section>
  <dialog class="acc-dialog" id="acc-points" aria-labelledby="acc-points-title" ${auto?`data-auto="${esc(JSON.stringify({intro:true,can:[...new Set([...(seen.can||[]),...can])]}))}"`:''}><h2 id="acc-points-title">${tr('pointsDialogTitle')}</h2><ul class="acc-list">${wallets.items.map(w=>`<li><span>${esc(w.name)}</span><b>${pts(w.balance)}</b></li>`).join('')}</ul><h3>${tr('pointsSpendOn')}</h3><ul class="acc-list acc-offers">${offers}</ul><p class="acc-muted">${tr('pointsEarn')}</p><div class="acc-actions"><a class="acc-primary" href="#/account/mentors" data-act="points-close">${tr('pointsBook')}</a><a class="acc-secondary" href="#/account/tasks" data-act="points-close">${tr('pointsTasks')}</a><button data-act="points-close">${tr('gotIt')}</button></div></dialog>`;
 }
 // Fills the new-task form from a pasted email; the organiser checks it and saves.
 function fillFromLetter(){
- const form=root.querySelector('form[data-form=task]'),out=root.querySelector('#letter-result');
+ const form=root.querySelector('form[data-form=task],form[data-form=task-compose]'),out=root.querySelector('#letter-result');
  const r=window.BirdLetter?.parse(root.querySelector('#letter-text').value);
  if(!form||!r||!r.instructions){out.textContent=tr('letterEmpty');return;}
  const set=(name,value)=>{const el=form.elements[name];if(el&&value)el.value=value;};
  set('title_'+r.language,r.title);set('instructions_'+r.language,r.instructions);
+ // The one-screen form has one title and one text, in the language the letter is in.
+ if(form.dataset.form==='task-compose'){set('title',r.title);set('instructions',r.instructions);form.dataset.lang=r.language;}
  if(r.dueLocal)set('dueAt',r.dueLocal);
  form.querySelectorAll('.acc-lang-block').forEach(d=>{if(d.querySelector(`[name=title_${r.language}]`))d.open=true;});
  out.textContent=`${tr('letterDone')} ${r.language.toUpperCase()} · ${r.dueAt?tr('due')+' '+date(r.dueAt.toISOString(),true):tr('letterNoDue')}`;
- form.elements['title_'+r.language]?.focus();
+ (form.elements['title_'+r.language]||form.elements.title)?.focus();
 }
 async function claimForm(claims){
  const people=(await api('GET','/api/people?limit=100')).items.filter(p=>p.kind==='participant');
@@ -202,8 +233,10 @@ const lectureFields=(x={})=>`<div class="acc-inline">${field('date',tr('lectureD
 async function tasksView(){
  const [tasks,cat]=await Promise.all([api('GET','/api/tasks'),api('GET','/api/catalog')]);
  const by=g=>tasks.items.filter(t=>g.includes(t.status));
- const cols=[['changes_requested',by(['changes_requested']),'is-risk'],['not_started',by(['not_started','draft']),'is-todo'],['submitted',by(['submitted']),'is-watch'],['accepted',by(['accepted','rejected']),'is-ok']];
- const total=tasks.items.length||1,loot=[...cols[0][1],...cols[1][1]].reduce((s,t)=>s+t.task.xp,0),won=by(['accepted']).reduce((s,t)=>s+t.task.xp,0);
+ // Tasks the organiser just gave wait for an answer (accept or decline) before anything else.
+ const asking=tasks.items.filter(t=>!t.response&&t.status==='not_started'),rest=g=>by(g).filter(t=>!asking.includes(t));
+ const cols=[['awaiting',asking,'is-ask'],['changes_requested',by(['changes_requested']),'is-risk'],['not_started',rest(['not_started','draft']),'is-todo'],['submitted',by(['submitted']),'is-watch'],['accepted',by(['accepted','rejected']),'is-ok']];
+ const total=tasks.items.length||1,loot=[...cols[0][1],...cols[1][1],...cols[2][1]].reduce((s,t)=>s+t.task.xp,0),won=by(['accepted']).reduce((s,t)=>s+t.task.xp,0);
  const head=tasks.items.length?`<section class="m-board-head m-rise"><div class="m-loot"><span>${mNum(loot)}<small>${esc(tr('mUpForGrabs'))}</small></span><span class="is-won">${mNum(won)}<small>${esc(tr('mWon'))}</small></span></div><div class="m-seg" aria-hidden="true">${cols.map(([k,items,c])=>items.length?`<i class="${c}" style="--w:${items.length/total*100}%"></i>`:'').join('')}</div><ul class="m-legend">${cols.filter(c=>c[1].length).map(([k,items,c])=>`<li class="${c}"><i aria-hidden="true"></i>${esc(tr('st_'+k))} <b>${items.length}</b></li>`).join('')}</ul></section>`:'';
  const catalog=cat.items.length?`<section class="m-pickboard m-rise"><div class="acc-card-head"><h2><span aria-hidden="true">${I('dice')}</span> ${tr('catalog')}</h2><small class="acc-muted">${tr('catalogNote')}</small></div><ul class="m-picks">${cat.items.map(t=>{const free=t.scope==='team'?t.projects.filter(p=>!t.taken.some(x=>x.projectId===p.id)):(t.taken.length?[]:[null]);return `<li class="m-pick m-rise ${t.taken.length&&!free.length?'is-taken':''}"><div class="m-pick-top"><span class="m-quest-icon" aria-hidden="true">${I(TYPE_ICON[t.type]||'star')}</span><span class="m-pts">+${t.xp}</span></div><strong>${authored(t.translations,'title')}</strong><small class="m-clamp">${authored(t.translations,'goal')}</small><span class="m-tag">${t.scope==='team'?I('team')+' '+esc(tr('team')):I('person')+' '+esc(tr('personal'))}</span><span class="m-pick-act">${t.taken.map(x=>`<a class="acc-chip is-accepted" href="#/account/task/${esc(x.assignmentId)}">✓ ${tr('taken')}</a>`).join('')}${free.map(p=>`<button class="acc-secondary" data-act="take" data-id="${esc(t.id)}" data-project="${esc(p?.id||'')}">${tr('take')}${p?' · '+esc(p.name):''}</button>`).join('')}</span></li>`;}).join('')}</ul></section>`:'';
  const lanes=cols.map(([k,items,c])=>items.length?`<section class="m-lane ${c}"><h2><i aria-hidden="true"></i>${esc(tr('st_'+k))} <span class="m-count">${items.length}</span></h2><ul class="m-quests">${items.map(questCard).join('')}</ul></section>`:'').join('');
@@ -230,13 +263,26 @@ async function taskView(id){
   const current=content.fileId&&!files.some(f=>f.id===content.fileId)?[[content.fileId,tr('attachedFile')]]:[];
   uploadProject=pid;
   input=`<div class="m-proof"><label class="acc-field m-upload"><span>${tr('proofUpload')}</span><input type="file" name="upload" accept="${PROOF_ACCEPT}"></label><p class="acc-small">${tr('proofTypes')}</p>${files.length||current.length?select('fileId',tr('chooseFile'),[['',tr('proofNoneYet')],...current,...files.map(f=>[f.id,f.filename])],content.fileId):''}${field('url',tr('proofVideo'),{type:'url',value:content.url,attrs:'maxlength="500" placeholder="https://"'})}</div>`+field('note',tr('note'),{type:'textarea',value:content.note,attrs:'rows="2"'});}
+ if(t.proof?.length){
+  const k=new Set(t.proof);let fileBox='';
+  if(k.has('file')){const pid=a.projectId||(await api('GET','/api/projects?mine=1').catch(()=>({items:[]}))).items.find(p=>['owner','editor','member'].includes(p.role)&&p.status!=='archived')?.id||'';
+   const files=pid?(await api('GET',`/api/projects/${encodeURIComponent(pid)}/files`).catch(()=>({items:[]}))).items.filter(f=>f.purpose!=='reference'):[];
+   const current=content.fileId&&!files.some(f=>f.id===content.fileId)?[[content.fileId,tr('attachedFile')]]:[];uploadProject=pid;
+   fileBox=`<label class="acc-field m-upload"><span>${tr('proofUpload')}</span><input type="file" name="upload" accept="${PROOF_ACCEPT}"></label><p class="acc-small">${tr('proofTypes')}</p>${files.length||current.length?select('fileId',tr('chooseFile'),[['',tr('proofNoneYet')],...current,...files.map(f=>[f.id,f.filename])],content.fileId):''}`;}
+  const checks=t.type==='checklist'?input.split('<label class="acc-field">')[0]:'';
+  input=`${checks}<div class="m-proof">${t.proof.length>1?`<p class="acc-small">${tr('proofAnyOne')}</p>`:''}${fileBox}${k.has('link')?field('url',tr('link'),{type:'url',value:content.url,attrs:'maxlength="500" placeholder="https://"'}):''}${k.has('text')?field('text',tr('answer'),{type:'textarea',value:content.text,attrs:'rows="6" maxlength="5000"'}):''}</div>${k.has('text')?'':field('note',tr('note'),{type:'textarea',value:content.note,attrs:'rows="2"'})}`;
+ }
  else if(t.type==='attendance'){const lectures=(await api('GET','/api/lectures'));input=`<fieldset class="acc-field"><legend>${tr('chooseLectures')}</legend>${lectures.items.filter(l=>l.date<=lectures.today).map(l=>`<label class="acc-check m-tick"><input type="checkbox" name="lectureIds" value="${esc(l.id)}" ${l.attendance?'checked disabled':''}> <span>${esc(pick(l.title))} <small>${date(l.date)}${l.attendance?' · '+tr(l.attendance.kind==='verified_by_admin'?'verified':'selfReported'):''}</small></span></label>`).join('')}</fieldset><p class="acc-small">${tr('selfReport')}</p>`;}
+ // A task the organiser gave the team asks for an answer first; the work form opens once they accept.
+ const ask=a.response||t.status!=='published'?'':`<section class="m-ask" role="group" aria-label="${esc(tr('taskAccept')+' / '+tr('taskDecline'))}"><p>${tr(a.projectId?'taskAsk':'taskAskPersonal')}</p><div class="acc-actions"><button type="button" class="acc-primary" data-act="accept-task" data-id="${esc(a.id)}">${I('check')} ${tr('taskAccept')}</button><details class="m-decline"><summary class="acc-secondary">${tr('taskDecline')}</summary><form data-form="decline" data-id="${esc(a.id)}">${field('reason',tr('taskDeclineReason'),{type:'textarea',attrs:'rows="2" maxlength="300"'})}<p class="acc-small">${tr('taskDeclineNote')}</p><button class="acc-secondary">${tr('taskDeclineSend')}</button></form></details></div></section>`;
  const reviews=a.reviews?.length?`<section class="acc-card m-rise"><h2>${tr('reviewsTitle')}</h2><ol class="m-timeline">${a.reviews.map(r=>`<li class="is-${esc(r.decision)}"><div>${statusChip(r.decision)} <small>${esc(r.reviewer)} · ${date(r.created,true)}</small>${r.comment?`<p>${esc(r.comment)}</p>`:''}</div></li>`).join('')}</ol></section>`:'';
  const revs=a.revisions?.length?`<details class="acc-card m-more"><summary>${tr('revisions')} (${a.revisions.length})</summary><ul class="acc-list">${a.revisions.map(r=>`<li><div><strong>#${r.revision}</strong> <small>${esc(r.author)} · ${date(r.created,true)}</small><pre class="acc-pre">${esc(r.content.text||r.content.note||'')}</pre></div></li>`).join('')}</ul></details>`:'';
  return shell('tasks',`<a class="acc-back" href="#/account/tasks">← ${tr('tasks')}</a><article class="acc-card acc-task m-task m-rise is-${esc(a.status)}"><header class="m-task-head"><span class="m-quest-icon is-big" aria-hidden="true">${I(TYPE_ICON[t.type]||'star')}</span><div class="m-task-title"><h2>${authored(t.translations,'title')}</h2><div class="m-quest-meta"><span class="m-tag">${t.scope==='team'?I('team')+' '+esc(a.projectName||tr('team')):I('person')+' '+esc(tr('personal'))}</span>${open&&t.dueAt?countdown(t.dueAt):t.dueAt?`<span class="m-tag">${tr('due')} ${date(t.dueAt)}</span>`:''}${t.requiresReview?`<span class="m-tag">${I('eye')} ${tr('requiresReview')}</span>`:''}${statusChip(a.status)}</div></div><span class="m-pts is-big" title="${t.xp} ${esc(pgPlural('xp',t.xp))}">+${t.xp}</span></header>${taskText(t.translations,'goal')?`<p class="m-goal">${authored(t.translations,'goal')}</p>`:''}<div class="m-brief"><h3>${tr('instructions')}</h3><p class="acc-pre">${authored(t.translations,'instructions')}</p></div>${taskText(t.translations,'criteria')?`<div class="m-done-when"><h3>✓ ${tr('criteria')}</h3><p>${authored(t.translations,'criteria')}</p></div>`:''}
  ${a.helpConfirmation?`<p>${statusChip(a.helpConfirmation.status==='confirmed'?'accepted':a.helpConfirmation.status==='declined'?'changes_requested':'pending')}</p>`:''}
- ${t.completionMode==='admin_only'?`<p class="acc-note">${tr('adminOnly')}</p>`:locked||t.key==='project-update'?(t.key==='project-update'?input:''):`<form data-form="answer" class="m-answer" data-id="${esc(a.id)}" data-type="${esc(t.type)}" data-project="${esc(uploadProject)}">${input}<div class="acc-actions"><button class="acc-primary" data-key="${idem()}">${tr(t.requiresReview?'submitReview':'submit')} · +${t.xp}</button><button type="button" data-act="answer-draft" class="acc-secondary">${tr('saveDraft')}</button></div></form>`}</article>${reviews}${revs}`);
+ ${ask}${t.completionMode==='admin_only'?`<p class="acc-note">${tr('adminOnly')}</p>`:ask||locked||t.key==='project-update'?(t.key==='project-update'?input:''):`<form data-form="answer" class="m-answer" data-id="${esc(a.id)}" data-type="${esc(t.proof?.length?'proof':t.type)}" data-project="${esc(uploadProject)}">${input}<div class="acc-actions"><button class="acc-primary" data-key="${idem()}">${tr(t.requiresReview?'submitReview':'submit')} · +${t.xp}</button><button type="button" data-act="answer-draft" class="acc-secondary">${tr('saveDraft')}</button></div></form>`}</article><p class="m-write">${writeBtn()}</p>${reviews}${revs}`);
 }
+// "Write to the programme manager": opens the conversation (or a chooser when there are several managers).
+const writeBtn=()=>isAdmin()?'':`<button type="button" class="acc-secondary m-write-btn" data-act="write-manager">${I('chat')} ${tr('writeManager')}</button>`;
 function answerContent(form,type){
  const f=new FormData(form),c={note:f.get('note')||''};
  if(type==='checklist')c.checked=[...form.querySelectorAll('[name=checked]')].map(x=>x.checked);
@@ -245,6 +291,8 @@ function answerContent(form,type){
  if(type==='link')c.url=f.get('url')||'';
  if(type==='attachment'){c.fileId=f.get('fileId')||'';if(f.get('url'))c.url=f.get('url');}
  if(type==='attendance')c.lectureIds=f.getAll('lectureIds');
+ // A task that names its proof kinds: a file, a link and/or text, plus the checklist when it has one.
+ if(type==='proof'){if(form.querySelector('[name=checked]'))c.checked=[...form.querySelectorAll('[name=checked]')].map(x=>x.checked);if(f.get('fileId'))c.fileId=f.get('fileId');if(f.get('url'))c.url=f.get('url');if(form.elements.text)c.text=f.get('text')||'';}
  return c;
 }
 
@@ -256,48 +304,29 @@ function noteText(n){
  return p.assignmentId?`<a href="#/account/task/${esc(p.assignmentId)}">${esc(text)}</a>`:esc(text);
 }
 // Private messages and group chats: organisers never read them; anyone in a conversation can report one message or block a person.
+// The list and the conversations are messenger.js (BirdMessenger.app); these pages keep what a chat app puts in settings:
+// starting a group chat, and a group's members, name and leaving.
 const who=p=>`${esc(p.name)}${p.organiser?` <span class="acc-chip">${tr('dmOrganiser')}</span>`:''}${p.waiting?` <span class="acc-chip">${tr('dmNotJoined')}</span>`:''}${p.team?`<small>${esc(p.team)}</small>`:''}`;
-const attachment=f=>!f?'':f.mime.startsWith('image/')?`<a class="acc-dm-file" href="/api/files/${esc(f.id)}" download><img src="/api/files/${esc(f.id)}?inline=1" alt="${esc(f.filename)}" loading="lazy"></a>`:`<a class="acc-dm-file" href="/api/files/${esc(f.id)}" download>${I('clip')} ${esc(f.filename)} <small>${size(f.size)}</small></a>`;
-const sendForm=(kind,id)=>`<form data-form="${kind}" data-id="${esc(id)}">${field('body',tr('dmMessage'),{type:'textarea',attrs:'rows="3" maxlength="2000"'})}<label class="acc-dm-attach">${tr('dmAttach')} <input type="file" name="file" accept=".pdf,.pptx,.png,.jpg,.jpeg,.webp"></label><small class="acc-muted">${tr('dmAttachHint')}</small><button class="acc-primary">${tr('dmSend')}</button></form>`;
-const bubble=(m,reportAct,group)=>m.hidden?`<li class="is-hidden"><p>${tr('dmHidden')}</p></li>`:`<li class="${m.mine?'is-mine':''}">${group&&!m.mine?`<b class="acc-dm-from">${esc(m.sender.name)}</b>`:''}${m.body?`<p>${esc(m.body)}</p>`:''}${attachment(m.file)}<small>${date(m.created,true)}${m.mine&&m.read?' · '+tr('dmRead'):''}${!m.mine?(m.reported?' · '+tr('dmReported'):` · <button class="acc-link" data-act="${reportAct}" data-id="${esc(m.id)}" data-confirm="${esc(tr('dmReportConfirm'))}">${tr('dmReport')}</button>`):''}</small></li>`;
-const threadList=(key,t,reportAct,group)=>`${t.hasMore?`<p class="acc-muted">${tr('dmOlder')}</p>`:''}<ol class="acc-dm-thread" data-thread="${esc(key)}" data-pg-count="${t.items.length}" data-last="${esc(t.items.at(-1)?.id||'')}">${t.items.map(m=>bubble(m,reportAct,group)).join('')}</ol>${t.items.length?'':`<p class="acc-muted">${tr('dmFirst')}</p>`}`;
-async function messagesView(otherId,groupId){
- if(otherId==='g')return groupChatView(groupId);
- if(!otherId){
-  const q=cache.dmQuery||'',picked=cache.groupPick||(cache.groupPick=new Map());
-  const [list,found]=await Promise.all([api('GET','/api/messages'),q?api('GET','/api/messages/people?q='+encodeURIComponent(q)):null]);
-  cache.messages=list.unread;
-  const last=c=>`${c.last.mine?tr('dmYou')+': ':c.kind==='group'&&c.last.who?esc(c.last.who)+': ':''}${esc(c.last.body)}`;
-  return shell('messages',`${list.teamsWithoutChat.length?`<section class="acc-card"><h2>${tr('teamChat')}</h2><p class="acc-muted">${tr('teamChatNote')}</p><div class="acc-actions">${list.teamsWithoutChat.map(t=>`<button class="acc-secondary" data-act="team-chat" data-id="${esc(t.id)}">${I('team')} ${esc(t.name)}</button>`).join('')}</div></section>`:''}
-  <section class="acc-card"><h2>${tr('dmNew')}</h2><p class="acc-muted">${tr('dmPrivacy')}</p><form data-form="dm-find" class="acc-inline">${field('q',tr('dmFind'),{value:q,attrs:'maxlength="60" autocomplete="off"'})}<button class="acc-secondary">${tr('dmSearch')}</button></form>${found?(found.items.length?`<ul class="acc-list acc-dm-people">${found.items.map(p=>`<li><a href="#/account/messages/${esc(p.id)}"><span>${who(p)}</span></a>${p.waiting?'':`<button class="acc-link" data-act="group-pick" data-id="${esc(p.id)}" data-name="${esc(p.name)}" ${picked.has(p.id)?'disabled':''}>${tr(picked.has(p.id)?'groupPicked':'groupAdd')}</button>`}</li>`).join('')}</ul>`:empty()):''}
-  ${picked.size?`<form data-form="group-new" class="acc-dm-new-group"><h3>${tr('groupNew')}</h3><p class="acc-actions">${[...picked].map(([id,name])=>`<button type="button" class="acc-chip" data-act="group-unpick" data-id="${esc(id)}" aria-label="${esc(tr('remove')+' '+name)}">${esc(name)} ×</button>`).join('')}</p>${field('title',tr('groupTitle'),{required:true,attrs:'maxlength="80"'})}<button class="acc-primary">${tr('groupCreate')}</button></form>`:`<p class="acc-small">${tr('groupHint')}</p>`}</section>
-  <section class="acc-card"><h2>${tr('dmTab')}</h2>${list.items.length?`<ul class="acc-list acc-dm-list">${list.items.map(c=>`<li class="${c.unread?'is-unread':''}"><a href="#/account/messages/${c.kind==='group'?'g/'+esc(c.group.id):esc(c.person.id)}"><span class="m-ava ${c.kind==='group'?'is-group':''}" aria-hidden="true">${c.kind==='group'?(c.group.everyone?I('globe'):I('team')):esc(initialsOf(c.person.name))}</span><span class="acc-dm-who">${c.kind==='group'?`${esc(c.group.everyone?tr('everyoneChat'):c.group.title)}<small>${c.group.team?tr('teamChat')+' · ':''}${tr('groupPeople')}: ${c.group.members}</small>`:who(c.person)}</span><span class="acc-dm-last">${last(c)}</span><small>${date(c.last.created,true)}${c.unread?` · <b class="acc-dot">${c.unread}</b>`:''}${c.blocked?' · '+tr('dmBlocked'):''}</small></a></li>`).join('')}</ul>`:`<p class="acc-muted">${tr('dmNone')}</p>`}</section>`);
- }
- const t=await api('GET','/api/messages/with/'+encodeURIComponent(otherId));
- cache.messages=Math.max(0,(await api('GET','/api/auth/me')).messages||0);
- return shell('messages',`<a class="acc-back" href="#/account/messages">← ${tr('dmTab')}</a><section class="acc-card acc-dm"><div class="acc-card-head"><h2>${who(t.person)}</h2>${t.waiting?'':`<button class="acc-secondary" data-act="dm-block" data-id="${esc(otherId)}" data-on="${t.blocked?'0':'1'}" ${t.blocked?'':`data-confirm="${esc(tr('dmBlockConfirm'))}"`}>${tr(t.blocked?'dmUnblock':'dmBlock')}</button>`}</div>${t.waiting?`<p class="acc-note">${tr('dmWaitingNote')}</p>`:''}
-  ${threadList(otherId,t,'dm-report',false)}
-  ${t.canSend?sendForm('dm-send',otherId):`<p class="acc-note">${tr(t.blocked?'dmYouBlocked':'dmCannot')}</p>`}
-  <p class="acc-small">${tr('dmPrivacy')}</p></section>`);
+const msgBack=(h,label)=>`<a class="acc-back" href="${h}">← ${esc(label)}</a>`;
+async function messagesView(a,b,c){
+ if(a==='new-group')return newGroupView();
+ if(a==='g'&&b&&c==='info')return groupInfoView(b);
+ return shell('messages',`<div class="acc-msgr" data-msgr-app data-route="${esc([a,b].filter(Boolean).join('/'))}"></div>`);
 }
-async function groupChatView(id){
+async function newGroupView(){
+ const q=cache.dmQuery||'',picked=cache.groupPick||(cache.groupPick=new Map());
+ const found=q?await api('GET','/api/messages/people?q='+encodeURIComponent(q)):null;
+ return shell('messages',`${msgBack('#/account/messages',tr('dmTab'))}<section class="acc-card"><h2>${tr('groupNew')}</h2><form data-form="dm-find" class="acc-inline">${field('q',tr('dmFind'),{value:q,attrs:'maxlength="60" autocomplete="off"'})}<button class="acc-secondary">${tr('dmSearch')}</button></form>${found?(found.items.filter(p=>!p.waiting).length?`<ul class="acc-list acc-dm-people">${found.items.filter(p=>!p.waiting).map(p=>`<li><span>${who(p)}</span><button class="acc-link" data-act="group-pick" data-id="${esc(p.id)}" data-name="${esc(p.name)}" ${picked.has(p.id)?'disabled':''}>${tr(picked.has(p.id)?'groupPicked':'groupAdd')}</button></li>`).join('')}</ul>`:empty()):''}
+  ${picked.size?`<form data-form="group-new" class="acc-dm-new-group"><p class="acc-actions">${[...picked].map(([id,name])=>`<button type="button" class="acc-chip" data-act="group-unpick" data-id="${esc(id)}" aria-label="${esc(tr('remove')+' '+name)}">${esc(name)} ×</button>`).join('')}</p>${field('title',tr('groupTitle'),{required:true,attrs:'maxlength="80"'})}<button class="acc-primary">${tr('groupCreate')}</button></form>`:`<p class="acc-small">${tr('groupHint')}</p>`}</section>`);
+}
+async function groupInfoView(id){
  const t=await api('GET','/api/messages/groups/'+encodeURIComponent(id));
- cache.messages=Math.max(0,(await api('GET','/api/auth/me')).messages||0);
  const q=cache.groupQuery||'',found=t.owner&&q?await api('GET','/api/messages/people?q='+encodeURIComponent(q)):null,inside=new Set(t.members.map(m=>m.id));
- return shell('messages',`<a class="acc-back" href="#/account/messages">← ${tr('dmTab')}</a><section class="acc-card acc-dm"><div class="acc-card-head"><h2>${I(t.group.everyone?'globe':'team')} ${esc(t.group.everyone?tr('everyoneChat'):t.group.title)}<small>${t.group.team?tr('teamChat')+' · ':''}${tr('groupPeople')}: ${t.group.members}</small></h2>${t.group.team||t.group.everyone?'':`<button class="acc-secondary" data-act="group-leave" data-id="${esc(id)}" data-user="${esc(me.id)}" data-confirm="${esc(tr('groupLeaveConfirm'))}">${tr('groupLeave')}</button>`}</div>
-  <details class="acc-dm-members"><summary>${tr('groupMembers')}</summary><ul class="acc-list">${t.members.map(m=>`<li><span>${who(m)}${m.owner?` <span class="acc-chip">${tr('groupOwner')}</span>`:''}</span>${m.id===me.id?'':`<span class="acc-actions"><a class="acc-link" href="#/account/messages/${esc(m.id)}">${tr('dmWrite')}</a>${t.owner?`<button class="acc-link" data-act="group-leave" data-id="${esc(id)}" data-user="${esc(m.id)}" data-confirm="${esc(tr('groupRemoveConfirm'))}">${tr('remove')}</button>`:''}</span>`}</li>`).join('')}</ul>
-  ${t.owner?`<form data-form="group-rename" data-id="${esc(id)}" class="acc-inline">${field('title',tr('groupTitle'),{value:t.group.title,required:true,attrs:'maxlength="80"'})}<button class="acc-secondary">${tr('save')}</button></form><form data-form="group-find" class="acc-inline">${field('q',tr('groupAddPeople'),{value:q,attrs:'maxlength="60" autocomplete="off"'})}<button class="acc-secondary">${tr('dmSearch')}</button></form>${found?`<ul class="acc-list">${found.items.filter(p=>!p.waiting&&!inside.has(p.id)).map(p=>`<li><span>${who(p)}</span><button class="acc-secondary" data-act="group-add" data-id="${esc(id)}" data-user="${esc(p.id)}">${tr('groupAdd')}</button></li>`).join('')||`<li>${empty()}</li>`}</ul>`:''}`:t.group.team?`<p class="acc-small">${tr('teamChatNote')}</p>`:t.group.everyone?`<p class="acc-small">${tr('everyoneNote')}</p>`:''}</details>
-  ${threadList('g/'+id,t,'group-report',true)}
-  ${sendForm('group-send',id)}
+ return shell('messages',`${msgBack('#/account/messages/g/'+esc(id),t.group.everyone?tr('everyoneChat'):t.group.title)}<section class="acc-card acc-dm"><div class="acc-card-head"><h2>${I(t.group.everyone?'globe':'team')} ${esc(t.group.everyone?tr('everyoneChat'):t.group.title)}<small>${t.group.team?tr('teamChat')+' · ':''}${tr('groupPeople')}: ${t.group.members}</small></h2>${t.group.team||t.group.everyone?'':`<button class="acc-secondary" data-act="group-leave" data-id="${esc(id)}" data-user="${esc(me.id)}" data-confirm="${esc(tr('groupLeaveConfirm'))}">${tr('groupLeave')}</button>`}</div>
+  ${t.owner?`<form data-form="group-rename" data-id="${esc(id)}" class="acc-inline">${field('title',tr('groupTitle'),{value:t.group.title,required:true,attrs:'maxlength="80"'})}<button class="acc-secondary">${tr('save')}</button></form><form data-form="group-find" class="acc-inline">${field('q',tr('groupAddPeople'),{value:q,attrs:'maxlength="60" autocomplete="off"'})}<button class="acc-secondary">${tr('dmSearch')}</button></form>${found?`<ul class="acc-list">${found.items.filter(p=>!p.waiting&&!inside.has(p.id)).map(p=>`<li><span>${who(p)}</span><button class="acc-secondary" data-act="group-add" data-id="${esc(id)}" data-user="${esc(p.id)}">${tr('groupAdd')}</button></li>`).join('')||`<li>${empty()}</li>`}</ul>`:''}`:t.group.team?`<p class="acc-small">${tr('teamChatNote')}</p>`:t.group.everyone?`<p class="acc-small">${tr('everyoneNote')}</p>`:''}
+  <h3>${tr('groupMembers')}</h3><ul class="acc-list acc-dm-people">${t.members.map(m=>`<li><span>${who(m)}${m.owner?` <span class="acc-chip">${tr('groupOwner')}</span>`:''}</span>${m.id===me.id?'':`<span class="acc-actions"><a class="acc-link" href="#/account/messages/${esc(m.id)}">${tr('dmWrite')}</a>${t.owner?`<button class="acc-link" data-act="group-leave" data-id="${esc(id)}" data-user="${esc(m.id)}" data-confirm="${esc(tr('groupRemoveConfirm'))}">${tr('remove')}</button>`:''}</span>`}</li>`).join('')}</ul>
   <p class="acc-small">${tr('groupPrivacy')}</p></section>`);
 }
-// While a conversation is open, new messages appear without a reload unless something is being typed.
-setInterval(async()=>{
- const list=root?.querySelector('[data-thread]');if(!list||document.hidden)return;
- const form=root.querySelector('form[data-form$=-send]');if(form?.elements.body?.value.trim()||form?.elements.file?.files.length)return;
- const key=list.dataset.thread,path=key.startsWith('g/')?'/api/messages/groups/'+encodeURIComponent(key.slice(2)):'/api/messages/with/'+encodeURIComponent(key);
- try{const t=await api('GET',path);if(String(t.items.length)!==list.dataset.count||(t.items.at(-1)?.id||'')!==list.dataset.last)render();}catch{}
-},10000);
 async function mentorsView(only){
  const [all,projects,mentors,wallets,rewards,asks]=await Promise.all([api('GET','/api/office-hours'),api('GET','/api/projects?mine=1'),api('GET','/api/mentors'),api('GET','/api/wallet'),api('GET','/api/rewards'),api('GET','/api/meeting-requests')]);
  const slots={items:only?all.items.filter(x=>x.mentorId===only):all.items};
@@ -349,12 +378,13 @@ async function progressView(){
  const [p,rank,lectures,mine_tasks]=await Promise.all([api('GET','/api/progress'),api('GET','/api/teams/ranking'),api('GET','/api/lectures').catch(()=>({items:[],today:''})),api('GET','/api/tasks').catch(()=>({items:[]}))]);
  reasonTasks=mine_tasks.items.map(a=>({taskId:a.task.id,key:a.task.key,title:a.task.translations}));
  const mine=new Set(p.teams.map(t=>t.projectId));
- const lv=level(p.xp),place=rank.items.findIndex(t=>mine.has(t.projectId));
+ const myTeam=p.teams[0],big=myTeam?myTeam.xp:p.xp;
+ const lv=level(big),place=rank.items.findIndex(t=>mine.has(t.projectId));
  // Lectures before the participant joined are shown as "before you joined", never as missed.
  const before=l=>!l.attendance&&lectures.since&&l.date<lectures.since;
  const past=lectures.items.filter(l=>l.date<=lectures.today&&!before(l)),went=past.filter(l=>l.attendance).length;
  const dot=l=>{const k=l.date>lectures.today?'next':l.attendance?(l.attendance.kind==='verified_by_admin'?'verified':'self'):before(l)?'before':'missed';const word=tr({next:'mUpcoming',verified:'verified',self:'selfReported',missed:'mMissed',before:'beforeJoined'}[k]);return `<li class="m-rise is-${k}" title="${esc(pick(l.title))} · ${date(l.date)} · ${esc(word)}"><span class="m-dot" aria-hidden="true">${k==='verified'?'✓':k==='self'?'·':''}</span><small>${new Intl.DateTimeFormat(loc[lang],{day:'numeric',month:'short'}).format(new Date(l.date+'T12:00:00Z'))}</small><span class="m-sr">${esc(pick(l.title))}: ${esc(word)}</span></li>`;};
- const top=`<section class="m-hero is-slim m-rise"><div class="m-lv-big"><small>${tr('mLevel')}</small><b>${lv.n}</b></div><div class="m-hero-main"><div class="m-xp"><div class="m-xp-top"><span>${mNum(p.xp,'is-xp')} <small>${esc(pgPlural('xp',p.xp))}</small></span><small>${esc(tr('mToNext').replace('{n}',lv.b-p.xp).replace('{l}',lv.n+1))}</small></div>${bar(lv.pct,'is-xp')}</div><ul class="m-stats"><li class="m-stat"><span class="m-stat-icon" aria-hidden="true">${I('medal')}</span>${mNum(p.badges.length)}<small>/ ${p.available.length}</small></li><li class="m-stat"><span class="m-stat-icon" aria-hidden="true">${I('cap')}</span>${mNum(went)}<small>/ ${past.length}</small></li>${rank.items[place]?.place?`<li class="m-stat"><span class="m-stat-icon" aria-hidden="true">${I('trophy')}</span><b class="m-num">#${rank.items[place].place}</b><small>/ ${rank.items.length}</small></li>`:''}</ul></div></section>`;
+ const top=`<section class="m-hero is-slim m-rise"><div class="m-lv-big"><small>${tr('mLevel')}</small><b>${lv.n}</b></div><div class="m-hero-main"><div class="m-xp"><div class="m-xp-top"><span>${mNum(big,'is-xp')} <small>${esc(pgPlural('xp',big))}${myTeam?' · '+esc(tr('teamPointsOf').replace('{team}',myTeam.name)):''}</small></span><small>${esc(tr('mToNext').replace('{n}',lv.b-big).replace('{l}',lv.n+1))}</small></div>${bar(lv.pct,'is-xp')}${myTeam?`<small class="m-own">${esc(tr('myOwnPoints').replace('{n}',p.xp))}</small>`:''}</div><ul class="m-stats"><li class="m-stat"><span class="m-stat-icon" aria-hidden="true">${I('medal')}</span>${mNum(p.badges.length)}<small>/ ${p.available.length}</small></li><li class="m-stat"><span class="m-stat-icon" aria-hidden="true">${I('cap')}</span>${mNum(went)}<small>/ ${past.length}</small></li>${rank.items[place]?.place?`<li class="m-stat"><span class="m-stat-icon" aria-hidden="true">${I('trophy')}</span><b class="m-num">#${rank.items[place].place}</b><small>/ ${rank.items.length}</small></li>`:''}</ul></div></section>`;
  const chart=`<section class="acc-card m-rise"><h2>${tr('mPointsOverTime')}</h2><div class="m-series"><div class="m-serie is-me"><div class="m-serie-head"><span>${esc(tr('myPoints'))}</span>${mNum(p.xp)}</div>${steps(p.history,p.xp,tr('myPoints'))}${gains(p.history)}</div>${p.teams.map(t=>`<div class="m-serie is-team"><div class="m-serie-head"><span>${I('team')} ${esc(t.name)}</span>${mNum(t.xp)}</div>${steps(t.history,t.xp,t.name)}${gains(t.history)}</div>`).join('')}</div></section>`;
  const badges=`<section class="acc-card m-rise"><div class="acc-card-head"><h2>${tr('badges')}</h2><b class="m-frac">${p.badges.length}<small>/${p.available.length}</small></b></div>${badgeGrid(p)}</section>`;
  const attend=lectures.items.length?`<section class="acc-card m-rise"><div class="acc-card-head"><h2>${tr('mAttendance')}</h2><b class="m-frac">${went}<small>/${past.length}</small></b></div><ol class="m-dots">${lectures.items.map(dot).join('')}</ol><ul class="m-legend is-dots"><li class="is-verified"><i aria-hidden="true"></i>${tr('verified')}</li><li class="is-self"><i aria-hidden="true"></i>${tr('selfReported')}</li><li class="is-missed"><i aria-hidden="true"></i>${tr('mMissed')}</li><li class="is-next"><i aria-hidden="true"></i>${tr('mUpcoming')}</li></ul></section>`:'';
@@ -380,11 +410,24 @@ async function settingsView(){
 
 // Project cabinet ------------------------------------------------------------------------
 const FIELDS=['name','short','problem','users','solution','value','ask','nextSteps','details'];
-function projectForm(c,version,id,live=false){
- return `<form data-form="project" data-id="${esc(id||'')}" data-version="${esc(version||'')}"><p class="acc-note">${tr('optional')}</p>${FIELDS.map(k=>field(k,tr('f_'+k),{type:k==='name'?'text':'textarea',value:c?.[k]||'',required:k==='name',attrs:k==='name'?'maxlength="100"':`rows="${k==='short'?2:4}" maxlength="${k==='details'?8000:3000}"`})).join('')}${select('stage',tr('f_stage'),['idea','research','prototype','pilot','launched'].map(s=>[s,tr('stage_'+s)]),c?.stage||'idea')}<fieldset class="acc-field"><legend>${tr('f_links')}</legend>${[0,1,2].map(i=>`<div class="acc-inline"><input name="linkLabel" placeholder="${tr('title')}" aria-label="${tr('f_links')} ${i+1}" value="${esc(c?.links?.[i]?.label||'')}" maxlength="80"><input name="linkUrl" type="url" placeholder="https://" aria-label="URL ${i+1}" value="${esc(c?.links?.[i]?.url||'')}" maxlength="500"></div>`).join('')}</fieldset><div class="acc-actions"><button class="acc-primary">${tr(id?(live?'saveChanges':'saveDraft'):'newProject')}</button>${id?`<button type="button" data-act="preview" class="acc-secondary">${tr('preview')}</button>`:''}</div></form>`;
+// One stage list for every hub (server/stages.mjs). Old keys from a draft kept in this tab map like the server does.
+const STAGES=window.BIRD_STAGES||['idea','prototype','mvp','product','first_customer','revenue','scaling'],ROUNDS=window.BIRD_ROUNDS||['none','pre_seed','seed','series_a'];
+const OLD_STAGE={research:'idea',discovery:'idea',pilot:'mvp',launched:'product'};
+const stageKey=s=>STAGES.includes(s)?s:OLD_STAGE[s]||'idea';
+const stageLabel=s=>tr('stage_'+stageKey(s));
+const eur=n=>n===null||n===undefined?'—':new Intl.NumberFormat(loc[lang]).format(n)+' €';
+// Required on save: a new project starts with nothing ticked, so the team picks what is true today.
+const stagePicker=stage=>`<fieldset class="acc-field acc-stages"><legend>${tr('f_stage')} <span class="acc-req" aria-hidden="true">*</span></legend><p class="acc-muted">${tr('stageNote')}</p><ol class="acc-stage-list">${STAGES.map((s,i)=>`<li><label class="acc-stage"><input type="radio" name="stage" value="${s}" ${stage&&stageKey(stage)===s?'checked':''} required><span class="acc-stage-n" aria-hidden="true">${i+1}</span><span class="acc-stage-text"><strong>${tr('stage_'+s)}</strong><small>${tr('stageHint_'+s)}</small></span></label></li>`).join('')}</ol></fieldset>`;
+const money=(name,label,value)=>field(name,label,{type:'number',value:value??'',attrs:'min="0" max="1000000000" step="1" inputmode="numeric" placeholder="0"'});
+const fundingFields=(f={})=>`<fieldset class="acc-field acc-financing"><legend>${tr('financing')}</legend><p class="acc-muted">${tr('financingNote')}</p><div class="acc-fin-grid">${money('raisedEur',tr('f_raisedEur'),f.raisedEur)}${money('raisingEur',tr('f_raisingEur'),f.raisingEur)}${select('round',tr('f_round'),[['',tr('roundUnset')],...ROUNDS.map(r=>[r,tr('round_'+r)])],f.round||'')}</div><label class="acc-check acc-investors"><input type="checkbox" name="investorVisible" ${f.investorVisible?'checked':''}> <span><strong>${tr('investorVisible')}</strong><small>${tr('investorVisibleNote')}</small></span></label></fieldset>`;
+const readFunding=form=>{const f=new FormData(form);return {raisedEur:f.get('raisedEur')||null,raisingEur:f.get('raisingEur')||null,round:f.get('round')||null,investorVisible:f.get('investorVisible')==='on'};};
+const stageHistoryList=h=>h?.length?`<ol class="acc-stage-history">${h.map(x=>`<li><span><strong>${esc(stageLabel(x.stage))}</strong>${x.source==='migration'?`<small>${tr('stageMigrated')}</small>`:x.previous?`<small>← ${esc(stageLabel(x.previous))}</small>`:''}</span><small>${date(x.changedAt)}${x.by?' · '+esc(x.by):''}</small></li>`).join('')}</ol>`:'';
+function projectForm(c,version,id,live=false,funding={}){
+ return `<form data-form="project" data-id="${esc(id||'')}" data-version="${esc(version||'')}"><p class="acc-note">${tr('optional')}</p>${FIELDS.slice(0,2).map(k=>projectField(k,c)).join('')}${stagePicker(c?.stage)}${FIELDS.slice(2).map(k=>projectField(k,c)).join('')}${fundingFields(funding||{})}<fieldset class="acc-field"><legend>${tr('f_links')}</legend>${[0,1,2].map(i=>`<div class="acc-inline"><input name="linkLabel" placeholder="${tr('title')}" aria-label="${tr('f_links')} ${i+1}" value="${esc(c?.links?.[i]?.label||'')}" maxlength="80"><input name="linkUrl" type="url" placeholder="https://" aria-label="URL ${i+1}" value="${esc(c?.links?.[i]?.url||'')}" maxlength="500"></div>`).join('')}</fieldset><div class="acc-actions"><button class="acc-primary">${tr(id?(live?'saveChanges':'saveDraft'):'newProject')}</button>${id?`<button type="button" data-act="preview" class="acc-secondary">${tr('preview')}</button>`:''}</div></form>`;
 }
+function projectField(k,c){return field(k,tr('f_'+k),{type:k==='name'?'text':'textarea',value:c?.[k]||'',required:k==='name',attrs:k==='name'?'maxlength="100"':`rows="${k==='short'?2:4}" maxlength="${k==='details'?8000:3000}"`});}
 function readProjectForm(form){const f=new FormData(form),c={};for(const k of FIELDS)c[k]=f.get(k)||'';c.stage=f.get('stage');const labels=f.getAll('linkLabel'),urls=f.getAll('linkUrl');c.links=urls.map((u,i)=>({label:labels[i]||'',url:u})).filter(l=>l.url);return c;}
-function previewHtml(c){return `<article class="acc-preview"><span class="eyebrow">${esc(tr('stage_'+c.stage))}</span><h2>${esc(c.name)}</h2><p class="acc-lede">${esc(c.short)}</p>${FIELDS.slice(2).filter(k=>c[k]).map(k=>`<h3>${tr('f_'+k)}</h3><p class="acc-pre">${esc(c[k])}</p>`).join('')}${c.links?.length?`<ul>${c.links.map(l=>`<li><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer nofollow">${esc(l.label||l.url)}</a></li>`).join('')}</ul>`:''}</article>`;}
+function previewHtml(c){return `<article class="acc-preview"><span class="eyebrow">${esc(stageLabel(c.stage))}</span><h2>${esc(c.name)}</h2><p class="acc-lede">${esc(c.short)}</p>${FIELDS.slice(2).filter(k=>c[k]).map(k=>`<h3>${tr('f_'+k)}</h3><p class="acc-pre">${esc(c[k])}</p>`).join('')}${c.links?.length?`<ul>${c.links.map(l=>`<li><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer nofollow">${esc(l.label||l.url)}</a></li>`).join('')}</ul>`:''}</article>`;}
 
 const DRAFT_KEY=id=>'bird-project-draft:'+id;
 async function projectView(id,tab='edit'){
@@ -394,21 +437,21 @@ async function projectView(id,tab='edit'){
  if(asAdmin&&!adminEditing)p.access={...p.access,edit:false,manage:false};
  const adminBar=asAdmin?`<div class="acc-flash acc-admin-view" role="status"><span>${tr(adminEditing?'adminEditingNote':'adminReadNote')}</span><button type="button" class="acc-secondary" data-act="admin-edit" data-id="${esc(id)}" data-on="${adminEditing?'':'1'}">${tr(adminEditing?'adminEditStop':'adminEdit')}</button></div>`:'';
  const tabs=[['edit',tr('description')],['checkin',tr('checkin')],['files',tr('files')],['team',tr('members')],['updates',tr('updates')],['journal',tr('journal')],['history',tr('history')]];
- const progress=await api('GET','/api/progress');
- // An organiser is not on the team: its points come from the ranking.
- const xp=progress.teams.find(t=>t.projectId===id)?.xp??(isAdmin()?(await api('GET','/api/teams/ranking')).items.find(t=>t.projectId===id)?.teamXp:0)??0;
+ // The team's one points number comes with the project, for the team and for an organiser alike.
+ const xp=p.points??0;
  let body='';
  if(tab==='edit'){
   let local=null;try{local=JSON.parse(sessionStorage.getItem(DRAFT_KEY(id))||'null');}catch{}
   const conflict=cache.conflict?.id===id?cache.conflict:null;cache.conflict=null;
-  body=(conflict?`<div class="acc-flash is-error" role="alert">${tr('conflict')}<details open><summary>${tr('yourText')}</summary>${previewHtml(conflict.yours)}</details></div>`:'')+(p.access.edit?projectForm(local&&local.version===p.draftVersion?local.content:p.draft,p.draftVersion,id,p.status==='published')+`<div class="acc-card"><p class="acc-note">${tr('publishNote')}</p><button data-act="publish" data-id="${esc(id)}" data-version="${p.draftVersion}" class="acc-primary">${tr(p.status==='published'?'publishChanges':'publish')}</button>${p.access.manage?`<button data-act="${p.status==='archived'?'unarchive':'archive'}" data-id="${esc(id)}">${tr(p.status==='archived'?'unarchive':'archive')}</button>`:''}</div>`:previewHtml(p.draft||p.published));
+  body=(conflict?`<div class="acc-flash is-error" role="alert">${tr('conflict')}<details open><summary>${tr('yourText')}</summary>${previewHtml(conflict.yours)}</details></div>`:'')+(p.access.edit?projectForm(local&&local.version===p.draftVersion?local.content:p.draft,p.draftVersion,id,p.status==='published',local&&local.version===p.draftVersion&&local.funding||p.funding)+`<div class="acc-card"><p class="acc-note">${tr('publishNote')}</p><button data-act="publish" data-id="${esc(id)}" data-version="${p.draftVersion}" class="acc-primary">${tr(p.status==='published'?'publishChanges':'publish')}</button>${p.access.manage?`<button data-act="${p.status==='archived'?'unarchive':'archive'}" data-id="${esc(id)}">${tr(p.status==='archived'?'unarchive':'archive')}</button>`:''}</div>`:previewHtml(p.draft||p.published))+(p.stageHistory?.length?`<section class="acc-card"><h2>${tr('stageHistory')}</h2>${stageHistoryList(p.stageHistory)}</section>`:'');
  }else if(tab==='files'){
   const f=await api('GET',`/api/projects/${encodeURIComponent(id)}/files`);
   body=`${p.access.edit?`<form data-form="upload" data-id="${esc(id)}" class="acc-card"><p class="acc-note">${tr('uploadHint')}</p><input type="file" name="file" accept="${PROOF_ACCEPT}" required><button class="acc-primary">${tr('upload')}</button></form>`:''}<div class="m-usage">${bar(f.limitBytes?f.usedBytes/f.limitBytes*100:0,f.usedBytes>f.limitBytes*.85?'is-risk':'',tr('used'))}<small>${tr('used')}: ${size(f.usedBytes)} / ${size(f.limitBytes)}</small></div>${f.items.length?`<ul class="acc-list">${f.items.map(x=>`<li><div><a href="/api/files/${esc(x.id)}" download>${esc(x.filename)}</a><small>${size(x.size)} · ${date(x.created)} · ${tr('notScanned')}</small></div>${p.access.edit?`<span class="acc-actions"><select data-act="visibility" data-id="${esc(x.id)}" aria-label="${tr('status')}">${['private','team','reviewer','public'].map(v=>`<option value="${v}" ${x.visibility===v?'selected':''}>${tr('vis_'+v)}</option>`).join('')}</select><button data-act="file-delete" data-id="${esc(x.id)}">${tr('remove')}</button></span>`:`<small>${tr('vis_'+x.visibility)}</small>`}</li>`).join('')}</ul>`:empty()}`;
  }else if(tab==='team'){
-  const invites=p.access.manage?await api('GET','/api/invites?projectId='+encodeURIComponent(id)):{items:[]};
+  // Any editor on the team invites teammates (roster teams have no owner); roles and removal stay with the owner.
+  const invites=p.access.edit?await api('GET','/api/invites?projectId='+encodeURIComponent(id)):{items:[]};
   body=`<ul class="acc-list">${(p.members||[]).map(m=>`<li><div><strong>${esc(m.displayName)}</strong><small>${esc(tr('role_'+m.role))}</small></div>${p.access.manage&&m.userId!==me.id?`<span class="acc-actions"><select data-act="member-role" data-project="${esc(id)}" data-user="${esc(m.userId)}" aria-label="${tr('roleChange')}">${['owner','editor','member'].map(r=>`<option value="${r}" ${m.role===r?'selected':''}>${tr('role_'+r)}</option>`).join('')}</select><button data-act="member-remove" data-project="${esc(id)}" data-user="${esc(m.userId)}">${tr('remove')}</button></span>`:''}</li>`).join('')}</ul>
-  ${p.access.manage?`<form data-form="project-invite" data-id="${esc(id)}" class="acc-card">${select('role',tr('roleChange'),[['editor',tr('role_editor')],['member',tr('role_member')]],'editor')}<button class="acc-secondary">${tr('invite')}</button></form>${inviteBox(cache.newInvite)}<ul class="acc-list">${invites.items.filter(i=>!i.used&&!i.revoked).map(i=>`<li><span>${tr('role_'+i.role)} · ${date(i.expires)}</span><button data-act="invite-revoke" data-id="${esc(i.id)}">${tr('revoke')}</button></li>`).join('')}</ul>`:''}`;
+  ${p.access.edit?`<form data-form="project-invite" data-id="${esc(id)}" class="acc-card">${select('role',tr('roleChange'),[['editor',tr('role_editor')],['member',tr('role_member')]],'editor')}<button class="acc-secondary">${tr('invite')}</button></form>${inviteBox(cache.newInvite)}<ul class="acc-list">${invites.items.filter(i=>!i.used&&!i.revoked).map(i=>`<li><span>${tr('role_'+i.role)} · ${date(i.expires)}</span><button data-act="invite-revoke" data-id="${esc(i.id)}">${tr('revoke')}</button></li>`).join('')}</ul>`:''}`;
   cache.newInvite=null;
  }else if(tab==='updates'){
   const u=await api('GET',`/api/projects/${encodeURIComponent(id)}/updates`);const helpList=await api('GET','/api/help');
@@ -426,7 +469,7 @@ async function projectView(id,tab='edit'){
   const r=p.access.edit?await api('GET',`/api/projects/${encodeURIComponent(id)}/revisions`):{items:[]};
   body=r.items.length?`<ul class="acc-list">${r.items.map(x=>`<li><div><strong>v${x.version}</strong> ${statusChip(x.kind==='published'?'published':x.kind==='conflict'?'changes_requested':'draft')}<small>${esc(x.author)} · ${date(x.created,true)}</small><details><summary>${tr('preview')}</summary>${previewHtml(x.content)}</details></div><button data-act="restore" data-project="${esc(id)}" data-id="${x.id}">${tr('restore')}</button></li>`).join('')}</ul>`:empty();
  }
- return shell('overview',`<a class="acc-back" href="#/account">← ${tr('myProjects')}</a><div class="m-project-head m-rise"><span class="m-ava is-big">${esc(initialsOf((p.draft||p.published).name))}</span><div><h2 class="acc-project-title">${esc((p.draft||p.published).name)}</h2><span class="m-quest-meta">${statusChip(p.status)}<span class="m-tag">${esc(tr('stage_'+((p.draft||p.published).stage||'idea')))}</span></span></div><span class="m-coin acc-xp">${mNum(xp)}<small>${esc(pgPlural('xp',xp))}</small></span></div><nav class="acc-tabs acc-subtabs m-pills">${tabs.map(([k,l])=>`<a href="#/account/project/${esc(id)}/${k}" ${k===tab?'aria-current="page"':''}>${esc(l)}</a>`).join('')}</nav>${adminBar}${body}`);
+ return shell('overview',`<a class="acc-back" href="#/account">← ${tr('myProjects')}</a><div class="m-project-head m-rise"><span class="m-ava is-big">${esc(initialsOf((p.draft||p.published).name))}</span><div><h2 class="acc-project-title">${esc((p.draft||p.published).name)}</h2><span class="m-quest-meta">${statusChip(p.status)}<span class="m-tag">${esc(stageLabel((p.draft||p.published).stage))}</span></span></div><span class="m-coin acc-xp">${mNum(xp)}<small>${esc(pgPlural('xp',xp))}</small></span></div><nav class="acc-tabs acc-subtabs m-pills">${tabs.map(([k,l])=>`<a href="#/account/project/${esc(id)}/${k}" ${k===tab?'aria-current="page"':''}>${esc(l)}</a>`).join('')}</nav>${adminBar}${body}`);
 }
 
 // Admin ------------------------------------------------------------------------------
@@ -435,7 +478,9 @@ const TAB_LABEL={reports:'tabModeration',overview:'teamsNav',news:'announcements
 function adminShell(active,body){
  const group=ADMIN_GROUPS.find(g=>g.tabs.includes(active))||ADMIN_GROUPS[0];
  const link=(k,l,on)=>`<a href="#/admin/${k}" ${on?'aria-current="page"':''}>${esc(l)}</a>`;
- return shell('admin',`<nav class="acc-tabs acc-subtabs">${ADMIN_GROUPS.map(g=>link(g.tabs[0],tr(g.label),g===group)).join('')}</nav>${group.tabs.length>1?`<nav class="acc-tabs acc-subtabs acc-subtabs-2">${group.tabs.filter(k=>k!=='links'||!document.body.classList.contains('is-demo')).map(k=>link(k,tr(TAB_LABEL[k]||k),k===active)).join('')}</nav>`:''}${body}`);
+ // Messages live in the organiser's own account; the badge says when someone wrote.
+ const inbox=`<a href="#/account/messages" class="acc-tab-inbox">${esc(tr('dmTab'))} <b class="acc-dot" data-msgr-count ${cache.messages?'':'hidden'}>${cache.messages}</b></a>`;
+ return shell('admin',`<nav class="acc-tabs acc-subtabs">${ADMIN_GROUPS.map(g=>link(g.tabs[0],tr(g.label),g===group)).join('')}${inbox}</nav>${group.tabs.length>1?`<nav class="acc-tabs acc-subtabs acc-subtabs-2">${group.tabs.filter(k=>k!=='links'||!document.body.classList.contains('is-demo')).map(k=>link(k,tr(TAB_LABEL[k]||k),k===active)).join('')}</nav>`:''}${body}`);
 }
 const recordTask=t=>`<li><a href="#/account/task/${esc(t.id)}"><strong>${esc(taskText(t.title))}</strong><small>${t.who?esc(t.who)+' · ':''}${t.xp} ${pgPlural('xp',t.xp)}${t.dueAt?' · '+tr('due')+' '+date(t.dueAt,true):''}${t.optional?' · '+tr('optionalTask'):''}</small></a>${statusChip(t.status)}</li>`;
 const noteList=n=>n.length?`<ul class="acc-list">${n.map(x=>`<li><div>${esc(x.body)}<small>${esc(x.author||'')} · ${date(x.created,true)}</small></div></li>`).join('')}</ul>`:'';
@@ -488,13 +533,17 @@ async function teamRecord(id){
  <section class="acc-card rec-points"><h2>${tr('pointsHistory')}</h2>${ledgerList(r.ledger,r.tasks)}<h3>${tr('adjustPoints')}</h3>${xpForm('project',id)}</section>
  <section class="acc-card"><h2>${tr('notesTitle')}</h2><p class="acc-muted">${tr('notesPrivate')}</p>${noteList(r.notes)}${noteForm('team',id)}</section></div>`);
 }
+// Financing as the team states it, and whether it agreed to be shown to investors.
+const fundingFacts=f=>f?`<dl class="rec-fin"><div><dt>${tr('f_raisedEur')}</dt><dd>${eur(f.raisedEur)}</dd></div><div><dt>${tr('f_raisingEur')}</dt><dd>${eur(f.raisingEur)}</dd></div><div><dt>${tr('f_round')}</dt><dd>${f.round?esc(tr('round_'+f.round)):'—'}</dd></div>${f.investorVisible?`<div><dt>${tr('investorsOn')}</dt><dd>✓</dd></div>`:''}</dl>`:'';
 // What the team says about its project (read only), its links and the deck, on the organiser's team card.
 function projectCard(r,id){
  const c=r.project||{},deck=r.pitch.deckFile;
  const parts=['short','problem','users','solution','value','ask','nextSteps'].filter(k=>c[k]);
- return `<section class="acc-card rec-project"><div class="acc-card-head"><h2>${tr('projectAbout')}</h2><span class="m-tag">${esc(tr('stage_'+(c.stage||'idea')))}</span></div>
+ return `<section class="acc-card rec-project"><div class="acc-card-head"><h2>${tr('projectAbout')}</h2><span class="m-tag">${esc(stageLabel(c.stage))}</span></div>
+ ${fundingFacts(r.funding)}
  ${parts.length?`<dl class="rec-project-fields">${parts.map(k=>`<div><dt>${tr(k==='short'?'f_short':'f_'+k)}</dt><dd class="acc-pre">${esc(c[k])}</dd></div>`).join('')}</dl>`:`<p class="acc-muted">${tr('projectEmpty')}</p>`}
  ${c.links?.length?`<ul class="rec-project-links">${c.links.map(l=>`<li><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer nofollow">${esc(l.label||l.url)} ↗</a></li>`).join('')}</ul>`:''}
+ ${r.stageHistory?.length?`<details class="rec-fold rec-stages"><summary>${tr('stageHistory')}</summary>${stageHistoryList(r.stageHistory)}</details>`:''}
  <p class="rec-project-deck"><strong>${tr('deck')}:</strong> ${deck?`<a href="/api/files/${esc(deck.id)}" download>${I('clip')} ${esc(deck.filename)}</a> · `:''}${esc(tr('st_'+r.pitch.deck))}</p>
  <p><a class="acc-secondary" href="#/account/project/${esc(id)}">${tr('openProject')} →</a></p></section>`;
 }
@@ -530,7 +579,7 @@ async function personRecord(id){
  ${u.role!=='platform_owner'?`<section class="acc-card"><h2>${tr('accessTitle')}</h2>${code?`<p class="acc-flash" role="status">${tr('resetShow')}<br><code class="acc-code">${esc(code)}</code></p>`:`<p class="acc-muted">${tr('resetNote')}</p>`}<div class="acc-actions"><button data-act="reset-code" data-id="${esc(u.id)}" class="acc-secondary">${tr('resetCode')}</button><button data-act="user-status" data-id="${esc(u.id)}" data-status="${u.status==='active'?'disabled':'active'}" ${u.status==='active'?`data-confirm="${esc(tr('confirmDisable'))}"`:''}>${tr(u.status==='active'?'disable':'enable')}</button></div></section>`:''}</div>`);
 }
 // Cohort dashboard: every team on one screen with progress, points, signals and the next step.
-const PIPELINE=['idea','research','prototype','pilot'];
+const PIPELINE=STAGES;
 const TEAM_TESTS={all:()=>true,overdue:p=>p.overdue>0,attendance:p=>p.risk.signals.includes('low_attendance'),pitch:p=>p.pitch.deck!=='accepted',waiting:p=>p.tasks.waitingReview>0};
 const DASH_TESTS={...TEAM_TESTS,risk:p=>p.risk.level!=='ok',idle:p=>p.members.length>0&&idle(p.lastSeen)};
 const RISK_ORDER={risk:0,watch:1,ok:2};
@@ -545,9 +594,8 @@ const daysAgo=iso=>Math.max(0,Math.floor((Date.now()-Date.parse(iso))/86400000))
 const ago=iso=>{const d=daysAgo(iso);return new Intl.RelativeTimeFormat(loc[lang],{numeric:'auto'}).format(-d,'day');};
 const initials=name=>String(name).split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 function pipeline(stage){
- const at=stage==='launched'?PIPELINE.length:Math.max(0,PIPELINE.indexOf(stage));
- const label=tr('stage_'+(stage||'idea'));
- return `<ol class="dash-stage" aria-hidden="true">${PIPELINE.map((s,i)=>`<li class="${i<at?'is-done':i===at?'is-now':''}"></li>`).join('')}</ol><p class="dash-stage-name"><span>${tr('dashStage')}: <b>${stage==='launched'?'✓ ':''}${esc(label)}</b></span><span aria-hidden="true">${Math.min(at+1,PIPELINE.length)}/${PIPELINE.length}</span></p>`;
+ const at=PIPELINE.indexOf(stageKey(stage));
+ return `<ol class="dash-stage" aria-hidden="true">${PIPELINE.map((s,i)=>`<li class="${i<at?'is-done':i===at?'is-now':''}"></li>`).join('')}</ol><p class="dash-stage-name"><span>${tr('dashStage')}: <b>${esc(stageLabel(stage))}</b></span><span aria-hidden="true">${at+1}/${PIPELINE.length}</span></p>`;
 }
 // Progress ring: an SVG stroke that sweeps from zero on first view. pathLength=100 keeps the maths in percent.
 function ring(pct,cls=''){
@@ -583,8 +631,8 @@ function teamCard(p,i){
 function cohortCharts(all,avg){
  const byProgress=[...all].sort((a,b)=>(b.percent??-1)-(a.percent??-1));
  const bars=`<section class="dash-panel" style="--i:0"><h3>${tr('vizProgress')}${avg===null?'':`<small>${tr('vizAvg')}: ${avg}%</small>`}</h3><ol class="viz-bars">${byProgress.map((p,j)=>`<li class="is-${esc(p.risk.level)}" style="--j:${j}"><a href="#/admin/team/${esc(p.id)}"><span class="viz-name">${esc(p.name)}</span><span class="viz-track" aria-hidden="true"><i style="--w:${p.percent??0}%"></i>${avg===null?'':`<span class="viz-avg" style="--a:${avg}%"></span>`}</span><b>${percent(p.percent)}</b><span class="acc-sr">${tr('risk_'+p.risk.level)}</span></a></li>`).join('')}</ol>${avg===null?'':`<p class="viz-note" aria-hidden="true">${tr('vizAvg')}</p>`}</section>`;
- const stages=[...PIPELINE,'launched'];
- const funnel=`<section class="dash-panel" style="--i:1"><h3>${tr('vizStages')}</h3><ol class="viz-stages">${stages.map(s=>{const teams=all.filter(p=>(p.stage||'idea')===s);return `<li class="${teams.length?'':'is-empty'}" aria-label="${esc(tr('stage_'+s)+': '+teams.length+(teams.length?' — '+teams.map(t=>t.name).join(', '):''))}"><b aria-hidden="true">${teams.length}</b><span class="viz-col" aria-hidden="true">${teams.map((t,j)=>`<i class="is-${esc(t.risk.level)}" style="--j:${j}" title="${esc(t.name)}"></i>`).join('')}</span><span aria-hidden="true">${esc(tr('stage_'+s))}</span></li>`;}).join('')}</ol></section>`;
+ const stages=PIPELINE;
+ const funnel=`<section class="dash-panel" style="--i:1"><h3>${tr('vizStages')}</h3><ol class="viz-stages">${stages.map(s=>{const teams=all.filter(p=>stageKey(p.stage)===s);return `<li class="${teams.length?'':'is-empty'}" aria-label="${esc(tr('stage_'+s)+': '+teams.length+(teams.length?' — '+teams.map(t=>t.name).join(', '):''))}"><b aria-hidden="true">${teams.length}</b><span class="viz-col" aria-hidden="true">${teams.map((t,j)=>`<i class="is-${esc(t.risk.level)}" style="--j:${j}" title="${esc(t.name)}"></i>`).join('')}</span><span aria-hidden="true">${esc(tr('stage_'+s))}</span></li>`;}).join('')}</ol></section>`;
  const sum=f=>all.reduce((n,p)=>n+f(p),0);
  const total=sum(p=>p.tasks.total),done=sum(p=>p.tasks.done),review=sum(p=>p.tasks.waitingReview),open=Math.max(0,total-done-review);
  const w=(n,of)=>of?(n/of*100).toFixed(1):0;
@@ -680,7 +728,9 @@ const pgPlural=(key,n)=>window.BirdPluralText(T,key,n,lang);
 const pgPct=(a,b)=>b?Math.round(a/b*100):null;
 
 async function todayView(){
- const t=await api('GET','/api/admin/today?lang='+lang);
+ const [t,who]=await Promise.all([api('GET','/api/admin/today?lang='+lang),api('GET','/api/auth/me').catch(()=>null)]);
+ if(who)cache.messages=who.messages||0;
+ const msgLine=cache.messages?`<a class="pg-msgline" href="#/account/messages">${pgIcon('chat')}<strong>${esc(tr('dmTab'))}</strong><span>${esc(pgPlural('msgUnread',cache.messages).replace('{n}',cache.messages))}</span><span aria-hidden="true">→</span></a>`:'';
  const teams=t.teams.filter(x=>x.members),unregistered=t.teams.filter(x=>!x.members).length;
  const lv={ok:0,watch:0,risk:0};teams.forEach(x=>lv[x.level]++);
  const calm=pgPct(lv.ok,teams.length);
@@ -707,7 +757,7 @@ async function todayView(){
  const late=iso=>Math.max(1,-pgDayDiff(iso));
  const overdueCard=pgCard(2,'pg-overdue',pgHead('clock',tr('overdueTasks'),t.overdue.length||'',t.overdue.length?'is-risk':''),t.overdue.length?`<ul class="pg-late">${t.overdue.slice(0,8).map(o=>`<li><a href="${o.userId?'#/admin/person/'+esc(o.userId):'#/admin/team/'+esc(o.projectId)}"><span class="pg-late-days" title="${esc(date(o.dueAt,true))}"><b>${late(o.dueAt)}</b><small>${esc(pgPlural('pgDaysLate',late(o.dueAt)))}</small></span><span class="pg-ev-main"><strong>${esc(o.who)}</strong><small>${esc(o.title)}</small></span></a></li>`).join('')}</ul>${t.overdue.length>8?`<p class="pg-more">+${t.overdue.length-8}</p>`:''}`:`<p class="pg-calm">${pgIcon('check')}${esc(tr('pgNoOverdue'))}</p>`,pgGo('#/admin/tasks',tr('pgOpenTasks')));
  const helpCard=t.help.length?pgCard(3,'pg-help',pgHead('flag',tr('needsHelp'),t.help.length,'is-risk'),`<ul class="pg-quotes">${t.help.map(h=>`<li><blockquote>${esc(h.blocker)}</blockquote><a href="#/admin/team/${esc(h.projectId)}">— ${esc(h.name)}</a></li>`).join('')}</ul>`,pgGo('#/admin/team/'+esc(t.help[0].projectId),tr('pgAnswerHelp'))):'';
- return adminShell('today',pgWrap('today','pg-today',`<header class="pg-hero"><div><span class="pg-kicker">${esc(dayTitle)}</span><h2 class="pg-title">${esc(tr('pgBriefing'))}</h2></div>${health}</header>${tiles}<div class="pg-grid pg-split pg-today-grid"><div class="pg-stack">${attentionCard}${overdueCard}</div><div class="pg-stack">${comingCard}${helpCard}</div></div>`));
+ return adminShell('today',pgWrap('today','pg-today',`<header class="pg-hero"><div><span class="pg-kicker">${esc(dayTitle)}</span><h2 class="pg-title">${esc(tr('pgBriefing'))}</h2></div>${health}</header>${msgLine}${tiles}<div class="pg-grid pg-split pg-today-grid"><div class="pg-stack">${attentionCard}${overdueCard}</div><div class="pg-stack">${comingCard}${helpCard}</div></div>`));
 }
 
 // Programme: lectures ------------------------------------------------------------------
@@ -848,12 +898,19 @@ async function systemView(){
  const limit=(n,label)=>`<li><b>${esc(n)}<small> MB</small></b><span>${esc(label)}</span></li>`;
  // Pilot requests from the demo's landing page: the platform owner only.
  const leads=me.role==='platform_owner'?await api('GET','/api/admin/pilot-requests').catch(()=>null):null;
- const leadsCard=leads&&(leads.demo||leads.items.length)?pgCard(4,'pg-leads',pgHead('mail',tr('leadsTitle'),leads.items.length||''),leads.items.length?`<ul class="pg-rows">${leads.items.map(l=>`<li><span class="pg-ev-main"><strong>${esc(l.name)} · ${esc(l.organisation)}</strong><small><a href="mailto:${esc(l.email)}">${esc(l.email)}</a>${l.phone?` · <a href="tel:${esc(l.phone.replace(/[^+\d]/g,''))}">${esc(l.phone)}</a>`:''}${l.teams?` · ${esc(tr('leadsTeams'))}: ${esc(l.teams)}`:''} · ${esc(l.language.toUpperCase())} · ${date(l.created,true)}</small>${l.message?`<small class="pg-lead-msg">${esc(l.message)}</small>`:''}</span><button data-act="lead-delete" data-id="${esc(l.id)}" class="acc-secondary" data-confirm="${esc(tr('leadsConfirm'))}">${tr('remove')}</button></li>`).join('')}</ul>`:`<p class="pg-note">${tr('leadsNone')}</p>`):'';
+ const leadsCard=leads&&(leads.demo||leads.items.length)?pgCard(4,'pg-leads',pgHead('mail',tr('leadsTitle'),leads.items.length||''),leads.items.length?`<ul class="pg-rows">${leads.items.map(l=>`<li><span class="pg-ev-main"><strong>${esc(l.name)}${l.organisation?` · ${esc(l.organisation)}`:''}${l.role&&l.role!=='hub'?` · ${esc(tr('leadRole_'+l.role))}`:''}</strong><small><a href="mailto:${esc(l.email)}">${esc(l.email)}</a>${l.phone?` · <a href="tel:${esc(l.phone.replace(/[^+\d]/g,''))}">${esc(l.phone)}</a>`:''}${l.teams?` · ${esc(tr('leadsTeams'))}: ${esc(l.teams)}`:''} · ${esc(l.language.toUpperCase())} · ${date(l.created,true)}</small>${l.message?`<small class="pg-lead-msg">${esc(l.message)}</small>`:''}</span><button data-act="lead-delete" data-id="${esc(l.id)}" class="acc-secondary" data-confirm="${esc(tr('leadsConfirm'))}">${tr('remove')}</button></li>`).join('')}</ul>`:`<p class="pg-note">${tr('leadsNone')}</p>`):'';
+ // Investors waiting for the platform owner (the public workspace only, server/investors.mjs).
+ const invs=me.role==='platform_owner'?await api('GET','/api/admin/investors').catch(()=>null):null;
+ const link=(href,label)=>`<a href="${esc(href)}" target="_blank" rel="noopener noreferrer nofollow">${esc(label)}</a>`;
+ const invCard=invs?.here?pgCard(5,'pg-leads pg-investors',pgHead('user',tr('invTitle'),invs.items.filter(x=>x.status==='pending').length||'',invs.items.some(x=>x.status==='pending')?'is-risk':''),`<p class="pg-note">${tr('invNote')}</p>${invs.items.length?`<ul class="pg-rows">${invs.items.map(x=>`<li><span class="pg-ev-main"><strong>${esc(x.name)} · ${esc(x.fund)}</strong><small>${pgDot(x.status==='approved'?'ok':x.status==='rejected'?'risk':'watch',tr('invSt_'+x.status))} · <a href="mailto:${esc(x.email)}">${esc(x.email)}</a> · ${link(x.website,x.website.replace(/^https:\/\//,''))}${x.linkedin?' · '+link(x.linkedin,'LinkedIn'):''}${x.country?' · '+esc(x.city)+', '+esc(x.country):''} · ${date(x.created,true)}</small><small>${tr('invDomain')}: <b>${esc(x.domain)}</b>${x.ticketMin!==null||x.ticketMax!==null?` · ${tr('invTicket')}: ${esc(x.ticketMin??'…')}–${esc(x.ticketMax??'…')} EUR`:''}</small>${x.bio?`<small class="pg-lead-msg">${esc(x.bio)}</small>`:''}</span><span class="acc-actions">${x.status!=='approved'?`<button data-act="inv-approve" data-id="${esc(x.id)}" class="acc-secondary">${tr('invApprove')}</button>`:''}${x.status!=='rejected'?`<button data-act="inv-reject" data-id="${esc(x.id)}" class="acc-secondary" data-confirm="${esc(tr('invRejectConfirm'))}">${tr('invReject')}</button>`:''}</span></li>`).join('')}</ul>`:`<p class="pg-calm">${pgIcon('check')}${esc(tr('invNone'))}</p>`}`):'';
+ // Investors who asked about this workspace's projects: the organisers decide whether to reply.
+ const interest=await api('GET','/api/admin/investor-interest').catch(()=>null);
+ const intCard=interest?pgCard(6,'pg-leads pg-interest',pgHead('mail',tr('intTitle'),interest.items.length||''),`<p class="pg-note">${tr('intNote')}</p>${interest.items.length?`<ul class="pg-rows">${interest.items.map(x=>`<li><span class="pg-ev-main"><strong>${esc(x.name)} · ${esc(x.fund)} → ${esc(x.project.name)}</strong><small>${x.email?`<a href="mailto:${esc(x.email)}">${esc(x.email)}</a> · `:''}${x.website?link(x.website,x.website.replace(/^https:\/\//,''))+' · ':''}${x.linkedin?link(x.linkedin,'LinkedIn')+' · ':''}${tr('intVia_'+x.via)} · ${date(x.created,true)}</small>${x.message?`<small class="pg-lead-msg">${esc(x.message)}</small>`:''}</span></li>`).join('')}</ul>`:`<p class="pg-calm">${pgIcon('check')}${esc(tr('intNone'))}</p>`}`):'';
  return adminShell('system',pgWrap('system','pg-settings',`<div class="pg-grid pg-settings-grid">
   ${pgCard(0,'',pgHead('user',tr('adminsTitle')),`<p class="pg-note">${tr('adminsNote')}</p>${inviteBox(inv)}`,`<button data-act="admin-invite" class="acc-secondary">${pgIcon('plus')}${tr('adminInvite')}</button>`)}
   ${pgCard(1,'',pgHead('mail',tr('mail')),`<p>${pgDot(s.mail==='disabled'?'none':'ok',s.mail==='disabled'?tr('mailOff'):s.mail)}</p>`)}
   ${pgCard(2,'',pgHead('box',tr('limits')),`<ul class="pg-limits">${limit(s.limits.documentMB,'PDF/PPTX')}${limit(s.limits.imageMB,tr('upload'))}${limit(s.limits.projectMB,tr('project'))}${limit(s.limits.uploadsMB,tr('total'))}</ul>`)}
-  ${me.role==='platform_owner'?pgCard(3,'',pgHead('key',tr('backup')),`<p class="pg-note">${tr('backupNote')}</p>`,`<a class="acc-secondary" href="/api/admin/backup.sqlite" download>${tr('backupDownload')}</a>`):''}${leadsCard}</div>
+  ${me.role==='platform_owner'?pgCard(3,'',pgHead('key',tr('backup')),`<p class="pg-note">${tr('backupNote')}</p>`,`<a class="acc-secondary" href="/api/admin/backup.sqlite" download>${tr('backupDownload')}</a>`):''}${leadsCard}${invCard}${intCard}</div>
   ${pgFold('shield',tr('whoCanDo'),`<ul class="pg-perms">${[0,1,2,3,4].map(i=>`<li><span>${tr('perm'+i)}</span><b>${tr('permWho'+i)}</b></li>`).join('')}</ul>`,{cls:'is-advanced'})}`));
 }
 async function reportsView(){
@@ -929,6 +986,7 @@ function tkRow(t,i){
  <small class="tk-meta"><span class="tk-st is-${esc(t.status)}">${esc(tr('st_'+t.status))}</span><span title="${esc(tr(t.scope==='team'?'oneForTeam':'eachPerson'))}">${tkI(scope)}${esc(tr('type_'+t.type))}</span>${t.requiresReview?`<span title="${esc(tr('requiresReview'))}">${tkI('review')}${tkSr(tr('requiresReview'))}</span>`:''}${t.pickMode==='catalog'?`<span>${esc(tr('pm_catalog'))}</span>`:''}</small></div>
  ${tkBar(p,{catalog:t.pickMode==='catalog'})}
  ${tkDue(t)}
+ ${t.assigned&&t.pickMode!=='catalog'&&t.responses?`<span class="mx-sum tk-answers" title="${esc(`${t.responses.accepted} ${tr('rsAccepted')}, ${t.responses.declined} ${tr('rsDeclined')}, ${t.responses.unanswered} ${tr('rsUnanswered')}`)}"><b>✓${t.responses.accepted}</b> <b>✗${t.responses.declined}</b> <b>?${t.responses.unanswered}</b></span>`:'<span class="tk-answers" aria-hidden="true"></span>'}
  ${t.waiting?`<a class="tk-wait" href="#/admin/reviews" title="${esc(t.waiting+' '+pgPlural('waiting',t.waiting))}">${tkI('review')}<b>${t.waiting}</b>${tkSr(tr('waiting'))}</a>`:'<span class="tk-wait is-none" aria-hidden="true"></span>'}
  ${tkPts(t.xp)}
  </li>`;
@@ -951,7 +1009,7 @@ async function tkBoard(){
  <div class="tk-kpi is-done"><span class="tk-kpi-l">${tr('tkCompletion')}</span>${tkN(pct,'%')}${tkBar(agg)}</div>
  </div>`;
  const filters=`<div class="tk-filters" role="group" aria-label="${esc(tr('tkFilter'))}">${Object.keys(TK_FILTERS).map(k=>{const n=items.filter(TK_FILTERS[k]).length;return `<button type="button" data-act="tk-filter" data-view="${k}" aria-pressed="${k===view}" ${n||k==='all'||k===view?'':'class="is-zero"'}>${tr('tkf_'+k)}<span>${n}</span></button>`;}).join('')}</div>`;
- const tools=`<div class="tk-tools">${filters}<div class="tk-new"><a class="tk-btn is-primary" href="#/admin/task/new">${tkI('plus')}${tr('newTask')}</a><a class="tk-btn" href="#/admin/task/new-letter" title="${esc(tr('letterTask'))}">${tkI('mail')}<span>${tr('tkFromEmail')}</span></a></div></div>`;
+ const tools=`<div class="tk-tools"><div class="tk-filters" role="group">${tkViews('list')}</div>${filters}<div class="tk-new"><a class="tk-btn is-primary" href="#/admin/task/new">${tkI('plus')}${tr('newTask')}</a><a class="tk-btn" href="#/admin/task/new-letter" title="${esc(tr('letterTask'))}">${tkI('mail')}<span>${tr('tkFromEmail')}</span></a></div></div>`;
  const shown=items.filter(TK_FILTERS[view]);
  let n=0;const rows=arr=>`<ol class="tk-rows">${arr.map(t=>tkRow(t,n++)).join('')}</ol>`;
  const groups=view==='all'?['published','draft','closed','archived'].map(s=>{const g=items.filter(t=>t.status===s).sort(s==='published'?tkUrgency:()=>0);if(!g.length)return '';
@@ -1002,6 +1060,75 @@ function tkStatus(t){
  const reopen=t.status==='closed'?`<button type="button" class="tk-btn" data-act="task-status" data-id="${esc(t.id)}" data-status="published">${tr('tkReopen')}</button>`:'';
  return `<ol class="tk-steps" aria-label="${esc(tr('tkStatus'))}">${steps.map((s,i)=>`<li class="${i<at?'is-done':i===at?'is-now':''}" ${i===at?'aria-current="step"':''}><span>${esc(tr(s==='published'?'tkLive':'st_'+s))}</span></li>`).join('')}</ol><div class="tk-actions"><button type="button" class="tk-btn ${next[2]}" data-act="task-status" data-id="${esc(t.id)}" data-status="${next[0]}">${esc(next[1]==='archive'?tr('archive').split(' ')[0]:tr(next[1]))}</button>${reopen}</div>`;
 }
+// One screen for a new task: title and instructions in one language, what proof counts, deadline, points, review and
+// the teams (every team of the programme, accounts or not), then Publish. Checklist and who submits sit under More options.
+const PROOFS=['file','link','text'];
+const proofFrom=t=>t?.proof?.length?t.proof:t?.type==='link'?['link']:['text','team_result','counter'].includes(t?.type)?['text']:t?.type==='attachment'?['file','link']:t?.type==='checklist'?[]:['file'];
+const tkComposable=t=>!t||['text','link','attachment','checklist'].includes(t.type);
+async function tkCompose(t){
+ const [mx,lib]=await Promise.all([api('GET','/api/admin/tasks/matrix'),t?{items:[]}:api('GET','/api/admin/tasks?library=1').catch(()=>({items:[]}))]);
+ cache.library=lib.items;
+ const tl=t?.translations||{},l=t?(tl[lang]?.title?lang:['hr','en','ru'].find(x=>tl[x]?.title)||lang):lang;
+ const proof=proofFrom(t),pick_=new Set(cache.pick?.team||[]);
+ const teams=mx.teams,now=localInput(new Date(Date.now()+3600000).toISOString());
+ const template=!t&&lib.items.length?`<div class="tkc-template"><label class="acc-field"><span>${tkI('file')}${tr('tkcFromTemplate')}</span><select data-act="tk-template" aria-describedby="tkc-tpl-note"><option value="">${esc(tr('tkcTemplateNone'))}</option>${lib.items.map(x=>`<option value="${esc(x.id)}">${esc(taskText(x.translations))}</option>`).join('')}</select></label><small class="tk-note" id="tkc-tpl-note">${tr('tkcTemplateNote')}</small></div>`:'';
+ const langNote=l!==lang?`<p class="tk-note">${esc(tr('tkcOtherLang').replace('{l}',l.toUpperCase()))}</p>`:'';
+ const teamBox=t?'':`<fieldset class="tkc-who"><legend>${tr('tkcWho')}</legend><div class="tk-seg-row">${tkSeg('audience','',[['all_participants',tr('tkcAllTeams'),'team'],['selected',tr('tkcChoose'),'check']],pick_.size?'selected':'all_participants')}</div>
+  <div class="tkc-teams">${teams.length?`<div class="tk-chips">${teams.map(x=>`<label class="tk-chip"><input type="checkbox" name="projectId" value="${esc(x.id)}" ${pick_.has(x.id)?'checked':''}><span>${esc(x.name)}${x.members?'':` <small class="tkc-wait">· ${esc(tr('tkcNoAccounts'))}</small>`}</span></label>`).join('')}</div>`:`<p class="tk-note">${tr('tkcNoTeams')} <a href="#/admin/overview">${tr('teamsNav')} →</a></p>`}</div></fieldset>`;
+ return `<form data-form="task-compose" data-id="${esc(t?.id||'')}" data-version="${t?.version||''}" data-lang="${l}" data-tl="${esc(JSON.stringify(tl))}" data-scope="${esc(t?.scope||'')}" class="tk-form tkc" novalidate>
+ ${template}
+ <section class="tk-sec">${langNote}${field('title',tr('title'),{value:tl[l]?.title,required:true,attrs:'maxlength="160"'})}${field('instructions',tr('instructions'),{type:'textarea',value:tl[l]?.instructions,required:true,attrs:'rows="5" maxlength="4000"'})}
+ <fieldset class="tkc-proof"><legend>${tr('tkcProof')}</legend><div class="tk-chips">${PROOFS.map(k=>`<label class="tk-chip"><input type="checkbox" name="proof" value="${k}" ${proof.includes(k)?'checked':''}><span>${tkI(k==='file'?'attachment':k)}${esc(tr('proof_'+k))}</span></label>`).join('')}</div><small class="tk-note">${tr('tkcProofNote')}</small></fieldset>
+ <div class="tk-row3">${field('dueAt',tr('due'),{type:'datetime-local',value:localInput(t?.dueAt),attrs:`min="${now}"`})}${field('xp',tr('points'),{type:'number',value:t?.xp??10,attrs:'min="0" max="1000" inputmode="numeric"'})}<label class="tk-switch"><input type="checkbox" name="requiresReview" ${!t||t.requiresReview?'checked':''}><span>${tkI('review')}${tr('tkcReview')}</span></label></div>
+ ${teamBox}</section>
+ <details class="tk-sec tk-adv"><summary class="tk-sec-h">${tr('tkcMore')}</summary>
+  ${field('checklist',tr('checklistItems'),{type:'textarea',value:(t?.checklist||[]).map(c=>pick(c)).join('\n'),hint:tr('tkcChecklistNote'),attrs:'rows="3"'})}
+  <div class="tk-row2">${tkSeg('scope',tr('whoSubmits'),[['team',tr('oneForTeam'),'team'],['personal',tr('eachPerson'),'person']],t?.scope||'team')}</div>
+  <div class="tk-row3">${select('completionMode',tr('completionMode'),['participant','admin_only'].map(v=>[v,tr('cm_'+v)]),t?.completionMode||'participant')}${select('pickMode',tr('pickMode'),['assigned','catalog'].map(v=>[v,tr('pm_'+v)]),t?.pickMode||'assigned')}${select('repeatRule',tr('repeat'),['once','weekly_reward','per_week'].map(v=>[v,tr('rep_'+v)]),t?.repeatRule||'once')}</div>
+  ${t?'':`<button class="tk-btn" name="mode" value="draft">${tr('tkcSaveDraft')}</button>`}
+ </details>
+ <div class="tk-save">${t?`<button class="tk-btn is-primary" name="mode" value="save">${tkI('check')}${tr('tkcSaveChanges')}</button>`:`<button class="tk-btn is-primary is-big" name="mode" value="publish">${tkI('send')}${tr('tkcPublish')}</button>`}</div></form>`;
+}
+// A template fills the form; nothing is saved until Publish.
+function tkTemplate(sel){
+ const x=(cache.library||[]).find(t=>t.id===sel.value),form=sel.closest('form');if(!x||!form)return;
+ const set=(n,v)=>{const el=form.elements[n];if(el)el.value=v??'';};
+ set('title',taskText(x.translations));set('instructions',taskText(x.translations,'instructions'));set('xp',x.xp);
+ const proof=proofFrom(x);form.querySelectorAll('[name=proof]').forEach(c=>c.checked=proof.includes(c.value));
+ form.elements.requiresReview.checked=!!x.requiresReview;
+ set('checklist',(x.checklist||[]).map(c=>pick(c)).join('\n'));
+ form.querySelectorAll('[name=scope]').forEach(r=>r.checked=r.value===x.scope);
+ if(x.checklist?.length)form.querySelector('.tk-adv').open=true;
+ form.elements.title.focus();
+}
+const MX=['unanswered','accepted','working','submitted','changes','done','declined','overdue'];
+const mxTitle=t=>taskText(t.title)||'—';
+// Homework overview: teams down, tasks across, one status per cell; on a phone only the table scrolls sideways.
+async function tkMatrix(){
+ const m=await api('GET','/api/admin/tasks/matrix');
+ const head=`<div class="tk-tools"><div class="tk-filters" role="group">${tkViews('matrix')}</div><div class="tk-new"><a class="tk-btn is-primary" href="#/admin/task/new">${tkI('plus')}${tr('newTask')}</a></div></div>`;
+ if(!m.tasks.length||!m.teams.length)return adminShell('tasks',`<div class="tk">${head}<div class="tk-calm">${tkI('plus')}<p>${tr(m.teams.length?'mxEmpty':'tkcNoTeams')}</p></div></div>`);
+ const count=t=>MX.reduce((o,k)=>(o[k]=m.teams.filter(x=>m.cells[x.id+'|'+t.id]?.status===k).length,o),{});
+ const th=m.tasks.map(t=>{const c=count(t);return `<th scope="col"><a href="#/admin/task/${esc(t.id)}" title="${esc(mxTitle(t))}"><span class="mx-t">${esc(mxTitle(t))}</span></a><small>${t.dueAt?esc(shortDate(t.dueAt)):'—'} · ${t.xp} ${esc(tr('tkPts'))}</small><small class="mx-sum" title="${esc(`${c.accepted+c.working+c.submitted+c.done+c.changes} ${tr('rsAccepted')}, ${c.declined} ${tr('rsDeclined')}, ${c.unanswered} ${tr('rsUnanswered')}`)}"><b>✓${c.accepted+c.working+c.submitted+c.done+c.changes}</b> <b>✗${c.declined}</b> <b>?${c.unanswered}</b></small></th>`;}).join('');
+ const cell=(team,t)=>{const c=m.cells[team.id+'|'+t.id];if(!c)return `<td class="mx-c is-none"><span class="tk-sr">${esc(tr('mx_none'))}</span><span aria-hidden="true">·</span></td>`;
+  const label=tr('mx_'+c.status)+(c.people>1?' · '+tr('mxPeople').replace('{d}',c.done).replace('{n}',c.people):'')+(c.reason?' · '+c.reason:'');
+  return `<td class="mx-c is-${c.status}"><a href="#/admin/answer/${esc(c.assignmentId)}" title="${esc(team.name+' · '+mxTitle(t)+': '+label)}"><i aria-hidden="true"></i><span>${esc(tr('mx_'+c.status))}</span></a></td>`;};
+ const table=`<div class="mx-wrap" tabindex="0" role="region" aria-label="${esc(tr('tkMatrix'))}"><table class="mx"><thead><tr><th scope="col" class="mx-corner">${tr('team')}</th>${th}</tr></thead><tbody>${m.teams.map(x=>`<tr><th scope="row"><a href="#/admin/team/${esc(x.id)}">${esc(x.name)}</a>${x.members?'':`<small>${esc(tr('noAccountsYet'))}</small>`}</th>${m.tasks.map(t=>cell(x,t)).join('')}</tr>`).join('')}</tbody></table></div>`;
+ const legend=`<ul class="mx-legend">${MX.map(k=>`<li class="is-${k}"><i aria-hidden="true"></i>${esc(tr('mx_'+k))}</li>`).join('')}</ul>`;
+ return adminShell('tasks',`<div class="tk tk-mx">${head}<p class="tk-note">${tr('mxHint')}</p>${table}${legend}</div>`);
+}
+const tkViews=on=>[['matrix','tkMatrix','#/admin/tasks'],['list','tkList','#/admin/tasks/list']].map(([k,l,h])=>`<a href="${h}" ${on===k?'aria-current="page"':''}>${tr(l)}</a>`).join('');
+// One team's answer to one task, opened from the matrix: what they handed in, their decline reason, review or reopen.
+async function tkAnswerView(id){
+ const {assignment:a}=await api('GET','/api/tasks/'+encodeURIComponent(id));
+ const r=a.revisions?.[0]?.content,declined=a.response?.decision==='declined',who=a.projectName||'';
+ const state=declined?'declined':a.status==='accepted'?'done':a.status==='submitted'?'submitted':a.status==='changes_requested'||a.status==='rejected'?'changes':a.status==='draft'?'working':a.response?'accepted':'unanswered';
+ const review=a.status==='submitted'&&a.submissionId?`<form data-form="review" data-id="${esc(a.submissionId)}" data-revision="${a.revision}" class="tk-rv-form"><label class="tk-sr" for="ans-c">${tr('comment')}</label><textarea id="ans-c" name="comment" rows="2" maxlength="3000" placeholder="${esc(tr('tkCommentPh'))}"></textarea><div class="tk-decide"><button name="decision" value="accepted" class="tk-btn is-ok">${tkI('check')}${tr('accept')}</button><button name="decision" value="changes_requested" class="tk-btn is-back">${tkI('back')}${tr('requestChanges')}</button></div></form>`:'';
+ const body=declined?`<p class="tk-rv-last">${tkI('cross')}<span><b>${tr('ansReason')}</b> ${a.response.reason?esc(a.response.reason):esc(tr('ansNoReason'))}</span></p><button type="button" class="tk-btn is-primary" data-act="reopen" data-id="${esc(a.id)}">${tkI('back')}${tr('reopenTask')}</button>`
+  :r?tkAnswer(a,r):`<p class="tk-empty">${tr('ansNothing')}</p>`;
+ const reviews=(a.reviews||[]).length?`<ol class="m-timeline">${a.reviews.map(x=>`<li class="is-${esc(x.decision)}"><div>${statusChip(x.decision)} <small>${esc(x.reviewer)} · ${date(x.created,true)}</small>${x.comment?`<p>${esc(x.comment)}</p>`:''}</div></li>`).join('')}</ol>`:'';
+ return adminShell('tasks',`<div class="tk tk-ans"><a class="tk-backlink" href="#/admin/tasks">← ${tr('tkMatrix')}</a><article class="tk-rv"><header class="tk-rv-head"><span class="tk-type">${tkI(a.task.type)}</span><div class="tk-main"><h3>${authored(a.task.translations,'title')}</h3><small class="tk-meta"><span class="tk-who"><i aria-hidden="true">${esc(tkInitials(who))}</i>${esc(who)}</span><span class="mx-pill is-${state}"><i aria-hidden="true"></i>${esc(tr('mx_'+state))}</span>${a.task.dueAt?`<span>${tr('due')} ${date(a.task.dueAt,true)}</span>`:''}</small></div>${tkPts(a.task.xp)}</header><div class="tk-rv-body"><div class="tk-rv-answer">${body}</div>${review}</div>${reviews}</article></div>`);
+}
 const tkSeg=(name,legend,options,value)=>`<fieldset class="tk-seg"><legend>${esc(legend)}</legend><div>${options.map(([v,l,ic])=>`<label><input type="radio" name="${name}" value="${esc(v)}" ${String(v)===String(value)?'checked':''}><span>${ic?tkI(ic):''}${esc(l)}</span></label>`).join('')}</div></fieldset>`;
 async function tkEditor(id){
  const [,presetKind,presetId]=(id||'').split('~');
@@ -1024,6 +1151,8 @@ async function tkEditor(id){
  </section>
  <details class="tk-sec tk-adv"><summary class="tk-sec-h"><span>3</span>${tr('tkAdvanced')}<small>${esc([tr('cm_'+(t?.completionMode||'participant')),tr('pm_'+(t?.pickMode||'assigned')),tr('rep_'+(t?.repeatRule||'once'))].join(' · '))}</small></summary><div class="tk-row3">${select('completionMode',tr('completionMode'),['participant','admin_only'].map(v=>[v,tr('cm_'+v)]),t?.completionMode||'participant')}${select('pickMode',tr('pickMode'),['assigned','catalog'].map(v=>[v,tr('pm_'+v)]),t?.pickMode||'assigned')}${select('repeatRule',tr('repeat'),['once','weekly_reward','per_week'].map(v=>[v,tr('rep_'+v)]),t?.repeatRule||'once')}</div></details>
  <div class="tk-save"><button class="tk-btn is-primary">${tkI('check')}${tr('save')}</button></div></form>`;
+ // Tasks of the usual kinds (text, link, file, checklist) are written and edited on the one-screen form.
+ const compose=tkComposable(t)?await tkCompose(t):null;
  const sendable=t&&['draft','published'].includes(t.status);
  const everyone=sendable&&t.audience!=='selected';
  const [teams,users]=sendable&&!everyone?await Promise.all([api('GET','/api/admin/overview'),api('GET','/api/admin/users')]):[{items:[]},{items:[]}];
@@ -1037,15 +1166,20 @@ async function tkEditor(id){
   mark=`<details class="tk-fold"><summary>${tkI('check')}${tr('markFor')}</summary><form data-form="mark" data-id="${esc(t.id)}" data-scope="${esc(t.scope)}"><div class="tk-chips">${targets.map(x=>`<label class="tk-chip"><input type="checkbox" name="target" value="${esc(x.id)}"><span>${esc(x.name)}</span></label>`).join('')}</div>${field('note',tr('note'),{attrs:'maxlength="500"'})}<button class="tk-btn is-primary">${tkI('check')}${tr('markDone')}</button></form></details>`;}
  const share=t&&t.status==='published'?`<details class="tk-fold"><summary>${tkI('share')}${tr('waTitle')}</summary><p class="tk-note">${tr('waNote')}</p>${waLink(`${tr('waNewTask')}: ${taskText(tl)}${t.dueAt?`\n${tr('due')} ${date(t.dueAt,true)}`:''}\n${t.xp} ${pgPlural('xp',t.xp)}\n${siteLink('#/account/tasks')}`)}</details>`:'';
  const p=t?tkParts(t):null;
+ // Who accepted, declined or has not answered yet, team by team (from the homework overview).
+ let answers='';
+ if(t&&t.assigned&&t.pickMode!=='catalog'){const mx=await api('GET','/api/admin/tasks/matrix').catch(()=>null);const rows=(mx?.teams||[]).map(x=>({x,c:mx.cells[x.id+'|'+t.id]})).filter(r=>r.c);
+  if(rows.length)answers=`<section class="tk-panel"><div class="tk-panel-top"><span class="tk-kpi-l">${tr('rsPanel')}</span><small class="mx-sum"><b>✓${t.responses.accepted}</b> <b>✗${t.responses.declined}</b> <b>?${t.responses.unanswered}</b></small></div><ul class="mx-list">${rows.map(({x,c})=>`<li><a href="#/admin/answer/${esc(c.assignmentId)}"><span>${esc(x.name)}</span><span class="mx-pill is-${c.status}"><i aria-hidden="true"></i>${esc(tr('mx_'+c.status))}</span></a></li>`).join('')}</ul></section>`;}
  const side=t?`<aside class="tk-side">
  <section class="tk-panel">${tkStatus(t)}</section>
  <section class="tk-panel"><div class="tk-panel-top"><span class="tk-kpi-l">${tr('progress')}</span>${tkDue(t)}</div>${tkBar(p,{big:true,catalog:t.pickMode==='catalog'})}${p.total?tkLegend(p):''}${t.waiting?`<a class="tk-btn is-wait" href="#/admin/reviews">${tkI('review')}${tr('tkToReview')} (${t.waiting})</a>`:''}</section>
- ${sendable?`<section class="tk-panel"><span class="tk-kpi-l">${tr('recipients')}</span>${picker}${preview}</section>`:''}
+ ${answers}
+ ${sendable&&t.status==='draft'?`<section class="tk-panel"><span class="tk-kpi-l">${tr('recipients')}</span>${picker}${preview}</section>`:''}
  ${nudge||mark||share?`<section class="tk-panel tk-folds">${nudge}${mark}${share}</section>`:''}
  </aside>`:'';
  const letter=t?'':`<details class="tk-panel acc-letter tk-letter" ${id==='new-letter'?'open':''}><summary>${tkI('mail')}<strong>${tr('letterTask')}</strong></summary><p class="tk-note">${tr('letterNote')}</p><label class="acc-field"><span>${tr('letterText')}</span><textarea id="letter-text" rows="8" maxlength="20000"></textarea></label><div class="tk-actions"><button type="button" class="tk-btn is-primary" data-act="letter-fill">${tr('letterFill')}</button></div><p class="acc-muted" id="letter-result" role="status"></p></details>`;
  const head=`<header class="tk-ed-head"><a class="tk-backlink" href="#/admin/tasks">← ${tr('tasks')}</a><div class="tk-ed-title">${t?`<span class="tk-type is-big">${tkI(t.type)}</span><h2>${authored(tl,'title')}</h2>${tkPts(t.xp)}`:`<span class="tk-type is-big">${tkI('plus')}</span><h2>${tr('newTask')}</h2>`}</div></header>`;
- return adminShell('tasks',`<div class="tk tk-ed ${t?'':'is-new'}">${head}<div class="tk-ed-grid">${side}<div class="tk-ed-main">${letter}${form}</div></div></div>`);
+ return adminShell('tasks',`<div class="tk tk-ed ${t?'':'is-new'}">${head}<div class="tk-ed-grid">${side}<div class="tk-ed-main">${letter}${compose||form}</div></div></div>`);
 }
 async function tkImport(){
  const [tl,ll,hooks]=await Promise.all([api('GET','/api/admin/tasks?status=published'),api('GET','/api/admin/lectures'),api('GET','/api/admin/form-hooks')]);
@@ -1063,7 +1197,12 @@ async function adminView(tab='dashboard',id){
  if(tab==='team'&&id)return teamRecord(id);
  if(tab==='person'&&id)return personRecord(id);
  if(tab==='overview'){
-  const o=await api('GET','/api/admin/overview'),view=cache.teamFilter||'all';
+  // Stage (several ticks) and raised-amount range go to the server; the quick buttons below narrow what came back.
+  const sf=cache.stageFilter||{stages:[],raisedMin:'',raisedMax:''},q=new URLSearchParams();
+  if(sf.stages.length)q.set('stage',sf.stages.join(','));if(sf.raisedMin!=='')q.set('raisedMin',sf.raisedMin);if(sf.raisedMax!=='')q.set('raisedMax',sf.raisedMax);
+  const o=await api('GET','/api/admin/overview'+(q.size?'?'+q:'')),view=cache.teamFilter||'all';
+  const filtered=sf.stages.length||sf.raisedMin!==''||sf.raisedMax!=='';
+  const stageFilter=`<form data-form="stage-filter" class="acc-card acc-stage-filter"><fieldset><legend>${tr('dashStage')}</legend><div class="tk-chips">${STAGES.map(s=>`<label class="tk-chip"><input type="checkbox" name="stage" value="${s}" ${sf.stages.includes(s)?'checked':''}><span>${esc(tr('stage_'+s))}</span></label>`).join('')}</div></fieldset><fieldset class="acc-raised"><legend>${tr('tfRaised')}</legend><div class="acc-inline">${field('raisedMin',tr('tfFrom'),{type:'number',value:sf.raisedMin,attrs:'min="0" step="1" inputmode="numeric"'})}${field('raisedMax',tr('tfTo'),{type:'number',value:sf.raisedMax,attrs:'min="0" step="1" inputmode="numeric"'})}</div>${sf.raisedMin!==''||sf.raisedMax!==''?`<small class="acc-muted">${tr('tfRaisedNote')}</small>`:''}</fieldset><div class="acc-actions"><button class="acc-secondary">${tr('tfApply')}</button>${filtered?`<button type="button" data-act="stage-filter-clear">${tr('tfClear')}</button><span class="acc-muted" role="status">${esc(tr('tfShown').replace('{n}',o.items.length).replace('{m}',o.total??o.items.length))}</span>`:''}</div></form>`;
   const tests=TEAM_TESTS;
   const rows=o.items.filter(tests[view]);
   const deck={accepted:'✓',submitted:'…'};
@@ -1073,12 +1212,15 @@ async function adminView(tab='dashboard',id){
   const roster=`<div class="acc-grid acc-roster"><details class="acc-card" ${made==='team'?'open':''}><summary><strong>${I('plus')} ${tr('newTeam')}</strong></summary><form data-form="admin-team" class="acc-compact">${field('name',tr('teamName'),{required:true,attrs:'maxlength="100"'})}${field('description',tr('teamDescription'),{type:'textarea',attrs:'rows="2" maxlength="280"'})}<button class="acc-primary">${tr('newTeam')}</button></form></details>
   <details class="acc-card" ${made==='person'?'open':''}><summary><strong>${I('person')} ${tr('addPerson')}</strong></summary><p class="acc-muted">${tr('addPersonNote')}</p><form data-form="admin-person" class="acc-compact">${field('name',tr('fullName'),{required:true,attrs:'maxlength="80"'})}${field('email',tr('personEmail'),{type:'email',attrs:'maxlength="200"'})}${select('projectId',tr('team'),[['',tr('noTeam')],...o.items.map(p=>[p.id,p.name])],cache.lastTeam||'')}<button class="acc-primary">${tr('addPerson')}</button></form><p><a href="#/admin/links">${tr('linksGo')} →</a></p></details></div>`;
   return adminShell(tab,`${roster}<div class="acc-actions acc-admin-tools"><a class="acc-secondary" href="/api/admin/export.csv" download>${tr('exportCsv')}</a><a class="acc-secondary" href="/api/admin/export-people.csv" download>${tr('exportPeople')}</a><a href="/api/calendar.ics">${tr('calendar')} (.ics)</a></div>
+  ${stageFilter}
   <div class="acc-filters" role="group">${Object.keys(tests).map(k=>`<button data-act="team-filter" data-view="${k}" aria-pressed="${k===view}">${tr('tf_'+k)}</button>`).join('')}</div>
   <details class="acc-card acc-nudge-team" ${nudging?'open':''}><summary>${tr('nudgeTeam')}</summary><form data-form="nudge" id="team-nudge" class="acc-compact"><p class="acc-muted">${tr('nudgePick')}</p>${field('message',tr('nudgeMessage'),{type:'textarea',required:true,value:nudging?tr('nudgeTeamTemplate'):'',attrs:'rows="2" maxlength="300"'})}<button class="acc-primary">${tr('nudgeSend')}</button></form></details>
-  <div class="acc-table-wrap"><table class="acc-table acc-matrix acc-teams-table"><thead><tr><th></th><th>${tr('project')}</th><th>${tr('scoreColumn')}</th><th>${tr('tasks')}</th><th>${tr('attendance')}<small>✓ ${tr('pgVerifiedShort')} · ${tr('selfReportedShort')}</small></th><th>${tr('pitches')}</th><th>${tr('mentors')}</th><th>${tr('risk')}</th><th>${tr('lastSeen')}</th></tr></thead><tbody>${rows.map(p=>`<tr class="risk-${esc(p.risk.level)}"><td>${p.members.length?`<label class="acc-tick"><input type="checkbox" name="teamId" value="${esc(p.id)}" form="team-nudge" aria-label="${esc(p.name)}" ${nudging&&p.risk.level!=='ok'?'checked':''}></label>`:''}</td><th scope="row"><a href="#/admin/team/${esc(p.id)}"><strong>${esc(p.name)}</strong></a><small>${esc(p.members.join(', '))||tr('noAccountsYet')}</small></th><td><b>${percent(p.percent)}</b><small>${p.totalXp} ${pgPlural('xp',p.totalXp)}</small></td><td>${p.tasks.done}/${p.tasks.total}${p.overdue?`<small class="acc-idle">${p.overdue} ${pgPlural('overdueShort',p.overdue)}</small>`:''}${p.tasks.waitingReview?`<small>${p.tasks.waitingReview} ${pgPlural('waiting',p.tasks.waitingReview)}</small>`:''}</td><td>${p.attendance.verified} ✓ · ${p.attendance.selfReported}</td><td>${deck[p.pitch.deck]||'—'}<small>${p.pitch.pitches} ${pgPlural('pitches',p.pitch.pitches)}</small></td><td>${p.mentorSessions}</td><td><span class="acc-light is-${esc(p.risk.level)}">${tr('risk_'+p.risk.level)}</span><small>${p.risk.signals.map(x=>tr('sig_'+x)).join(', ')}${p.streak?` · ${I('flame')}${p.streak}`:''}</small></td><td><small class="${idle(p.lastSeen)?'acc-idle':''}">${p.lastSeen?date(p.lastSeen,true):'—'}</small></td></tr>`).join('')}</tbody></table></div>`);
+  <div class="acc-table-wrap"><table class="acc-table acc-matrix acc-teams-table"><thead><tr><th></th><th>${tr('project')}</th><th>${tr('colStage')}</th><th>${tr('scoreColumn')}</th><th>${tr('tasks')}</th><th>${tr('attendance')}<small>✓ ${tr('pgVerifiedShort')} · ${tr('selfReportedShort')}</small></th><th>${tr('pitches')}</th><th>${tr('mentors')}</th><th>${tr('risk')}</th><th>${tr('lastSeen')}</th></tr></thead><tbody>${rows.map(p=>`<tr class="risk-${esc(p.risk.level)}"><td>${p.members.length?`<label class="acc-tick"><input type="checkbox" name="teamId" value="${esc(p.id)}" form="team-nudge" aria-label="${esc(p.name)}" ${nudging&&p.risk.level!=='ok'?'checked':''}></label>`:''}</td><th scope="row"><a href="#/admin/team/${esc(p.id)}"><strong>${esc(p.name)}</strong></a><small>${esc(p.members.join(', '))||tr('noAccountsYet')}</small></th><td class="acc-stage-cell"><span class="m-tag">${esc(stageLabel(p.stage))}</span>${p.stageSince?`<small>${tr('stageSince')} ${date(p.stageSince)}</small>`:''}${p.funding&&(p.funding.raisedEur!==null||p.funding.raisingEur!==null)?`<small>${p.funding.raisedEur!==null?`${tr('raisedShort')} ${eur(p.funding.raisedEur)}`:''}${p.funding.raisedEur!==null&&p.funding.raisingEur!==null?' · ':''}${p.funding.raisingEur!==null?`${tr('raisingShort')} ${eur(p.funding.raisingEur)}`:''}</small>`:''}${p.funding?.round?`<small>${esc(tr('round_'+p.funding.round))}</small>`:''}</td><td><b>${percent(p.percent)}</b><small>${p.totalXp} ${pgPlural('xp',p.totalXp)}</small></td><td>${p.tasks.done}/${p.tasks.total}${p.overdue?`<small class="acc-idle">${p.overdue} ${pgPlural('overdueShort',p.overdue)}</small>`:''}${p.tasks.waitingReview?`<small>${p.tasks.waitingReview} ${pgPlural('waiting',p.tasks.waitingReview)}</small>`:''}</td><td>${p.attendance.verified} ✓ · ${p.attendance.selfReported}</td><td>${deck[p.pitch.deck]||'—'}<small>${p.pitch.pitches} ${pgPlural('pitches',p.pitch.pitches)}</small></td><td>${p.mentorSessions}</td><td><span class="acc-light is-${esc(p.risk.level)}">${tr('risk_'+p.risk.level)}</span><small>${p.risk.signals.map(x=>tr('sig_'+x)).join(', ')}${p.streak?` · ${I('flame')}${p.streak}`:''}</small></td><td><small class="${idle(p.lastSeen)?'acc-idle':''}">${p.lastSeen?date(p.lastSeen,true):'—'}</small></td></tr>`).join('')}</tbody></table></div>`);
  }
  if(tab==='reviews')return tkReviews(id);
- if(tab==='tasks')return tkBoard();
+ // Homework overview is the first thing under Tasks; the list of tasks is one tab further.
+ if(tab==='tasks')return id==='list'?tkBoard():tkMatrix();
+ if(tab==='answer'&&id)return tkAnswerView(id);
  if(tab==='task')return tkEditor(id);
  // Linking cards to accounts lives in whoami.js (it fills this slot after render).
  if(tab==='links')return adminShell(tab,'<div data-admin-links></div>');
@@ -1090,7 +1232,7 @@ async function adminView(tab='dashboard',id){
  }
  if(tab==='users'){
   const u=await api('GET','/api/admin/users');
-  return adminShell(tab,`<label class="acc-field"><span>${tr('searchPeople')}</span><input type="search" data-filter="people" autocomplete="off"></label><div class="acc-table-wrap"><table class="acc-table acc-matrix"><thead><tr><th></th><th>${tr('displayName')}</th><th>${tr('status')}</th><th>${tr('points')}</th><th></th></tr></thead><tbody>${u.items.map(x=>`<tr data-search="${esc((x.displayName+' '+x.login+' '+(x.projects||[]).join(' ')).toLowerCase())}" class="${x.status==='active'&&x.role==='member'&&idle(x.lastSeen)?'risk-watch':''}"><td>${x.status==='active'?`<label class="acc-tick"><input type="checkbox" name="userId" value="${esc(x.id)}" form="nudge-form" data-idle="${x.role==='member'&&idle(x.lastSeen)?1:0}" aria-label="${esc(x.displayName)}"></label>`:''}</td><th scope="row"><a href="#/admin/person/${esc(x.id)}"><strong>${esc(x.displayName)}</strong></a><small>${esc(seen(x.lastSeen))}</small><small>${esc(x.login)}${x.projects?.length?' · '+esc(x.projects.join(', ')):''}</small></th><td>${esc(tr('urole_'+x.role))}<small>${x.status==='active'?'':tr('disabledNow')}</small></td><td>${x.xp}<small>${x.tasksDone} ${pgPlural('tasksDoneShort',x.tasksDone)} · ${x.lectures} ${pgPlural('lecturesShort',x.lectures)}</small></td><td>${x.role!=='platform_owner'?`<select data-act="user-role" data-id="${esc(x.id)}" data-current="${esc(x.role)}" aria-label="${tr('roleChange')}">${['member','program_admin'].map(r=>`<option value="${r}" ${x.role===r?'selected':''}>${tr('urole_'+r)}</option>`).join('')}</select><button data-act="user-status" data-id="${esc(x.id)}" data-status="${x.status==='active'?'disabled':'active'}" ${x.status==='active'?`data-confirm="${esc(tr('confirmDisable'))}"`:''}>${tr(x.status==='active'?'disable':'enable')}</button>`:''}</td></tr>`).join('')}</tbody></table></div><form data-form="nudge" id="nudge-form" class="acc-card"><h2>${tr('nudgeTitle')}</h2><p class="acc-muted">${tr('nudgeNote')}</p>${field('message',tr('nudgeMessage'),{type:'textarea',required:true,attrs:'rows="2" maxlength="300"'})}<div class="acc-actions"><button class="acc-primary">${tr('nudgeSend')}</button><button type="button" data-act="pick-idle">${tr('pickIdle')}</button></div></form>`);
+  return adminShell(tab,`<label class="acc-field"><span>${tr('searchPeople')}</span><input type="search" data-filter="people" autocomplete="off"></label><p class="acc-muted acc-pm-note">${tr('pmNote')}</p><div class="acc-table-wrap"><table class="acc-table acc-matrix"><thead><tr><th></th><th>${tr('displayName')}</th><th>${tr('status')}</th><th>${tr('points')}</th><th></th></tr></thead><tbody>${u.items.map(x=>`<tr data-search="${esc((x.displayName+' '+x.login+' '+(x.projects||[]).join(' ')).toLowerCase())}" class="${x.status==='active'&&x.role==='member'&&idle(x.lastSeen)?'risk-watch':''}"><td>${x.status==='active'?`<label class="acc-tick"><input type="checkbox" name="userId" value="${esc(x.id)}" form="nudge-form" data-idle="${x.role==='member'&&idle(x.lastSeen)?1:0}" aria-label="${esc(x.displayName)}"></label>`:''}</td><th scope="row"><a href="#/admin/person/${esc(x.id)}"><strong>${esc(x.displayName)}</strong></a><small>${esc(seen(x.lastSeen))}</small><small>${esc(x.login)}${x.projects?.length?' · '+esc(x.projects.join(', ')):''}</small></th><td>${esc(tr('urole_'+x.role))}<small>${x.status==='active'?'':tr('disabledNow')}</small>${x.role!=='member'&&x.status==='active'?`<button type="button" class="acc-link acc-pm ${x.programmeManager?'is-on':''}" data-act="manager-flag" data-id="${esc(x.id)}" data-on="${x.programmeManager?'':'1'}" aria-pressed="${x.programmeManager?'true':'false'}" title="${esc(tr('pmNote'))}">${x.programmeManager?'✓ ':''}${tr('pmToggle')}</button>`:''}</td><td>${x.xp}<small>${x.tasksDone} ${pgPlural('tasksDoneShort',x.tasksDone)} · ${x.lectures} ${pgPlural('lecturesShort',x.lectures)}</small></td><td>${x.role!=='platform_owner'?`<select data-act="user-role" data-id="${esc(x.id)}" data-current="${esc(x.role)}" aria-label="${tr('roleChange')}">${['member','program_admin'].map(r=>`<option value="${r}" ${x.role===r?'selected':''}>${tr('urole_'+r)}</option>`).join('')}</select><button data-act="user-status" data-id="${esc(x.id)}" data-status="${x.status==='active'?'disabled':'active'}" ${x.status==='active'?`data-confirm="${esc(tr('confirmDisable'))}"`:''}>${tr(x.status==='active'?'disable':'enable')}</button>`:''}</td></tr>`).join('')}</tbody></table></div><form data-form="nudge" id="nudge-form" class="acc-card"><h2>${tr('nudgeTitle')}</h2><p class="acc-muted">${tr('nudgeNote')}</p>${field('message',tr('nudgeMessage'),{type:'textarea',required:true,attrs:'rows="2" maxlength="300"'})}<div class="acc-actions"><button class="acc-primary">${tr('nudgeSend')}</button><button type="button" data-act="pick-idle">${tr('pickIdle')}</button></div></form>`);
  }
  if(tab==='system')return systemView();
  if(tab==='lectures')return lecturesView();
@@ -1134,14 +1276,16 @@ async function render(){
  if(me===undefined)await loadMe();
  let html;
  try{
-  if(!me){html=cache.codes?codesView(cache.codes.codes,cache.codes.next):authView(['register','recover'].includes(p[1])?p[1]:'login');}
+  if(p[0]==='account'&&p[1]==='reset')html=resetView();
+  else if(!me&&p[1]==='forgot')html=forgotView();
+  else if(!me){html=cache.codes?codesView(cache.codes.codes,cache.codes.next):authView(['register','recover'].includes(p[1])?p[1]:'login');}
   else if(cache.codes){html=codesView(cache.codes.codes,cache.codes.next);}
   else if(p[0]==='admin'){html=isAdmin()?await adminView(p[1]||'dashboard',p[2]):shell('overview',`<p class="acc-flash is-error">${tr('e_FORBIDDEN')}</p>`);}
   else if(!p[1])html=await overviewView();
   else if(p[1]==='tasks')html=await tasksView();
   else if(p[1]==='task')html=await taskView(p[2]);
   else if(p[1]==='progress')html=await progressView();
-  else if(p[1]==='messages')html=await messagesView(p[2],p[3]);
+  else if(p[1]==='messages')html=await messagesView(p[2],p[3],p[4]);
   else if(p[1]==='mentors')html=await mentorsView(p[2]);
   else if(p[1]==='character')html=await characterView();
   else if(p[1]==='settings')html=await settingsView();
@@ -1151,8 +1295,10 @@ async function render(){
   else html=await overviewView();
  }catch(e){html=me?shell('overview',`<p class="acc-flash is-error" role="alert">${errText(e)}</p>`):authView('login');}
  if(token!==renderToken||!root)return;
- cache.stopChars?.();cache.stopChars=null;stopChar?.();stopChar=null;
+ cache.stopChars?.();cache.stopChars=null;stopChar?.();stopChar=null;cache.stopMsgr?.();cache.stopMsgr=null;
  root.innerHTML=html;updateNav();motion();
+ const msgr=root.querySelector('[data-msgr-app]');
+ if(msgr&&window.BirdMessenger)cache.stopMsgr=window.BirdMessenger.app(msgr,{lang,route:msgr.dataset.route?msgr.dataset.route.split('/'):[],newGroup:'#/account/messages/new-group'});
  // One owner for the living characters: the admin stage and the participant's own one.
  const stage=root.querySelector('[data-cs-stage]');if(window.BirdCharacter&&stage)cache.stopChars=window.BirdCharacter.start(root);
  liven(p);
@@ -1212,14 +1358,19 @@ async function onSubmit(e){
    // Signed in from an invitation link: the code is used at once.
    const code=hashParam('invite');if(code){try{await api('POST','/api/invites/accept',{code});await loadMe();setFlash(tr('saved'));}catch(err){setFlash(errText(err),true);}}
    announce();go('#/account');return;}
-  if(kind==='register'){const r=await api('POST','/api/auth/register',{login:f.get('login'),password:f.get('password'),displayName:f.get('displayName'),email:f.get('email'),language:lang});me=r.user;if(f.get('invite')){try{await api('POST','/api/invites/accept',{code:f.get('invite')});await loadMe();}catch(err){setFlash(errText(err),true);}}announce();cache.codes={codes:r.recoveryCodes,next:'#/account'};render();return;}
+  if(kind==='register'){const r=await api('POST','/api/auth/register',{login:f.get('login'),password:f.get('password'),displayName:f.get('displayName'),email:f.get('email'),language:lang});me=r.user;if(f.get('invite')){try{await api('POST','/api/invites/accept',{code:f.get('invite')});await loadMe();}catch(err){setFlash(errText(err),true);}}announce();cache.codesNotice=r.recoveryCodes;go('#/account');return;}
+  if(kind==='forgot'){const r=await api('POST','/api/auth/password-reset/request',{login:f.get('login')});cache.forgotSent={mail:!!r.mail};render();return;}
+  if(kind==='reset'){if(f.get('newPassword')!==f.get('newPassword2')){setFlash(tr('passwordsDiffer'),true);render();return;}
+   try{await api('POST','/api/auth/password-reset/confirm',{token:hashParam('token'),newPassword:f.get('newPassword')});}catch(err){if(err.code!=='RESET_INVALID')throw err;cache.resetBad=true;render();return;}
+   await loadMe();announce();setFlash(tr('resetDone'));go('#/account');return;}
   if(kind==='recover'){await api('POST','/api/auth/recover',{login:f.get('login'),code:f.get('code'),newPassword:f.get('newPassword')});await loadMe();setFlash(tr('saved'));go('#/account/settings');return;}
   if(kind==='invite'){const r=await api('POST','/api/invites/accept',{code:f.get('code')});await loadMe();setFlash(tr('saved'));go(r.projectId?'#/account/project/'+r.projectId:'#/account');return;}
   if(kind==='claim'){await api('POST','/api/people/claims',{personId:f.get('personId'),message:f.get('message')});setFlash(tr('st_pending'));render();return;}
-  if(kind==='project'){const content=readProjectForm(form);
-   if(!form.dataset.id){const r=await api('POST','/api/projects',content,{key:form.dataset.key||(form.dataset.key=idem())});go('#/account/project/'+r.project.id);return;}
-   try{sessionStorage.setItem(DRAFT_KEY(form.dataset.id),JSON.stringify({version:Number(form.dataset.version),content}));}catch{}
-   await api('PUT',`/api/projects/${encodeURIComponent(form.dataset.id)}/draft`,{content},{headers:{'If-Match':`"${form.dataset.version}"`}});
+  if(kind==='stage-filter'){const n=k=>{const v=String(f.get(k)||'').trim();return /^\d+$/.test(v)?v:'';};cache.stageFilter={stages:f.getAll('stage'),raisedMin:n('raisedMin'),raisedMax:n('raisedMax')};render();return;}
+  if(kind==='project'){const content=readProjectForm(form),funding=readFunding(form);
+   if(!form.dataset.id){const r=await api('POST','/api/projects',{...content,funding},{key:form.dataset.key||(form.dataset.key=idem())});go('#/account/project/'+r.project.id);return;}
+   try{sessionStorage.setItem(DRAFT_KEY(form.dataset.id),JSON.stringify({version:Number(form.dataset.version),content,funding}));}catch{}
+   await api('PUT',`/api/projects/${encodeURIComponent(form.dataset.id)}/draft`,{content,funding},{headers:{'If-Match':`"${form.dataset.version}"`}});
    try{sessionStorage.removeItem(DRAFT_KEY(form.dataset.id));}catch{}
    setFlash(tr('saved'));render();return;}
   if(kind==='upload'||kind==='reference'){const file=f.get('file');if(!file?.size)return;
@@ -1248,6 +1399,26 @@ async function onSubmit(e){
    if(!['en','hr','ru'].some(l=>String(body.translations[l].title||'').trim()&&String(body.translations[l].instructions||'').trim())){say(tr('tkNeedOneLang'));const d=form.querySelector(`.tk-lang:has([name=title_${lang}])`)||form.querySelector('.tk-lang');if(d){d.open=true;d.querySelector('input')?.focus();}return;}
    let r;try{r=form.dataset.id?await api('PUT','/api/admin/tasks/'+encodeURIComponent(form.dataset.id),body):await api('POST','/api/admin/tasks',body);}catch(err){if(err.code==='CONFLICT')throw err;say(errText(err).replace(/<[^>]+>/g,''));return;}
    setFlash(tr('saved'));go('#/admin/task/'+r.task.id);return;}
+  if(kind==='task-compose'){
+   const say=msg=>{let p=form.querySelector('.tk-form-error');if(!p){p=document.createElement('p');p.className='acc-flash is-error tk-form-error';p.setAttribute('role','alert');form.querySelector('.tk-save').before(p);}p.textContent=msg;p.scrollIntoView?.({block:'center',behavior:'smooth'});};
+   const l=form.dataset.lang||lang,tl=JSON.parse(form.dataset.tl||'{}'),mode=btn?.value||'publish',edit=!!form.dataset.id;
+   const title=String(f.get('title')||'').trim(),instructions=String(f.get('instructions')||'').trim();
+   const checklist=String(f.get('checklist')||'').split('\n').map(x=>x.trim()).filter(Boolean),proof=f.getAll('proof');
+   const due=f.get('dueAt')?new Date(f.get('dueAt')):null,audience=f.get('audience')||'all_participants',projectIds=f.getAll('projectId');
+   if(!title||!instructions){say(tr('tkcNeedText'));form.elements[title?'instructions':'title'].focus();return;}
+   if(!proof.length&&!checklist.length){say(tr('tkcNeedProof'));form.querySelector('[name=proof]')?.focus();return;}
+   if(due&&due<Date.now()&&!(edit&&form.elements.dueAt.defaultValue===f.get('dueAt'))){say(tr('tkcPastDue'));form.elements.dueAt.focus();return;}
+   if(!edit&&mode==='publish'&&audience==='selected'&&!projectIds.length){say(tr('tkcNeedTeams'));form.querySelector('[name=projectId]')?.focus();return;}
+   // Other languages the task already has stay as they are; the form writes the one it shows.
+   const body={type:checklist.length?'checklist':'attachment',proof,checklist:checklist.map(line=>({en:'',hr:'',ru:'',[l]:line})),scope:f.get('scope')||form.dataset.scope||'team',xp:Number(f.get('xp')||0),dueAt:due?due.toISOString():null,requiresReview:f.get('requiresReview')==='on',
+    completionMode:f.get('completionMode'),pickMode:f.get('pickMode'),repeatRule:f.get('repeatRule'),translations:{...tl,[l]:{...(tl[l]||{}),title,instructions}},version:Number(form.dataset.version)};
+   if(!edit)Object.assign(body,{audience,projectIds:audience==='selected'?projectIds:[],publish:mode==='publish'});
+   let r;try{r=edit?await api('PUT','/api/admin/tasks/'+encodeURIComponent(form.dataset.id),body):await api('POST','/api/admin/tasks',body);}
+   catch(err){if(err.code==='CONFLICT')throw err;say(err.detail?.reason==='past'?tr('tkcPastDue'):errText(err).replace(/<[^>]+>/g,''));return;}
+   cache.pick=null;
+   if(!edit&&mode==='publish'){setFlash(esc(pgPlural('tkcPublished',r.assigned).replace('{n}',r.assigned)));go('#/admin/tasks');return;}
+   setFlash(tr('saved'));go('#/admin/task/'+r.task.id);return;}
+  if(kind==='decline'){await api('POST',`/api/tasks/${encodeURIComponent(form.dataset.id)}/respond`,{decision:'declined',reason:f.get('reason')});setFlash(tr('taskDeclined'));go('#/account/tasks');return;}
   if(kind==='checkin'){await api('POST',`/api/projects/${encodeURIComponent(form.dataset.id)}/checkins`,{metricName:f.get('metricName'),metricValue:f.get('metricValue'),goal:f.get('goal'),blocker:f.get('blocker'),needsHelp:f.get('needsHelp')==='on'});setFlash(tr('saved'));render();return;}
   if(kind==='outcome'){await api('POST',`/api/projects/${encodeURIComponent(form.dataset.id)}/outcomes`,{kind:f.get('kind'),fundingType:f.get('fundingType'),amount:f.get('amount')===''?undefined:Number(f.get('amount')),happenedOn:f.get('happenedOn'),note:f.get('note')});render();return;}
   if(kind==='mark'){const ids=f.getAll('target');const r=await api('POST',`/api/admin/tasks/${encodeURIComponent(form.dataset.id)}/mark`,{[form.dataset.scope==='team'?'projectIds':'userIds']:ids,note:f.get('note')});setFlash(`${tr('markDone')}: ${r.marked}`);render();return;}
@@ -1277,11 +1448,6 @@ async function onSubmit(e){
   if(kind==='reward'){const id=form.dataset.id;await api(id?'PUT':'POST','/api/admin/rewards'+(id?'/'+encodeURIComponent(id):''),{title:f.get('title'),description:f.get('description'),price:Number(f.get('price')),stock:f.get('stock')===''?null:Number(f.get('stock'))});setFlash(tr('saved'));render();return;}
   if(kind==='reward-order'){await api('POST',`/api/rewards/${encodeURIComponent(form.dataset.id)}/order`,{projectId:f.get('projectId'),note:f.get('note')});setFlash(tr('rewardOrdered'));render();return;}
   if(kind==='dm-find'){cache.dmQuery=String(f.get('q')||'').trim();render();return;}
-  if(kind==='dm-send'||kind==='group-send'){
-   const file=f.get('file');let fileId;
-   if(file?.size)fileId=(await api('POST','/api/files?purpose=message',undefined,{raw:file,key:idem(),headers:{'X-Filename':encodeURIComponent(file.name),'Content-Type':file.type||'application/octet-stream'}})).file.id;
-   const body=String(f.get('body')||'');if(!body.trim()&&!fileId)return;
-   await api('POST',(kind==='dm-send'?'/api/messages/with/':'/api/messages/groups/')+encodeURIComponent(form.dataset.id),{body,fileId});render();return;}
   if(kind==='group-new'){const r=await api('POST','/api/messages/groups',{title:f.get('title'),userIds:[...cache.groupPick.keys()]});cache.groupPick=null;cache.dmQuery='';go('#/account/messages/g/'+r.id);return;}
   if(kind==='group-rename'){await api('PUT','/api/messages/groups/'+encodeURIComponent(form.dataset.id),{title:f.get('title')});setFlash(tr('saved'));render();return;}
   if(kind==='group-find'){cache.groupQuery=String(f.get('q')||'').trim();render();return;}
@@ -1310,6 +1476,7 @@ async function onClick(e){
  if(act==='points-close'){root.querySelector('#acc-points')?.close?.();return;}
  if(d.confirm&&!window.confirm(d.confirm))return;
  if(act==='codes-done'){cache.codes=null;go(d.next||'#/account');return;}
+ if(act==='codes-ok'){cache.codesNotice=null;render();return;}
  e.preventDefault();
  if(el.dataset.busy)return;el.dataset.busy='1';el.disabled=true;
  await run(async()=>{
@@ -1327,14 +1494,11 @@ async function onClick(e){
   else if(act==='order-decide'){await api('POST','/api/admin/reward-orders/'+encodeURIComponent(d.id),{status:d.status});render();}
   else if(act==='reward-archive'){await api('DELETE','/api/admin/rewards/'+encodeURIComponent(d.id));render();}
   else if(act==='reward-restore'){await api('POST',`/api/admin/rewards/${encodeURIComponent(d.id)}/restore`);render();}
-  else if(act==='dm-block'){await api(d.on==='1'?'POST':'DELETE',`/api/messages/with/${encodeURIComponent(d.id)}/block`);render();}
   else if(act==='team-chat'){const r=await api('POST','/api/messages/team/'+encodeURIComponent(d.id));go('#/account/messages/g/'+r.id);}
   else if(act==='group-pick'){cache.groupPick.set(d.id,d.name);render();}
   else if(act==='group-unpick'){cache.groupPick.delete(d.id);render();}
   else if(act==='group-add'){await api('POST',`/api/messages/groups/${encodeURIComponent(d.id)}/members`,{userIds:[d.user]});render();}
   else if(act==='group-leave'){await api('DELETE',`/api/messages/groups/${encodeURIComponent(d.id)}/members/${encodeURIComponent(d.user)}`);if(d.user===me.id)go('#/account/messages');else render();}
-  else if(act==='group-report'){await api('POST','/api/messages/group-report/'+encodeURIComponent(d.id));setFlash(tr('dmReportSent'));render();}
-  else if(act==='dm-report'){await api('POST','/api/messages/report/'+encodeURIComponent(d.id));setFlash(tr('dmReportSent'));render();}
   else if(act==='dm-resolve'){await api('POST',`/api/admin/message-reports/${encodeURIComponent(d.id)}/resolve`);render();}
   else if(act==='read'){await api('POST','/api/notifications/read',{});cache.unread=0;render();}
   else if(act==='session'){await api('DELETE','/api/auth/sessions/'+encodeURIComponent(d.id));await loadMe();render();}
@@ -1346,12 +1510,23 @@ async function onClick(e){
   else if(act==='att-remove'){await api('POST','/api/admin/attendance/remove',{userId:d.user,lectureId:d.lecture});render();}
   else if(act==='att-toggle'){if(d.kind==='verified_by_admin'){if(window.confirm(tr('confirmRemoveMark'))){await api('POST','/api/admin/attendance/remove',{userId:d.user,lectureId:d.lecture});render();}}else{await api('POST','/api/admin/attendance',{userId:d.user,lectureId:d.lecture});render();}}
   else if(act==='team-filter'){cache.teamFilter=d.view;render();}
+  else if(act==='stage-filter-clear'){cache.stageFilter=null;render();}
   else if(act==='tk-filter'){cache.tkFilter=cache.tkFilter===d.view&&d.view!=='all'?'all':d.view;cache.tkQuiet=true;cache.refocus=`[data-act="tk-filter"][data-view="${cache.tkFilter}"]`;render();}
   else if(act==='dash-filter'){cache.dashFilter=cache.dashFilter===d.view&&d.view!=='all'?'all':d.view;cache.refocus=`[data-act="dash-filter"][data-view="${cache.dashFilter}"]`;render();}
   else if(act==='dash-sort'){cache.dashSort=d.sort;cache.refocus=`.dash-sort [data-sort="${d.sort}"]`;render();}
   else if(act==='dash-refresh'){cache.refocus='[data-act="dash-refresh"]';cache.lastHash=null;render();}
   else if(act==='reset-code'){const r=await api('POST',`/api/admin/users/${encodeURIComponent(d.id)}/reset-code`,{});cache.resetCode=r.code;render();}
   else if(act==='user-status'){await api('PUT',`/api/admin/users/${encodeURIComponent(d.id)}/status`,{status:d.status});render();}
+  else if(act==='accept-task'){await api('POST',`/api/tasks/${encodeURIComponent(d.id)}/respond`,{decision:'accepted'});setFlash(tr('taskAccepted'));render();}
+  else if(act==='reopen'){await api('POST',`/api/admin/assignments/${encodeURIComponent(d.id)}/reopen`,{});setFlash(tr('reopenDone'));render();}
+  else if(act==='manager-pick'){go('#/account/messages/'+encodeURIComponent(d.id));}
+  else if(act==='write-manager'){const m=(await api('GET','/api/messages/managers')).items;
+   // One manager: straight to the conversation. Several: a short chooser right under the button.
+   if(m.length===1){go('#/account/messages/'+encodeURIComponent(m[0].id));}
+   else{const box=el.parentElement.querySelector('.m-managers')||el.insertAdjacentElement('afterend',document.createElement('div'));box.className='m-managers';box.setAttribute('role','group');
+    box.innerHTML=m.length?`<p>${tr('writeManagerPick')}</p><ul>${m.map(x=>`<li><a class="acc-secondary" href="#/account/messages/${esc(x.id)}">${I('chat')} ${esc(x.name)}</a></li>`).join('')}</ul>`:`<p class="acc-muted">${tr('writeManagerNone')}</p>`;box.querySelector('a')?.focus();}}
+  else if(act==='manager-flag'){await api('PUT',`/api/admin/users/${encodeURIComponent(d.id)}/manager`,{on:d.on==='1'});render();}
+  else if(act==='fs-hide'){try{localStorage.setItem('bird-first-steps:'+me.id,'hidden');}catch{}render();}
   else if(act==='take'){const r=await api('POST',`/api/catalog/${encodeURIComponent(d.id)}/take`,d.project?{projectId:d.project}:{});go('#/account/task/'+r.assignmentId);}
   else if(act==='meet-decline'){await api('POST','/api/admin/meeting-requests/'+encodeURIComponent(d.id),{status:'declined'});render();}
   else if(act==='meet-withdraw'){await api('DELETE','/api/meeting-requests/'+encodeURIComponent(d.id));render();}
@@ -1365,6 +1540,7 @@ async function onClick(e){
   else if(act==='news-archive'){await api('DELETE','/api/admin/announcements/'+encodeURIComponent(d.id));render();}
   else if(act==='hook-revoke'){await api('DELETE','/api/admin/form-hooks/'+encodeURIComponent(d.id));render();}
   else if(act==='outcome-delete'){await api('DELETE',`/api/projects/${encodeURIComponent(d.project)}/outcomes/${encodeURIComponent(d.id)}`);render();}
+  else if(act==='inv-approve'||act==='inv-reject'){await api('POST','/api/admin/investors/'+encodeURIComponent(d.id),{approve:act==='inv-approve'});render();}
   else if(act==='lead-delete'){await api('DELETE','/api/admin/pilot-requests/'+encodeURIComponent(d.id));render();}
   else if(act==='admin-invite'){const r=await api('POST','/api/invites',{kind:'program_admin'});cache.newInvite=r.code;render();}
  });
@@ -1378,6 +1554,7 @@ function onInput(e){
 }
 async function onChange(e){
  const el=e.target.closest('select[data-act]');if(!el||!root.contains(el))return;
+ if(el.dataset.act==='tk-template'){tkTemplate(el);return;}
  await run(async()=>{
   if(el.dataset.act==='visibility')await api('PATCH','/api/files/'+encodeURIComponent(el.dataset.id),{visibility:el.value});
   if(el.dataset.act==='member-role')await api('PUT',`/api/projects/${encodeURIComponent(el.dataset.project)}/members/${encodeURIComponent(el.dataset.user)}`,{role:el.value});

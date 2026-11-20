@@ -28,7 +28,10 @@ import * as report from './report.mjs';
 import * as demoVisit from './demo-visit.mjs';
 import * as demoJoin from './demo-join.mjs';
 import * as leads from './leads.mjs';
-import {LANDING_ASSETS,renderLanding} from './landing.mjs';
+import * as network from './network.mjs';
+import * as investors from './investors.mjs';
+import {LANDING_ASSETS,renderLanding,PRODUCT_NAME} from './landing.mjs';
+import {SITE_ASSETS,SITE_PAGES,NETWORK_PAGES,PROFILE_PAGE,PROFILE_PATH,INVESTOR_PAGES,INVESTOR_PROJECT_PAGE,INVESTOR_PROJECT_PATH,HUBS_FILE,renderSite,siteOrigin,robotsTxt,sitemapXml,securityTxt} from './site.mjs';
 import {createDemoOffice} from './demo-office.mjs';
 import {startDemo,ensureDemoFiles} from './demo.mjs';
 import {seedCurated} from './seed.mjs';
@@ -39,7 +42,7 @@ import {isAdmin} from './permissions.mjs';
 
 const MUTATING=new Set(['POST','PUT','PATCH','DELETE']);
 
-export function createApp(config,{publicDir=new URL('../public/',import.meta.url).pathname.replace(/\/$/,''),data,log=console.log}={}){
+export function createApp(config,{publicDir=new URL('../public/',import.meta.url).pathname.replace(/\/$/,''),data,log=console.log,peers}={}){
  prepareDirectories(config);
  const db=openDatabase(config.dbPath);
  const migration=migrate(db,{backupDir:config.backupDir,log});
@@ -51,17 +54,20 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  const bootstrap=auth.ensureOwnerBootstrap(db,config);
  if(bootstrap.status!=='completed')log('Owner bootstrap invitation is waiting in the private data directory');
  const directory=createDirectoryHandler(db);
+ // Workspaces the investor dashboard may read (server/investors.mjs): the platform's list, or this workspace alone.
+ const self=config.workspace?.id||'bird';
+ const workspaces=()=>(peers?.()||[{id:self,name:config.workspace?.name||'',city:config.workspace?.city||'',country:config.workspace?.country||'',db}]).map(w=>({...w,self:w.id===self}));
  const storage=config.storage||localStorage(config.uploadDir);
  const scanner=config.scanner||noScanner;
  let releaseInfo={release:'dev',assets:[]};
  try{releaseInfo=JSON.parse(readFileSync(publicDir+'/release.json','utf8'));}catch{}
  const integration=createIntegration({config,db,data,publicDir,release:releaseInfo.release});
  // A workspace from the blank template has the account pages only: BIRD's lecture notes, teams, people and office stay with BIRD.
- const blank=seedProfile!=='bird',WORKSPACE_ASSETS=['style.css','account.css','account-i18n.js','whoami.js','whoami.css','letter.js','account.js','workspace.js','workspace.css','character-stage.js','character-stage.css','icons.js','admin-tasks.css','admin-programme.css','account-member.css','bird-motion.js','people-sheet.js','people-sheet.css','admin-report.js','admin-report.css','anime.js','demo-skin.css','character-kit.js','demo-join.js','demo-join.css'];
+ const blank=seedProfile!=='bird',WORKSPACE_ASSETS=['style.css','account.css','account-i18n.js','whoami.js','whoami.css','messenger.js','messenger.css','letter.js','account.js','workspace.js','workspace.css','character-stage.js','character-stage.css','icons.js','admin-tasks.css','admin-programme.css','account-member.css','bird-motion.js','people-sheet.js','people-sheet.css','admin-report.js','admin-report.css','anime.js','demo-skin.css','character-kit.js','demo-join.js','demo-join.css'];
  const staticFiles=blank
   ?new Map([['/','workspace.html'],['/index.html','workspace.html'],...releaseInfo.assets.filter(n=>WORKSPACE_ASSETS.includes(n)).map(n=>['/assets/'+n,'assets/'+n])])
   :new Map([['/','index.html'],['/index.html','index.html'],['/city-harness.html','city-harness.html'],...releaseInfo.assets.map(n=>['/assets/'+n,'assets/'+n])]);
- const DEMO_ASSETS=new Set(['office-scene.js','office-iso-assets.js','office-art-data.js','office-pixelfx.js','office-life.js','office-model.js','office.js','office.css','incubator-map.js','incubators-hr.js',...LANDING_ASSETS].filter(n=>releaseInfo.assets.includes(n)));
+ const DEMO_ASSETS=new Set(['office-scene.js','office-iso-assets.js','office-art-data.js','office-pixelfx.js','office-life.js','office-model.js','office.js','office.css','incubator-map.js','incubators-hr.js',...LANDING_ASSETS,...SITE_ASSETS].filter(n=>releaseInfo.assets.includes(n)));
  // A demo workspace refreshes an older invented cohort and keeps real accounts out of its authorship.
  // On start and from the server's hourly timer (server-production.mjs); BIRD's own workspace never has a demo.
  let refusedLogged=false;
@@ -70,6 +76,9 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
   return null;
  }
  refreshDemo();
+ // The outline of Europe drawn on /hubs (inline in hubs.html), reused by the mentor map: read once from the built page.
+ let europeCache=null;
+ const europeMap=()=>europeCache??=(()=>{try{const h=readFileSync(publicDir+'/hubs.html','utf8');return (h.match(/<svg viewBox="0 0 800 640"[^>]*data-proj="[^"]+">/)?.[0]||'').replace(/ data-hubs-map/,' data-net-map').replace(/aria-labelledby="[^"]*"/,'aria-labelledby="net-map-cap"')+(h.match(/<!-- HUBS-EUROPE -->[\s\S]*?<!-- \/HUBS-EUROPE -->/)?.[0]||'')+'<g data-dots></g></svg>';}catch{return '';}})();
  let demoOfficeCache=null;const demoOffice=()=>demoOfficeCache??=createDemoOffice(publicDir);
  const escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -80,6 +89,7 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
   onEvent(ctx,e){
    if(e.type==='project.created'){progress.badgeForRule(db,e.userId,'project.created');tasks.assignForUser(db,ctx.user);}
    if(e.type==='project.update')tasks.onProjectUpdate(db,e);
+   if(e.type==='team.created')tasks.assignForProject(db,e.projectId);
    if(e.type==='milestone.done'){for(const m of db.query("SELECT user_id FROM memberships WHERE project_id=? AND revoked_at IS NULL AND role IN ('owner','editor','member')").all(e.projectId))progress.badgeForRule(db,m.user_id,'milestone.done');}
    if(e.type==='attendance'){
     const n=db.query('SELECT count(DISTINCT lecture_id) n FROM attendance WHERE user_id=?').get(e.userId).n;
@@ -113,6 +123,8 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('GET','/api/auth/sessions',ctx=>auth.listSessions(ctx),{auth:user});
  on('DELETE','/api/auth/sessions/:id',(ctx,p)=>auth.revokeSession(ctx,p.id),{auth:user});
  on('POST','/api/auth/recover',ctx=>auth.recover(ctx));
+ on('POST','/api/auth/password-reset/request',ctx=>auth.requestReset(ctx));
+ on('POST','/api/auth/password-reset/confirm',ctx=>auth.confirmReset(ctx));
  on('POST','/api/auth/password',ctx=>auth.changePassword(ctx),{auth:user});
  on('POST','/api/auth/recovery-codes',ctx=>auth.regenerateCodes(ctx),{auth:user});
  on('PUT','/api/me/profile',ctx=>people.updateProfile(ctx),{auth:user});
@@ -164,6 +176,12 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('GET','/api/tasks/:id',(ctx,p)=>tasks.getAssignment(ctx,p.id),{auth:user});
  on('PUT','/api/tasks/:id/draft',(ctx,p)=>tasks.saveAnswerDraft(ctx,p.id),{auth:user});
  on('POST','/api/tasks/:id/submit',(ctx,p)=>tasks.submitAnswer(ctx,p.id),{auth:user});
+ on('POST','/api/tasks/:id/respond',(ctx,p)=>tasks.respond(ctx,p.id),{auth:user});
+ on('POST','/api/admin/assignments/:id/reopen',(ctx,p)=>tasks.reopen(ctx,p.id),{auth:user});
+ on('GET','/api/admin/tasks/matrix',ctx=>tasks.matrix(ctx),{auth:user});
+ on('GET','/api/me/first-steps',ctx=>profile.firstSteps(ctx),{auth:user});
+ on('GET','/api/messages/managers',ctx=>messages.managers(ctx),{auth:user});
+ on('PUT','/api/admin/users/:id/manager',(ctx,p)=>admin.setManager(ctx,p.id),{auth:user});
  on('GET','/api/reviews',ctx=>tasks.reviewQueue(ctx),{auth:user});
  on('POST','/api/reviews/:id',(ctx,p)=>tasks.review(ctx,p.id),{auth:user});
  // Progress
@@ -234,6 +252,7 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('GET','/api/admin/reward-orders',ctx=>wallet.adminOrders(ctx),{auth:user});
  on('POST','/api/admin/reward-orders/:id',(ctx,p)=>wallet.decideOrder(ctx,p.id),{auth:user});
  on('GET','/api/messages',ctx=>messages.conversations(ctx),{auth:user});
+ on('GET','/api/messages/unread',ctx=>messages.unreadSummary(ctx),{auth:user});
  on('GET','/api/messages/people',ctx=>messages.directory(ctx),{auth:user});
  on('GET','/api/messages/person/:personId',(ctx,p)=>messages.forPerson(ctx,p.personId),{auth:user});
  on('POST','/api/messages/report/:id',(ctx,p)=>messages.report(ctx,p.id),{auth:user});
@@ -301,10 +320,30 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
  on('GET','/api/admin/settings',ctx=>admin.settings(ctx),{auth:user});
  on('GET','/api/admin/pilot-requests',ctx=>leads.list(ctx),{auth:user});
  on('DELETE','/api/admin/pilot-requests/:id',(ctx,p)=>leads.remove(ctx,p.id),{auth:user});
+ // Hubvers network (server/network.mjs): public sign-up with a profile, the directory, connections, deleting one's account.
+ on('GET','/api/network/meta',ctx=>network.meta(ctx));
+ on('POST','/api/network/signup/:kind',(ctx,p)=>network.signup(ctx,p.kind));
+ on('GET','/api/network/cards/:kind',(ctx,p)=>network.cards(ctx,p.kind));
+ on('GET','/api/network/directory/:kind',(ctx,p)=>network.directory(ctx,p.kind),{auth:user});
+ on('GET','/api/network/people/:id',(ctx,p)=>network.profile(ctx,p.id),{auth:user});
+ on('GET','/api/network/people/:id/photo',(ctx,p)=>network.photo(ctx,p.id),{auth:user});
+ on('GET','/api/network/me',ctx=>network.mine(ctx),{auth:user});
+ on('PUT','/api/network/me/:kind',(ctx,p)=>network.saveMine(ctx,p.kind),{auth:user});
+ on('DELETE','/api/network/me',ctx=>network.deleteMine(ctx),{auth:user});
+ on('POST','/api/network/connections/:id',(ctx,p)=>network.requestConnection(ctx,p.id),{auth:user});
+ on('POST','/api/network/connections/:id/decide',(ctx,p)=>network.decideConnection(ctx,p.id),{auth:user});
+ on('DELETE','/api/network/connections/:id',(ctx,p)=>network.removeConnection(ctx,p.id),{auth:user});
+ // Investors (server/investors.mjs): approved investors read opted-in projects of every workspace; organisers see interest.
+ on('GET','/api/investors/projects',ctx=>investors.projects(ctx),{auth:user});
+ on('GET','/api/investors/projects/:hub/:id',(ctx,p)=>investors.project(ctx,p.hub,p.id),{auth:user});
+ on('POST','/api/investors/projects/:hub/:id/interest',(ctx,p)=>investors.interest(ctx,p.hub,p.id),{auth:user});
+ on('GET','/api/admin/investors',ctx=>investors.pending(ctx),{auth:user});
+ on('POST','/api/admin/investors/:id',(ctx,p)=>investors.decide(ctx,p.id),{auth:user});
+ on('GET','/api/admin/investor-interest',ctx=>investors.interestList(ctx),{auth:user});
 
  async function handleApi(request,server){
   const url=new URL(request.url);
-  const ctx={db,config,request,url,storage,scanner,hooks,ip:clientIp(request,server,config)};
+  const ctx={db,config,request,url,storage,scanner,hooks,workspaces,ip:clientIp(request,server,config)};
   try{
    if(url.pathname.startsWith('/api/integration/v1/')){
     // The city visit shows BIRD's office; other workspaces have none.
@@ -343,7 +382,15 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
   const demo=blank&&demoVisit.isDemo(db);
   // A demo workspace opens on the public landing page; the app itself lives at /demo (hash routes as before).
   if(demo&&url.pathname==='/demo/')return new Response(null,{status:301,headers:{Location:'/demo'}});
-  let file=demo&&['/','/index.html'].includes(url.pathname)?'landing.html':demo&&url.pathname==='/demo'?'workspace.html':staticFiles.get(url.pathname);
+  // Hubvers section pages (server/site.mjs) and the catalogue of hubs behind /hubs sit next to the landing.
+  if(demo&&url.pathname.length>1&&url.pathname.endsWith('/')&&SITE_PAGES[url.pathname.slice(0,-1)])return new Response(null,{status:301,headers:{Location:url.pathname.slice(0,-1)}});
+  // Crawler files of the public site (server/site.mjs); BIRD and other workspaces have none.
+  const crawl=demo&&{'/robots.txt':robotsTxt,'/sitemap.xml':sitemapXml,'/.well-known/security.txt':securityTxt}[url.pathname];
+  if(crawl){
+   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
+   return new Response(request.method==='HEAD'?null:crawl(),{headers:{'Content-Type':(url.pathname.endsWith('.xml')?'application/xml':'text/plain')+'; charset=utf-8','Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff'}});
+  }
+  let file=demo&&['/','/index.html'].includes(url.pathname)?'landing.html':demo&&url.pathname==='/demo'?'workspace.html':demo&&SITE_PAGES[url.pathname]?SITE_PAGES[url.pathname]:demo&&NETWORK_PAGES[url.pathname]?NETWORK_PAGES[url.pathname]:demo&&PROFILE_PATH.test(url.pathname)?PROFILE_PAGE:demo&&INVESTOR_PAGES[url.pathname]?INVESTOR_PAGES[url.pathname]:demo&&INVESTOR_PROJECT_PATH.test(url.pathname)?INVESTOR_PROJECT_PAGE:demo&&url.pathname==='/'+HUBS_FILE?HUBS_FILE:staticFiles.get(url.pathname);
   // A demo workspace also gets the office and the incubator map, with characters under invented names.
   if(!file&&demo){
    if(url.pathname==='/assets/office-demo-data.js')return new Response(demoOffice().script+demoJoin.officeScript(db,publicDir),{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
@@ -354,14 +401,29 @@ export function createApp(config,{publicDir=new URL('../public/',import.meta.url
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
   let body;try{body=await readFile(publicDir+'/'+file);}catch{return new Response('Not found',{status:404});}
   if(file==='workspace.html')body=body.toString('utf8').replaceAll('{{name}}',escapeHtml(config.workspace?.name||''));
-  if(file==='landing.html')body=renderLanding(body.toString("utf8"),selfOrigin(request,config));
-  const type=file.endsWith('.png')?'image/png':file.endsWith('.webp')?'image/webp':file.endsWith('.avif')?'image/avif':file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html';
+  const origin=siteOrigin(request,selfOrigin(request,config));
+  if(file==='landing.html')body=renderSite(renderLanding(body.toString("utf8"),origin),{origin,current:'home',product:PRODUCT_NAME});
+  else if(Object.values(SITE_PAGES).includes(file))body=renderSite(body.toString('utf8'),{origin,current:file.replace('.html',''),product:PRODUCT_NAME});
+  else if(file===PROFILE_PAGE||Object.values(NETWORK_PAGES).includes(file))body=renderSite(body.toString('utf8'),{origin,current:'mentors',product:PRODUCT_NAME,europe:file==='mentors-network.html'?europeMap():''});
+  else if(file===INVESTOR_PROJECT_PAGE||Object.values(INVESTOR_PAGES).includes(file))body=renderSite(body.toString('utf8'),{origin,current:'investors',product:PRODUCT_NAME,europe:file==='investors-me.html'?europeMap():''});
+  const type=file.endsWith('.png')?'image/png':file.endsWith('.webp')?'image/webp':file.endsWith('.avif')?'image/avif':file.endsWith('.webm')?'video/webm':file.endsWith('.mp4')?'video/mp4':file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.json')?'application/json':'text/html';
   // Caching: pages stay no-store; scripts and styles are revalidated against the release (a 304 costs no body);
-  // pictures change rarely and are cached for a day. Text is gzipped when the browser accepts it.
-  const image=type.startsWith('image/'),etag=`"${releaseInfo.release}"`;
-  const cache=type==='text/html'?'no-store':image?'public, max-age=86400':'no-cache';
+  // pictures change rarely and are cached for a day; videos are cached for a year (a new recording gets a new file name).
+  // Text is gzipped when the browser accepts it.
+  const video=type.startsWith('video/'),image=type.startsWith('image/')||video,etag=`"${releaseInfo.release}"`;
+  const cache=type==='text/html'?'no-store':video?'public, max-age=31536000, immutable':image?'public, max-age=86400':'no-cache';
   const headers={'Content-Type':type+(image?'':'; charset=utf-8'),'Cache-Control':cache,'X-Content-Type-Options':'nosniff','X-BIRD-Release':releaseInfo.release,'Referrer-Policy':'same-origin'};
   if(type!=='text/html'){headers.ETag=etag;if(request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers});}
+  // Videos answer byte ranges (Safari plays a video only from a server that does).
+  if(video){
+   headers['Accept-Ranges']='bytes';
+   const m=/^bytes=(\d*)-(\d*)$/.exec(request.headers.get('range')||'');
+   if(m&&(m[1]||m[2])){
+    const size=body.length,from=m[1]?Number(m[1]):Math.max(0,size-Number(m[2])),to=m[1]&&m[2]?Math.min(Number(m[2]),size-1):size-1;
+    if(from>=size||from>to)return new Response(null,{status:416,headers:{...headers,'Content-Range':`bytes */${size}`}});
+    return new Response(request.method==='HEAD'?null:body.subarray(from,to+1),{status:206,headers:{...headers,'Content-Range':`bytes ${from}-${to}/${size}`,'Content-Length':String(to-from+1)}});
+   }
+  }
   if(!image&&body.length>1024&&/\bgzip\b/.test(request.headers.get('accept-encoding')||'')){body=Bun.gzipSync(typeof body==='string'?new TextEncoder().encode(body):body);headers['Content-Encoding']='gzip';headers.Vary='Accept-Encoding';}
   // The office may be framed only by the allowed city origin (light visit); other pages not at all.
   if(type==='text/html')headers['Content-Security-Policy']=`frame-ancestors 'self' ${config.cityOrigins.join(' ')}`;

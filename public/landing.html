@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="hr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#eef1f4">
+<html lang="hr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f4f1">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='13' width='5' height='8' fill='%23b5371a'/%3E%3Crect x='10' y='8' width='5' height='13' fill='%239a6200'/%3E%3Crect x='17' y='3' width='5' height='18' fill='%232b7a4b'/%3E%3C/svg%3E">
 <meta name="product-name" content="{{product}}">
 <title>{{product}} · znate što rade svi vaši timovi</title>
@@ -10,39 +10,31 @@
 <meta property="og:description" content="Platforma za inkubatore i akceleratore. Otvorite demo bez registracije.">
 <meta property="og:url" content="{{origin}}/"><meta property="og:image" content="{{origin}}/assets/landing-social.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{{product}}: virtualni ured i ploča voditelja programa">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="preload" as="image" href="assets/landing-office.webp" type="image/webp" fetchpriority="high">
+<link rel="preload" as="image" href="assets/landing-hero-office.webp" type="image/webp" fetchpriority="high">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@400..600&amp;family=Onest:wght@400..800&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400..600&amp;display=swap">
 <link rel="stylesheet" href="assets/landing.css"><link rel="stylesheet" href="assets/whoami.css">
-<script>/* Before first paint: hide what landing.js reveals, and the hero until its intro starts. If landing.js has not
-   started within 4 s, show everything as it is. Reduced motion: no hidden hero. Sets html[data-art] (?art=). */(()=>{const h=document.documentElement;h.classList.add('js');try{h.dataset.art=new URLSearchParams(location.search).get('art')==='oil'?'oil':'watercolour';}catch(e){}
-   /* the hero painting of the chosen art variant starts loading now (landing-paint.js asks for it with the same srcset and sizes) */
-   if(h.dataset.art){const f=h.dataset.art==='oil'?'oil-hero':'wc-hero',l=document.createElement('link');l.rel='preload';l.as='image';l.type='image/avif';l.fetchPriority='low';l.setAttribute('imagesrcset',[800,1200,1600].map(w=>'assets/art/'+f+'-'+w+'.avif '+w+'w').join(', '));l.setAttribute('imagesizes','(min-width: 1024px) 66vw, 100vw');document.head.appendChild(l);}if(!matchMedia('(prefers-reduced-motion: reduce)').matches)h.classList.add('mo-intro');setTimeout(()=>{h.classList.remove('mo-intro');if(!h.classList.contains('js-ok'))h.classList.remove('js');},4000);})();</script>
-<script src="assets/anime.js" defer></script><script src="assets/bird-motion.js" defer></script><script src="assets/landing-world.js" defer></script><script src="assets/incubators-hr.js" defer></script><script src="assets/landing.js" defer></script><script src="assets/whoami.js" defer></script><script src="assets/landing-paint.js" defer></script>
-<meta name="bird-release" content="bird-79381a15ff93ca08"></head><body>
-<!-- Art direction "Programme line": a cohort is a transit line, weeks are stations, teams ride it. Zagreb-tram blue field,
-     line colours are the status colours (green on track, amber watch, red risk). Type: Onest for headings and text, Martian Mono for figures and labels. Square corners, hairline rules (timetable pass, 17 Nov).
-     Painted plates (data-paint, landing-paint.js): real public-domain paintings (assets/art/, docs/ART-CREDITS.md),
-     each painted in as its section appears; ?art=watercolour (default: Dürer, Girtin, Turner) or ?art=oil (Patinir,
-     Bruegel, Altdorfer, Bellini) picks the pictures and the way they are painted. Every section below the hero has one:
-     a chapter view, the How painting with the steps pinned on it, a view beside the map, a detail by the questions,
-     and a full-width band under the pilot form.
-     Signature motion: the line draws itself through the facts (stations light up), reaches the office station and the
-     office paints in from that point through an ink-bleed mask. Same ink material reveals screenshots further down. -->
+<script src="assets/landing-world.js" defer></script><script src="assets/incubators-hr.js" defer></script><script src="assets/landing.js" defer></script><script src="assets/whoami.js" defer></script>
+<meta name="bird-release" content="bird-61ba191a513cae46"></head><body>
+<!-- Look "Warm room" (owner, 20 Nov): warm off-white ground, white rounded panels, ink-navy type, one brand blue,
+     centred section heads under pill tags, screenshots framed in a soft tray (assets/landing.css). Nothing moves on its own.
+     The hero frames a loop of our own demo office (assets/landing-hero-office.*, recorded from /demo); phones, reduced
+     motion and Save-Data get its first frame only (landing.js). Below the hero: the dot maps and the gap chart, static. -->
 <a class="skip" href="#main" data-t="skip">Preskoči na sadržaj</a>
-<header class="top" id="top"><div class="wrap top-in">
- <a class="logo" href="#top" aria-label="{{product}}"><span class="logo-mark" aria-hidden="true"><i></i><i></i><i></i></span><b data-product>{{product}}</b></a>
- <nav class="top-nav" aria-label="Glavna navigacija" data-t-aria="navLabel">
-  <a href="#how" data-t="navHow">Kako radi</a><a href="#map" data-t="navMap">Karta</a><a href="#faq" data-t="navFaq">Pitanja</a>
- </nav>
- <div class="langs" role="group" aria-label="Jezik" data-t-aria="langLabel"><button type="button" data-lang="hr" aria-pressed="true">HR</button><button type="button" data-lang="en" aria-pressed="false">EN</button><button type="button" data-lang="ru" aria-pressed="false">RU</button></div>
- <a class="btn btn-sm" href="/demo" data-t="ctaDemo">Otvori demo</a>
- <div data-account-menu="/demo"></div>
-</div></header>
+<!-- Shared top menu and footer of the public site (server/site.mjs): logo, Hubs, Demo, Mentors, Investors, language, Sign in;
+     the footer links Privacy, Contact, Hubs and Demo. -->
+{{menu}}
 
 <main id="main">
 <!-- ATTENTION -->
-<section class="hero"><div class="paint-plate hero-plate" data-paint="hero" aria-hidden="true"></div><div class="wrap hero-grid">
+<section class="hero"><div class="hero-stage">
+ <!-- Our demo office, recorded from /demo: people walk between the desks. Decorative and washed out behind the copy.
+      The page shows the first frame (poster); landing.js adds the video sources only when the visit can afford them. -->
+ <div class="hero-media" aria-hidden="true">
+  <video class="hero-video" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback preload="metadata" tabindex="-1"
+   poster="assets/landing-hero-office.webp" width="1280" height="688" data-hero-video data-webm="assets/landing-hero-office.webm" data-mp4="assets/landing-hero-office.mp4"></video>
+ </div>
+ <div class="wrap hero-grid">
  <div class="hero-copy">
   <p class="eyebrow" data-t="heroEyebrow">Za inkubatore i akceleratore</p>
   <h1 data-t="heroTitle">Znate što rade svi vaši timovi. <em>I nakon zadnjeg predavanja.</em></h1>
@@ -53,19 +45,9 @@
   </div>
   <p class="fine" data-t="heroFine">Bez registracije. Izmišljeni inkubator sa šest timova. Ništa se ne sprema.</p>
  </div>
- <div class="hero-art" aria-hidden="false">
-  <figure class="shot shot-office">
-   <img src="assets/landing-office.webp" width="2000" height="1221" alt="Virtualni ured demo inkubatora: timovi za svojim stolovima, svaki s postotkom napretka i nizom tjedana." data-t-alt="altOffice" fetchpriority="high">
-   
-   <figcaption><span class="dot is-live" aria-hidden="true"></span><span data-t="capOffice">Virtualni ured: svaki tim ima stol, svaka osoba svoj lik</span></figcaption>
-  </figure>
-  <figure class="shot shot-dash">
-   <img src="assets/landing-dashboard.webp" width="2000" height="1096" alt="Ploča voditelja programa: šest timova, aktivnost u zadnjih 7 dana, prosječni napredak, zadaci koji kasne i napredak po timovima." data-t-alt="altDash" loading="eager">
-   <figcaption data-t="capDash">Ploča voditelja programa</figcaption>
-  </figure>
  </div>
+ <p class="wrap hero-cap"><span class="dot is-live" aria-hidden="true"></span><span data-t="capOffice">Virtualni ured: svaki tim ima stol, svaka osoba svoj lik</span></p>
 </div>
-<svg class="route" aria-hidden="true" focusable="false" data-route></svg>
 <div class="wrap facts" role="list">
  <div class="fact" role="listitem" data-reveal><b class="num" data-count="1">1</b><span data-t="fact1">ploča za sve timove i sve signale</span></div>
  <div class="fact" role="listitem" data-reveal style="--i:1"><b class="num" data-count="3">3</b><span data-t="fact2">jezika: hrvatski, engleski i ruski</span></div>
@@ -76,14 +58,10 @@
 
 <!-- INTEREST -->
 <section class="pains" aria-labelledby="pains-title"><div class="wrap">
- <!-- Chapter opener: the heading beside a painted view (Girtin's evening river / the Icarus landscape, where nobody looks). -->
- <div class="chapter">
-  <div class="sec-head" data-reveal>
+ <div class="sec-head" data-reveal>
    <p class="eyebrow" data-t="painsEyebrow">Što čujemo od voditelja programa</p>
    <h2 id="pains-title" data-t="painsTitle">Program završi. Pitanja ostanu.</h2>
   </div>
-  <figure class="plate-frame chapter-frame"><div class="paint-plate pains-plate" data-paint="pains" aria-hidden="true"></div><figcaption class="plate-label" aria-hidden="true"><span data-art-only="watercolour" data-t="lbWcPains">Thomas Girtin · 1800.</span><span data-art-only="oil" data-t="lbOilPains">Prema Pieteru Bruegelu starijem · oko 1600.</span></figcaption></figure>
- </div>
 
  <article class="pain" id="manage">
   <div class="pain-copy" data-reveal>
@@ -162,17 +140,11 @@
 <!-- HOW -->
 <section class="how" id="how" aria-labelledby="how-title"><div class="wrap">
  <div class="sec-head" data-reveal><p class="eyebrow" data-t="howEyebrow">Kako radi</p><h2 id="how-title" data-t="howTitle">Tri koraka do pune slike.</h2></div>
- <!-- The steps on the picture: landing-paint.js pins the three stations of the programme line to places in the painting
-      (Dürer's wire-drawing mill / Bruegel's Hunters in the Snow); on wide screens the cards hang over its lower edge. -->
- <div class="how-stage" data-how-stage>
-  <figure class="plate-frame how-frame"><div class="paint-plate how-plate" data-paint="how" aria-hidden="true"></div><figcaption class="plate-label" aria-hidden="true"><span data-art-only="watercolour" data-t="lbWcHow">Albrecht Dürer · oko 1494.</span><span data-art-only="oil" data-t="lbOilHow">Pieter Bruegel stariji · 1565.</span></figcaption></figure>
-  <svg class="how-line" aria-hidden="true" focusable="false" data-how-line></svg>
  <ol class="steps">
   <li data-reveal><span class="step-n">1</span><h3 data-t="s1Title">Postavimo vaš prostor</h3><p data-t="s1Text">Vaše ime, vaši timovi, vaš raspored predavanja. Zasebna baza samo za vaš inkubator.</p></li>
   <li data-reveal style="--i:1"><span class="step-n">2</span><h3 data-t="s2Title">Timovi rade i skupljaju bodove</h3><p data-t="s2Text">Zadaci s rokovima, tjedno javljanje, sastanci s mentorima. Svaki korak donosi bodove.</p></li>
   <li data-reveal style="--i:2"><span class="step-n">3</span><h3 data-t="s3Title">Vi vidite sve na jednoj ploči</h3><p data-t="s3Text">Tko napreduje, tko je zapeo, tko traži pomoć. Podatke izvezete u CSV za izvješće.</p></li>
  </ol>
- </div>
  <div class="how-cta" data-reveal><a class="btn btn-big" href="/demo"><span data-t="ctaDemo">Otvori demo</span> <span aria-hidden="true">→</span></a></div>
 </div></section>
 
@@ -184,8 +156,6 @@
    <h2 id="map-title" data-t="mapTitle">Jedna karta. Sve više zemalja.</h2>
    <p class="sec-lead" data-t="mapLead">Zemlje u kojima smo popisali inkubatore. Prijeđite mišem ili prstom preko oznake.</p>
   </div>
-  <!-- A painted view hung on the night-blue wall beside the heading (Dürer's Arco / Altdorfer's Danube). -->
-  <figure class="plate-frame map-frame"><div class="paint-plate map-plate" data-paint="map" aria-hidden="true"></div><figcaption class="plate-label" aria-hidden="true"><span data-art-only="watercolour" data-t="lbWcMap">Albrecht Dürer · 1495.</span><span data-art-only="oil" data-t="lbOilMap">Albrecht Altdorfer · oko 1528.</span></figcaption></figure>
  </div>
  <div class="map-grid" data-map>
   <div class="map-world"><svg viewBox="0 0 1000 435" role="img" aria-label="Karta svijeta od točaka; Hrvatska i susjedne zemlje su istaknute" data-t-aria="altWorld" data-world></svg></div>
@@ -208,8 +178,6 @@
 <section class="faq" id="faq" aria-labelledby="faq-title"><div class="wrap faq-grid">
  <div class="faq-side">
   <div class="sec-head" data-reveal><p class="eyebrow" data-t="faqEyebrow">Pitanja</p><h2 id="faq-title" data-t="faqTitle">Što nas pitaju prije pilota.</h2></div>
-  <!-- A painted detail under the heading (Dürer's Large Piece of Turf / Bellini's hill town and rocks). -->
-  <figure class="plate-frame faq-frame"><div class="paint-plate faq-plate" data-paint="faq" aria-hidden="true"></div><figcaption class="plate-label" aria-hidden="true"><span data-art-only="watercolour" data-t="lbWcFaq">Albrecht Dürer · 1503.</span><span data-art-only="oil" data-t="lbOilFaq">Giovanni Bellini · oko 1480.</span></figcaption></figure>
  </div>
  <div class="faq-list">
   <details data-reveal><summary data-t="q1">Čiji su podaci?</summary><p data-t="a1">Vaši. Svaki inkubator ima zasebnu bazu podataka, a poslužitelj je u EU (Amsterdam). Na zahtjev podatke izvozimo i brišemo.</p></details>
@@ -227,8 +195,6 @@
   <h2 id="act-title" data-t="actTitle">Pogledajte sami. Trebaju vam samo dvije minute.</h2>
   <a class="btn btn-big btn-paper" href="/demo"><span data-t="ctaDemo">Otvori demo</span> <span aria-hidden="true">→</span></a>
  </div>
- <!-- The terminus: a full-width painted band the pilot form stands on (Turner's Red Rigi / Bruegel's Harvesters). -->
- <figure class="act-band"><div class="paint-plate act-plate" data-paint="act" aria-hidden="true"></div><figcaption class="plate-label" aria-hidden="true"><span data-art-only="watercolour" data-t="lbWcAct">J.&nbsp;M.&nbsp;W.&nbsp;Turner · 1842.</span><span data-art-only="oil" data-t="lbOilAct">Pieter Bruegel stariji · 1565.</span></figcaption></figure>
  <div class="act-card" data-reveal style="--i:1">
   <h3 id="pilot-title" data-t="pilotTitle">Dogovori pilot</h3>
   <p data-t="pilotText">Pilot traje jedan ciklus programa. Postavimo vaš prostor s vašim timovima, a kriterije uspjeha zapišemo prije početka.</p>
@@ -273,7 +239,7 @@
     <label for="pf-consent"><span data-t="pfConsent">Slažem se da me kontaktirate u vezi s pilotom.</span>&nbsp;<span class="pf-req" aria-hidden="true">*</span></label>
     <p class="pf-err" id="pf-consent-err" hidden></p>
    </div>
-   <p class="pf-privacy" data-t="pfPrivacy">Podatke koristimo samo za dogovor o pilotu. Ne dijelimo ih i brišemo ih na vaš zahtjev.</p>
+   <p class="pf-privacy" data-t="pfPrivacy">Podatke koristimo samo za dogovor o pilotu. Ne dijelimo ih i brišemo ih na vaš zahtjev. <a href="/privacy">Obavijest o privatnosti</a></p>
    <p class="pf-fail" data-pilot-fail role="alert" hidden></p>
    <button class="btn btn-big" type="submit"><span data-t="pfSend">Pošalji upit</span> <span aria-hidden="true">→</span></button>
   </form>
@@ -287,12 +253,5 @@
 </div></section>
 </main>
 
-<footer class="foot"><div class="wrap foot-in">
- <p><b data-product>{{product}}</b> <span data-t="footLine">· platforma za inkubatore i akceleratore</span></p>
- <p class="foot-links"><a href="/demo" data-t="ctaDemo">Otvori demo</a><a href="#top" data-t="footTop">Na vrh ↑</a></p>
- <!-- Credits for the painted plates: only the line of the chosen art variant is shown (landing.css). Details: docs/ART-CREDITS.md -->
- <p class="art-credit" data-art-credit="watercolour" data-t="creditWc">Slike: akvareli Albrechta Dürera (1494.–1503.), Thomasa Girtina (1800.) i J.&nbsp;M.&nbsp;W.&nbsp;Turnera (1842.). Javno dobro, preuzeto s <a href="https://commons.wikimedia.org/">Wikimedia Commonsa</a>.</p>
- <p class="art-credit" data-art-credit="oil" data-t="creditOil">Slike: Joachim Patinir, Pieter Bruegel stariji i njegov krug, Albrecht Altdorfer, Giovanni Bellini. Javno dobro, preuzeto s <a href="https://commons.wikimedia.org/">Wikimedia Commonsa</a>.</p>
-</div></footer>
-<noscript><style>[data-reveal]{opacity:1!important;transform:none!important}</style></noscript>
+{{footer}}
 </body></html>

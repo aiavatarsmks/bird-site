@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="hr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f4f1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='13' width='5' height='8' fill='%23b5371a'/%3E%3Crect x='10' y='8' width='5' height='13' fill='%239a6200'/%3E%3Crect x='17' y='3' width='5' height='18' fill='%232b7a4b'/%3E%3C/svg%3E">
+<title>Kontakt · {{site}}</title>
+<meta name="description" content="{{site}} je platforma za startup inkubatore i akceleratore iz Zagreba. Pišite nam za pilot, listu čekanja ili pitanje o vašim podacima.">
+<link rel="canonical" href="{{origin}}/contact">
+<meta property="og:type" content="website"><meta property="og:site_name" content="{{site}}"><meta property="og:title" content="Kontakt · {{site}}"><meta property="og:url" content="{{origin}}/contact">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400..600&amp;display=swap">
+<link rel="stylesheet" href="assets/site-page.css">
+<script src="assets/showcase.js" defer></script>
+<meta name="bird-release" content="bird-61ba191a513cae46"></head><body data-page="contact">
+<!-- Who we are and the one way to reach us: the pilot/waitlist form (showcase.js → /api/pilot-request, server/leads.mjs),
+     with the role picked here. No public email address on purpose. -->
+<a class="skip" href="#main" data-m="skip">Preskoči na sadržaj</a>
+{{menu}}
+<main id="main">
+<section class="page-head"><div class="wrap">
+ <p class="eyebrow" data-m="cEyebrow">Kontakt</p>
+ <h1 data-m="cTitle">Javite nam se.</h1>
+ <p class="lead" data-m="cLead">{{site}} je platforma za startup inkubatore i akceleratore. Radimo u Zagrebu, u Hrvatskoj, a prvi pilot vodimo s inkubatorom BIRD.</p>
+</div></section>
+
+<section class="section"><div class="wrap">
+ <h2 data-m="cWhoTitle">Tko smo</h2>
+ <dl class="facts">
+  <div><dt data-m="cWhat">Što radimo</dt><dd data-m="cWhatT">Platformu na kojoj inkubator vodi svoj program: virtualni ured, timove, zadatke, mentore i izvještaje za voditelje programa.</dd></div>
+  <div><dt data-m="cWhere">Gdje smo</dt><dd data-m="cWhereT">Zagreb, Hrvatska.</dd></div>
+  <div><dt data-m="cPilot">Pilot</dt><dd data-m="cPilotT">Prvi pilot vodimo s inkubatorom BIRD u Zagrebu. <a href="/demo">Demo</a> je otvoren svima, bez registracije.</dd></div>
+  <div><dt data-m="cHow">Kako do nas</dt><dd data-m="cHowT">Preko obrasca na ovoj stranici. Odgovaramo e-poštom na adresu koju upišete.</dd></div>
+ </dl>
+</div></section>
+
+<section class="section wl-section" id="write"><div class="wrap wl-grid">
+ <div>
+  <h2 data-m="cFormTitle">Pišite nam</h2>
+  <p class="lead" data-m="cFormLead">Za pilot u vašem inkubatoru, listu čekanja za mentore i investitore ili bilo koje pitanje, uključujući pitanja o vašim podacima.</p>
+ </div>
+ <div>
+  <form class="wl" data-waitlist="hub" novalidate>
+   <label><span data-m="cRole">Pišem kao</span><select name="role">
+    <option value="hub" data-m="cRoleHub" selected>Inkubator ili akcelerator</option>
+    <option value="mentor" data-m="cRoleMentor">Mentor</option>
+    <option value="investor" data-m="cRoleInvestor">Investitor</option>
+   </select></label>
+   <label><span data-m="fName">Ime i prezime</span><input name="name" autocomplete="name" required maxlength="120"></label>
+   <label><span data-m="fEmail">E-pošta</span><input name="email" type="email" autocomplete="email" required maxlength="200"></label>
+   <label><span><span data-m="cOrg">Organizacija</span> <span class="opt" data-m="optional" data-org-optional hidden>(neobavezno)</span></span><input name="organisation" autocomplete="organization" required maxlength="160"></label>
+   <label><span data-m="cMsg">Poruka</span><textarea name="message" required maxlength="2000"></textarea></label>
+   <label class="wl-hp" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label>
+   <label class="check"><input name="consent" type="checkbox" required><span data-m="cConsent">Slažem se da me kontaktirate u vezi s ovom porukom.</span></label>
+   <p class="fine" data-m="cPrivacy">Podatke koristimo samo da vam odgovorimo. Ne prodajemo ih i brišemo ih na vaš zahtjev. <a href="/privacy">Obavijest o privatnosti</a></p>
+   <p class="wl-err" data-wl-err role="alert" hidden></p>
+   <p><button class="btn" type="submit"><span data-m="cSend">Pošalji poruku</span> <span aria-hidden="true">→</span></button></p>
+  </form>
+  <div class="wl-done" data-wl-done tabindex="-1" hidden><h3 data-m="cDoneTitle">Hvala, poruka je stigla.</h3><p><span data-m="cDoneText">Odgovorit ćemo vam na</span> <b data-wl-email></b>.</p></div>
+ </div>
+</div></section>
+</main>
+{{footer}}
+</body></html>

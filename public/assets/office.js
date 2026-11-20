@@ -11,7 +11,7 @@ const words={
  zoomIn:l('Zoom in','Povećaj','Приблизить'),zoomOut:l('Zoom out','Smanji','Отдалить'),fit:l('Fit office','Cijeli ured','Весь офис'),
  hint:l('Drag to move. Use + / − or pinch to zoom.','Povucite za pomicanje. Za zumiranje koristite + / − ili dva prsta.','Перетаскивайте пространство. Меняйте масштаб кнопками + / − или двумя пальцами.'),
  extensionArea:l('Gym & lounge','Odmor i trening','Зона отдыха'),outsideArea:l('Outside','Vani','Балкон'),
- areas:l('Office areas','Dijelovi ureda','Зоны офиса'),lectureArea:l('Lecture hall','Predavaonica','Лекционный зал'),kitchenArea:l('Kitchen & lift','Kuhinja i dizalo','Кухня и лифт'),homeView:l('Start view','Početni pogled','Начальный вид'),miniMap:l('Move view using the office map','Pomakni pogled pomoću karte ureda','Переместить обзор по мини-карте'),miniMapLabel:l('Office map','Karta ureda','Карта офиса'),
+ areas:l('Office areas','Dijelovi ureda','Зоны офиса'),wheelHint:l('To zoom the office, hold Ctrl (⌘ on Mac) and scroll','Za zumiranje ureda držite Ctrl (⌘ na Macu) i pomičite kotačić','Чтобы приблизить офис, зажмите Ctrl (⌘ на Mac) и крутите колесо'),lectureArea:l('Lecture hall','Predavaonica','Лекционный зал'),kitchenArea:l('Kitchen & lift','Kuhinja i dizalo','Кухня и лифт'),homeView:l('Start view','Početni pogled','Начальный вид'),miniMap:l('Move view using the office map','Pomakni pogled pomoću karte ureda','Переместить обзор по мини-карте'),miniMapLabel:l('Office map','Karta ureda','Карта офиса'),
  teams:l('Teams','Timovi','Команды'),people:l('People','Ljudi','Участники'),spaces:l('Free places','Slobodna mjesta','Свободные места'),
  free:l('Room for your team','Mjesto za vaš tim','Место для вашей команды'),place:l('Add a project here','Dodaj projekt ovdje','Добавить проект сюда'),shared:l('Shared space','Zajednički prostor','Общая зона'),welcome:l('The office is open','Ured je otvoren','Офис открыт'),
  select:l('Choose a team or a person in the office. You can also use this list.','Odaberite tim ili osobu u uredu. Možete koristiti i ovaj popis.','Нажмите на команду или участника в офисе. Можно выбрать проект и из списка.'),
@@ -41,7 +41,8 @@ const store=new OfficeStore(officeStorage);
 let controlsOpen=false;
 let motionEnabled=!matchMedia('(prefers-reduced-motion: reduce)').matches,embedded=false,root=null,selection=null,query='',formOpen=false,draft={name:'',description:'',stage:'idea',members:[{name:'',role:'Founder',avatar:''}]},message='',formError=false,layout=null,camera=null,resizeObserver=null;
 const text=key=>words[key]?.[language]||key;
-const stageName=stage=>text(stage==='prototype'?'prototypeStage':stage);
+// Stage names come from the shared project stage list (account-i18n.js) when it is loaded.
+const stageName=stage=>{const t=window.BIRD_ACCOUNT_TEXT?.['stage_'+stage];return t?(t[language]||t.en):text(stage==='prototype'?'prototypeStage':stage);};
 const desc=p=>typeof p.description==='string'?p.description:p.description[language];
 function matches(p){const q=query.trim().toLocaleLowerCase();return !q||[p.name,desc(p),...p.members.flatMap(m=>[m.name,m.role])].some(s=>s.toLocaleLowerCase().includes(q));}
 function artLayout(){
@@ -76,6 +77,8 @@ function setFullscreen(on){
  try{if(on&&board.requestFullscreen&&!document.fullscreenElement)board.requestFullscreen({navigationUI:'hide'}).catch(()=>{});if(!on&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});}catch{}
  requestAnimationFrame(()=>requestAnimationFrame(()=>{if(camera)applyCamera();}));
 }
+let wheelHintTimer=0,wheelHintShown=false;
+function wheelHint(){if(wheelHintShown)return;wheelHintShown=true;const board=root?.querySelector('.office-board');if(!board)return;let t=board.querySelector('.office-wheel-hint');if(!t){t=document.createElement('p');t.className='office-wheel-hint';t.setAttribute('role','status');board.append(t);}t.textContent=text('wheelHint');t.classList.add('is-on');clearTimeout(wheelHintTimer);wheelHintTimer=setTimeout(()=>t.classList.remove('is-on'),1600);}
 document.addEventListener?.('fullscreenchange',()=>{if(!document.fullscreenElement&&fullscreen&&root)setFullscreen(false);});
 document.addEventListener?.('keydown',e=>{if(e.key!=='Escape'||!root)return;if(fullscreen)setFullscreen(false);else if(selection&&!e.target.closest?.('.office-hud,input,textarea,select'))root.querySelector('#office-card [data-action="close"]')?.click();});
 window.addEventListener?.('orientationchange',()=>{if(root&&camera)setTimeout(()=>fullscreen?fit():applyCamera(),250);});
@@ -131,7 +134,7 @@ const placementNote=()=>({en:'Choose a project to move the camera. Everyone stay
 function teamGroups(){if(!store.real)return '';return `<div class="office-group-control"><label class="office-sr-only" for="office-team-group">${({en:'Find a project',hr:'Pronađi projekt',ru:'Найти проект'})[language]}</label><select id="office-team-group" title="${placementNote()}"><option value="all" ${!selection?.projectId?'selected':''}>${({en:'All teams · {count} participants',hr:'Svi timovi · {count} sudionika',ru:'Все команды · {count} участника'})[language].replace('{count}',store.state.projects.reduce((n,p)=>n+p.members.length,0))}</option>${store.state.projects.map(p=>`<option value="${escape(p.id)}" ${p.id===selection?.projectId?'selected':''}>${escape(p.name)}</option>`).join('')}</select></div>`;}
 
 
-function navigator(){return `<div class="office-area-nav" role="group" aria-label="${text('areas')}"><button class="office-controls-toggle" data-action="controls" aria-expanded="${controlsOpen}">${({en:'Search & teams',hr:'Pretraga i timovi',ru:'Поиск и команды'})[language]}</button>${['teams','lecture','kitchen','extension','outside'].map(area=>`<button data-area="${area}">${text(area==='lecture'?'lectureArea':area==='kitchen'?'kitchenArea':area==='extension'?'extensionArea':area==='outside'?'outsideArea':'teams')}</button>`).join('')}${store.real?`<button data-area="staff">${({en:brand()+' team',hr:'Tim · '+brand(),ru:'Команда '+brand()})[language]}</button><span class="office-placement-note">${placementNote()}</span>`:''}<button data-action="home">${text('homeView')}</button></div>`;}
+function navigator(){return `<div class="office-area-nav" role="group" aria-label="${text('areas')}"><button class="office-controls-toggle" data-action="controls" aria-expanded="${controlsOpen}">${({en:'Search & teams',hr:'Pretraga i timovi',ru:'Поиск и команды'})[language]}</button>${store.real?`<button data-area="staff">${({en:brand()+' team',hr:'Tim · '+brand(),ru:'Команда '+brand()})[language]}</button><span class="office-placement-note">${placementNote()}</span>`:''}<button data-action="home">${text('homeView')}</button></div>`;}
 function miniMap(){return `<button class="office-minimap" aria-label="${text('miniMap')}"><svg viewBox="0 0 ${layout.width} ${layout.height}" aria-hidden="true">${BirdOfficeScene.minimap(layout.zones)}<rect class="office-minimap-viewport" fill="#fff5bd" fill-opacity=".22" stroke="#f8e6a2" stroke-width="22" rx="12"/></svg></button>`;}
 function avatar(member,p,index=0,selected=false){return `<g transform="translate(0 55) scale(.55)">${spriteAvatar(member,p,index,selected)}</g>`;}
 function projectList(){const items=store.state.projects.filter(matches);return items.length?`<ul class="office-project-list">${items.map(p=>`<li><button data-project="${escape(p.id)}"><span class="office-list-item"><i class="project-dot" style="background:${color(p)}"></i><span><strong>${escape(p.name)}</strong><small>${p.real?'':stageName(p.stage)+' · '}${text('people')}: ${p.members.length}</small></span></span><span aria-hidden="true">↗</span></button></li>`).join('')}</ul>`:`<p class="office-side-note">${text('noResults')}</p>`;}
@@ -170,8 +173,8 @@ function sheetCard(){
  return vm.kind==='team'?window.BirdSheet.team(vm,{mode:'office'}):window.BirdSheet.person(vm,{mode:'office'});
 }
 function mountSheet(){
- stopSheet?.();stopSheet=null;
- const host=root?.querySelector('#office-card.ps-host');if(!host||!sheetModelNow)return;
+ stopSheet?.();stopSheet=null;stopChat?.();stopChat=null;
+ const host=root?.querySelector('#office-card.ps-host');host?.classList.remove('has-chat');if(!host||!sheetModelNow)return;
  const key=sheetModelNow.kind+':'+sheetModelNow.id;
  // Re-renders of the same selection (search, language, motion) keep the panel still.
  host.classList.toggle('is-quiet',key===sheetKeyShown);sheetKeyShown=key;
@@ -251,22 +254,41 @@ async function fillOrganiserCard(){
  const signal=organiser.teams.find(t=>t.id===projectId);
  slot.innerHTML=`<h3>${orgText('Organiser','Organizator','Организатор')}</h3><p><b>${d.score.percent===null?'—':d.score.percent+'%'}</b> ${orgText('of possible points','mogućih bodova','от возможных баллов')}${signal?.waiting?` · ${signal.waiting} ${orgText('to review','za pregled','на проверку')}`:''}</p>${d.checkins[0]?.blocker?`<p>${orgText('Blocker','Prepreka','Блокер')}: ${escape(d.checkins[0].blocker)}</p>`:''}${orgTasks(d.tasks)}${d.members.length?`<ul class="office-org-list">${d.members.map(m=>`<li>${escape(m.name)} · ${orgDate(m.lastSeen)}</li>`).join('')}</ul>${orgNudge('projectId',projectId)}`:`<p>${orgText('Nobody has registered yet.','Još nitko nije registriran.','Пока никто не зарегистрирован.')}</p>`}<a class="office-secondary" href="#/admin/task/new~team~${escape(projectId)}">${orgText('Give a task','Dodijeli zadatak','Дать задание')}</a><a class="office-secondary" href="#/admin/team/${escape(projectId)}">${orgText('Full record','Puni zapis','Полная запись')} ↗</a>`;
 }
-// Anyone signed in can write to a person on the map who has an account.
+// The person's card carries the conversation itself (messenger.js); one's own card carries one's inbox.
+// The chat fills the panel from under the name down to its bottom edge, so the composer sits at the bottom.
+let stopChat=null;
+function chatInCard(details,person,mine){
+ const M=window.BirdMessenger,host=root?.querySelector('#office-card');if(!M||!host)return false;
+ stopChat?.();
+ const box=document.createElement('section');box.className='ps-chat office-dm';box.setAttribute('aria-label',orgText('Messages','Poruke','Сообщения'));
+ if(details.classList.contains('ps-actions'))details.after(box);else details.append(box);
+ host.classList.add('has-chat');M.language(language);
+ // On a phone the card is a bottom sheet with a height cap: the chat runs down to that cap instead.
+ const fit=()=>{if(!box.isConnected){removeEventListener('resize',fit);return;}
+  const cap=parseFloat(getComputedStyle(host).maxHeight),full=Number.isFinite(cap)?cap:host.clientHeight;
+  const top=box.getBoundingClientRect().top-host.getBoundingClientRect().top+host.scrollTop;box.style.setProperty('--chat-h',Math.max(Number.isFinite(cap)?260:340,full-top)+'px');};
+ const stop=mine?M.panel(box,{lang:language}):M.thread(box,{kind:'dm',id:person.id,name:person.name,head:'slim',focus:false,lang:language});
+ addEventListener('resize',fit);fit();requestAnimationFrame(fit);
+ stopChat=()=>{stop?.();removeEventListener('resize',fit);};
+ return true;
+}
+// Anyone signed in can write to a person on the map who has an account (or will have one: the message waits).
 async function fillMessageLink(){
  if(!selection?.personId||!root)return;
- const details=root.querySelector('#office-card .ps-actions')||root.querySelector('#office-card .office-details');if(!details||details.querySelector('.office-dm'))return;
+ const details=root.querySelector('#office-card .ps-actions')||root.querySelector('#office-card .office-details');if(!details||root?.querySelector('#office-card .office-dm'))return;
  const key=selection.personId;details.dataset.dmKey=key;
  const add=(label,href)=>{const a=document.createElement('a');a.className='office-secondary office-dm';a.href=href;a.textContent='✉ '+label;details.prepend(a);return a;};
  // A guest sees where writing starts instead of a card with no way to write.
  if(!viewer){add(orgText('Sign in to write','Prijavite se da biste pisali','Войдите, чтобы написать'),'#/account');return;}
  const r=await fetch('/api/messages/person/'+encodeURIComponent(key),{credentials:'same-origin'}).catch(()=>null);
- if(!r?.ok||details.dataset.dmKey!==key||!details.isConnected||details.querySelector('.office-dm'))return;
+ if(!r?.ok||details.dataset.dmKey!==key||!details.isConnected||root?.querySelector('#office-card .office-dm'))return;
  const {person}=await r.json();
  // "This is you" on one's own card; an organiser can link their own card or invite the person (whoami.js).
  await window.BirdWhoami?.card(details,{personId:key,lang:language});
- if(person.id===viewer.id||details.dataset.dmKey!==key||details.querySelector('.office-dm'))return;
- // The chat opens beside the map; the link still leads to the full conversation if the chat script is missing.
- add(orgText('Write a message','Napiši poruku','Написать'),'#/account/messages/'+encodeURIComponent(person.id)).addEventListener('click',e=>{if(!window.BirdOfficeChat)return;e.preventDefault();window.BirdOfficeChat.open({id:person.id,name:person.name,language});});
+ if(details.dataset.dmKey!==key||root?.querySelector('#office-card .office-dm')||!details.isConnected)return;
+ if(chatInCard(details,person,person.id===viewer.id))return;
+ // Without the messenger script the card keeps a plain link to the conversation.
+ if(person.id!==viewer.id)add(orgText('Write a message','Napiši poruku','Написать'),'#/account/messages/'+encodeURIComponent(person.id));
 }
 async function sendOrganiserNudge(form){
  const message=form.elements.message.value.trim();if(!message)return;
@@ -417,9 +439,9 @@ function bindCamera(){
  });
  let lastTap=null;const end=e=>{if(e.type==='lostpointercapture'&&e.target!==canvas)return;if(e.type==='pointerup'&&e.pointerType==='touch'&&!dragged&&pointers.size===1&&!e.target.closest('[role=button]')){const now=Date.now();if(lastTap&&now-lastTap.t<320&&Math.hypot(e.clientX-lastTap.x,e.clientY-lastTap.y)<30){zoom(1.7,{x:e.clientX,y:e.clientY});lastTap=null;}else lastTap={t:now,x:e.clientX,y:e.clientY};}pointers.delete(e.pointerId);canvas.classList.remove('is-panning');if(pointers.size<2){pinchDistance=0;pinchCenter=null;}if(!pointers.size){start=null;setTimeout(()=>{dragged=false;},0);}};
  canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);canvas.addEventListener('lostpointercapture',end);
- canvas.addEventListener('wheel',e=>{e.preventDefault();cancelAnimationFrame(cameraAnimation);if(e.ctrlKey||e.metaKey)zoom(Math.exp(-e.deltaY*.008),{x:e.clientX,y:e.clientY});else{camera.x+=(e.deltaX+(e.shiftKey?e.deltaY:0))/camera.scale;camera.y+=(e.shiftKey?0:e.deltaY)/camera.scale;applyCamera();}},{passive:false});
+ canvas.addEventListener('wheel',e=>{if(!fullscreen&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&Math.abs(e.deltaY)>Math.abs(e.deltaX)){wheelHint();return;}e.preventDefault();cancelAnimationFrame(cameraAnimation);if(e.ctrlKey||e.metaKey)zoom(Math.exp(-e.deltaY*.008),{x:e.clientX,y:e.clientY});else{camera.x+=(e.deltaX+(e.shiftKey?e.deltaY:0))/camera.scale;camera.y+=(e.shiftKey?0:e.deltaY)/camera.scale;applyCamera();}},{passive:false});
  canvas.querySelector('svg').addEventListener('keydown',e=>{if(e.target!==e.currentTarget)return;cancelAnimationFrame(cameraAnimation);const step=85/camera.scale;if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-','0','Home'].includes(e.key))e.preventDefault();if(e.key==='ArrowLeft')camera.x-=step;if(e.key==='ArrowRight')camera.x+=step;if(e.key==='ArrowUp')camera.y-=step;if(e.key==='ArrowDown')camera.y+=step;if(e.key==='+'||e.key==='=')zoom(1.25);if(e.key==='-')zoom(.8);if(e.key==='0')fit();if(e.key==='Home')homeView();applyCamera();});
 }
-window.IncubatorOffice={mount(element,options={}){root=element;embedded=Boolean(options.embedded);cityMode=window.BirdCity?.isRoute()===true;if(options.language&&['en','hr','ru'].includes(options.language))language=options.language;if(store.real){store.state.projects=BirdProjects.officeProjects(language);const parts=location.hash.replace(/^#\/?/,'').split('/');if(parts[0]==='office'&&store.project(parts[1])){selection={projectId:parts[1],personId:parts[2]||null};}else selection=null;}render();if(store.real&&selection&&!keepCamera)focusProject(selection.projectId);keepCamera=false;},unmount(){if(fullscreen){fullscreen=false;document.body.classList.remove('office-fullscreen');if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}resizeObserver?.disconnect();cancelAnimationFrame(cameraAnimation);cancelAnimationFrame(lifeFrame);stopSheet?.();stopSheet=null;sheetKeyShown='';root=null;}};
+window.IncubatorOffice={mount(element,options={}){root=element;embedded=Boolean(options.embedded);cityMode=window.BirdCity?.isRoute()===true;if(options.language&&['en','hr','ru'].includes(options.language))language=options.language;if(store.real){store.state.projects=BirdProjects.officeProjects(language);const parts=location.hash.replace(/^#\/?/,'').split('/');if(parts[0]==='office'&&store.project(parts[1])){selection={projectId:parts[1],personId:parts[2]||null};}else selection=null;}render();if(store.real&&selection&&!keepCamera)focusProject(selection.projectId);keepCamera=false;},unmount(){if(fullscreen){fullscreen=false;document.body.classList.remove('office-fullscreen');if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}resizeObserver?.disconnect();cancelAnimationFrame(cameraAnimation);cancelAnimationFrame(lifeFrame);stopSheet?.();stopSheet=null;stopChat?.();stopChat=null;sheetKeyShown='';root=null;}};
 const standalone=document.getElementById('office-app');if(standalone)window.IncubatorOffice.mount(standalone);
 })();

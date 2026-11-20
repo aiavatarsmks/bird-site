@@ -40,6 +40,21 @@ export function badgeForRule(db,userId,rule){const b=BADGES.find(x=>x.rule===rul
 export function userXp(db,userId){return db.query("SELECT coalesce(sum(amount),0) n FROM xp_ledger WHERE beneficiary_type='user' AND beneficiary_id=?").get(userId).n;}
 export function projectXp(db,projectId){return db.query("SELECT coalesce(sum(amount),0) n FROM xp_ledger WHERE beneficiary_type='project' AND beneficiary_id=?").get(projectId).n;}
 
+// A person's own points count for one team only, so nobody counts or spends them twice: their programme team
+// if they have one, otherwise their earliest project. Archiving does not move them.
+const PRIMARY=`(CASE WHEN p.source='user' THEN 1 ELSE 0 END)`;
+export const teamMembers=(db,projectId)=>db.query(`SELECT m.user_id FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.project_id=?1 AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member') AND NOT EXISTS(SELECT 1 FROM memberships o JOIN projects q ON q.id=o.project_id WHERE o.user_id=m.user_id AND o.revoked_at IS NULL AND o.role IN ('owner','editor','member') AND o.project_id<>?1 AND ((CASE WHEN q.source='user' THEN 1 ELSE 0 END)<${PRIMARY} OR ((CASE WHEN q.source='user' THEN 1 ELSE 0 END)=${PRIMARY} AND (o.created<m.created OR (o.created=m.created AND o.project_id<?1)))))`).all(projectId).map(r=>r.user_id);
+/**
+ * The one points number of a team, shown the same on every screen (overview, project page, ranking, admin):
+ * team tasks and check-ins plus what its members earned themselves. `own` is the team-only part.
+ */
+export function teamPoints(db,projectId){const own=projectXp(db,projectId),members=teamMembers(db,projectId).reduce((n,id)=>n+userXp(db,id),0);return {total:own+members,own,members};}
+/**
+ * Teams of the programme: the cohort roster (curated, or created by an organiser) and any project at least two people
+ * joined. A test project one person made alone never shows in the ranking, the homework matrix or the team picker.
+ */
+export const PROGRAMME_TEAM=`(p.status<>'archived' AND (p.source='curated' OR EXISTS(SELECT 1 FROM users c WHERE c.id=p.created_by AND c.role IN ('program_admin','platform_owner')) OR (SELECT count(*) FROM memberships pm WHERE pm.project_id=p.id AND pm.revoked_at IS NULL AND pm.role IN ('owner','editor','member'))>=2))`;
+
 export function myProgress(ctx){
  const user=ctx.user;
  const projects=ctx.db.query("SELECT p.id,p.draft FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member')").all(user.id);
@@ -47,7 +62,8 @@ export function myProgress(ctx){
  const history=ctx.db.query("SELECT amount,reason,created FROM xp_ledger WHERE beneficiary_type='user' AND beneficiary_id=? ORDER BY id DESC LIMIT 30").all(user.id);
  return json({
   xp:userXp(ctx.db,user.id),
-  teams:projects.map(p=>({projectId:p.id,name:JSON.parse(p.draft).name,xp:projectXp(ctx.db,p.id),history:ctx.db.query("SELECT amount,reason,created FROM xp_ledger WHERE beneficiary_type='project' AND beneficiary_id=? ORDER BY id DESC LIMIT 20").all(p.id)})),
+  // xp is the team's one number (teamPoints); the history adds the members' own rows so the chart ends on it.
+  teams:projects.map(p=>{const pts=teamPoints(ctx.db,p.id),ids=teamMembers(ctx.db,p.id);return {projectId:p.id,name:JSON.parse(p.draft).name,xp:pts.total,teamOnly:pts.own,history:ctx.db.query(`SELECT amount,reason,created,beneficiary_type type FROM xp_ledger WHERE (beneficiary_type='project' AND beneficiary_id=?) ${ids.length?`OR (beneficiary_type='user' AND beneficiary_id IN (${ids.map(()=>'?').join(',')}))`:''} ORDER BY created DESC,id DESC LIMIT 30`).all(p.id,...ids)};}),
   badges:badges.map(b=>({id:b.badge_id,title:JSON.parse(b.translations),created:b.created})),
   available:BADGES.map(b=>({id:b.id,title:b.t})),
   history,leaderboardOptIn:!!user.leaderboard_opt_in,

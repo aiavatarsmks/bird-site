@@ -439,3 +439,11 @@ a.pg-col:hover .pg-col-bar{outline:2px solid var(--ink);outline-offset:1px}
  .pg.is-first .pg-card,.pg.is-first .pg-kpi,.pg.is-first .pg-tile{animation:mo-fade .3s ease both!important}
 }
 .pg-lead-msg{white-space:pre-line;color:var(--pg-ink,inherit)}
+
+/* Today: a line for unread messages above the inbox tiles (pilot phase 2). */
+.pg-msgline{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--info,#2c5b8c);background:var(--white);color:var(--ink);text-decoration:none}
+.pg-msgline span:last-child{margin-left:auto}
+.pg-msgline:hover strong{text-decoration:underline}
+.acc-tab-inbox{margin-left:auto}
+.acc-pm{display:block;margin-top:4px;font-size:12px}
+.acc-pm.is-on{color:var(--ok,#2b7a4b);font-weight:600}

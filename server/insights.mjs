@@ -18,7 +18,8 @@ const daysAgo=n=>new Date(Date.now()-n*86400000).toISOString().slice(0,10);
 /** Lectures held in the last two weeks that this person has not rated yet. */
 export function feedbackDue(ctx){
  const user=requireUser(ctx);
- const rows=ctx.db.query("SELECT l.id,l.date,l.title FROM lectures l WHERE l.status='published' AND l.date<=? AND l.date>=? AND NOT EXISTS(SELECT 1 FROM lecture_feedback f WHERE f.lecture_id=l.id AND f.user_id=?) ORDER BY l.date DESC LIMIT 3").all(zagrebToday(),daysAgo(FEEDBACK_DAYS),user.id);
+ // Only lectures the person was at (their own mark or an organiser's): nobody is asked to rate a talk they missed.
+ const rows=ctx.db.query("SELECT l.id,l.date,l.title FROM lectures l WHERE l.status='published' AND l.date<=? AND l.date>=? AND NOT EXISTS(SELECT 1 FROM lecture_feedback f WHERE f.lecture_id=l.id AND f.user_id=?3) AND EXISTS(SELECT 1 FROM attendance a WHERE a.lecture_id=l.id AND a.user_id=?3) ORDER BY l.date DESC LIMIT 3").all(zagrebToday(),daysAgo(FEEDBACK_DAYS),user.id);
  return json({items:rows.map(l=>({id:l.id,date:l.date,title:JSON.parse(l.title)}))});
 }
 export async function saveFeedback(ctx,lectureId){

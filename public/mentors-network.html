@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="hr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f4f1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='13' width='5' height='8' fill='%23b5371a'/%3E%3Crect x='10' y='8' width='5' height='13' fill='%239a6200'/%3E%3Crect x='17' y='3' width='5' height='18' fill='%232b7a4b'/%3E%3C/svg%3E">
+<title>Mreža mentora · {{site}}</title>
+<meta name="description" content="Mreža mentora Hubversa: pretražite mentore po stručnosti, regiji, zemlji, hubu i jeziku ili na karti Europe.">
+<meta name="robots" content="noindex"><link rel="canonical" href="{{origin}}/mentors/network">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400..600&amp;display=swap">
+<link rel="stylesheet" href="/assets/site-page.css"><link rel="stylesheet" href="/assets/network.css">
+<script src="/assets/network.js" defer></script>
+<meta name="bird-release" content="bird-61ba191a513cae46"></head><body data-page="network">
+<a class="skip" href="#main" data-m="skip">Preskoči na sadržaj</a>
+{{menu}}
+<main id="main">
+<section class="page-head net-head"><div class="wrap">
+ <p class="eyebrow" data-m="netEyebrow">Mreža mentora</p>
+ <h1 data-m="netTitle">Pronađite mentora</h1>
+ <p class="lead" data-m="netLead">Po stručnosti, regiji, zemlji, hubu i jeziku, ili na karti. Profil vide samo prijavljeni korisnici.</p>
+ <p class="net-head-links"><a class="btn btn-ghost" href="/mentors/me" data-net-me hidden><span data-m="myCabinet">Moj kabinet</span></a></p>
+</div></section>
+<div class="wrap net-gate" data-net-gate hidden></div>
+<section class="net-dir" data-net-dir hidden><div class="wrap">
+ <form class="net-filters" data-net-filters role="search" aria-label="Filtri" data-m-aria="filtersLabel">
+  <label class="net-search"><span class="sr" data-m="searchLabel">Traži po imenu</span><input type="search" name="q" maxlength="60" autocomplete="off" placeholder="Traži po imenu ili opisu" data-m-ph="searchPh"></label>
+  <fieldset class="net-cats"><legend data-m="fCategories">Stručnost</legend><div class="chips" data-net-cats></div></fieldset>
+  <div class="net-selects">
+   <label><span data-m="fRegion">Regija</span><select name="region" data-net-region></select></label>
+   <label><span data-m="fCountry">Zemlja</span><select name="country" data-net-country></select></label>
+   <label><span data-m="fHub">Hub</span><select name="hub" data-net-hub></select></label>
+   <label><span data-m="fLang">Jezik</span><select name="lang" data-net-lang></select></label>
+  </div>
+  <div class="net-bar">
+   <p class="net-count" data-net-count aria-live="polite"></p>
+   <button class="net-reset" type="reset" data-m="reset">Očisti filtre</button>
+   <div class="net-view" role="group" aria-label="Prikaz" data-m-aria="viewLabel"><button type="button" data-view="list" aria-pressed="true" data-m="viewList">Popis</button><button type="button" data-view="map" aria-pressed="false" data-m="viewMap">Karta</button></div>
+  </div>
+ </form>
+ <div class="net-list" data-net-list></div>
+ <div class="net-mapview" data-net-mapview hidden>
+  <figure class="net-map">{{europe}}<figcaption id="net-map-cap" class="fine" data-m="mapCap">Karta Europe: broj u točki je broj mentora u tom gradu. Odaberite točku.</figcaption></figure>
+  <aside class="net-side" data-net-side aria-live="polite" hidden></aside>
+ </div>
+</div></section>
+</main>
+{{footer}}
+</body></html>

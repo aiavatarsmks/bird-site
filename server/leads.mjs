@@ -1,5 +1,5 @@
 /**
- * Pilot requests from the public landing of the demo workspace. This is the sales funnel, so the requests are
+ * Pilot requests from the public landing of the demo workspace, and the waitlists of /mentors and /investors (role). This is the sales funnel, so the requests are
  * stored for real even though the rest of the demo is read-only. Only the platform owner reads them.
  */
 import {fail,json,readJson,text,newId,rateLimit} from './http.mjs';
@@ -10,6 +10,9 @@ import {postToChat} from './cohort.mjs';
 import {isDemo,isDemoUser} from './demo-visit.mjs';
 
 export const TEAMS=['1-5','6-10','11-20','21-50','50+'];
+// Who is asking: a hub (the landing's pilot form, the default) or someone on the waitlist of /mentors or /investors.
+// A mentor may work on their own, so the organisation is optional there.
+export const ROLES=['hub','mentor','investor'];
 const EMAIL=/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/,PHONE=/^\+?[\d\s()./-]{6,30}$/;
 
 export async function submit(ctx){
@@ -19,7 +22,8 @@ export async function submit(ctx){
  const body=await readJson(ctx.request,16*1024);
  // Honeypot: people never see the "website" field; a bot that fills it is told "thank you" and nothing is kept.
  if(body.website)return json({ok:true},201);
- const name=text(body.name,{min:2,max:120},'name'),organisation=text(body.organisation,{min:2,max:160},'organisation');
+ const role=body.role==null||body.role===''?'hub':String(body.role);if(!ROLES.includes(role))fail(400,'INVALID_FIELDS',{field:'role'});
+ const name=text(body.name,{min:2,max:120},'name'),organisation=role==='mentor'?text(body.organisation,{optional:true,max:160},'organisation'):text(body.organisation,{min:2,max:160},'organisation');
  const email=text(body.email,{min:5,max:200},'email').toLowerCase();if(!EMAIL.test(email))fail(400,'INVALID_FIELDS',{field:'email'});
  const phone=text(body.phone,{optional:true,max:30},'phone');if(phone&&!PHONE.test(phone))fail(400,'INVALID_FIELDS',{field:'phone'});
  const teams=body.teams?String(body.teams):'';if(teams&&!TEAMS.includes(teams))fail(400,'INVALID_FIELDS',{field:'teams'});
@@ -28,18 +32,18 @@ export async function submit(ctx){
  // One incubator may send a few; a script may not fill the table.
  rateLimit(ctx.db,'pilot:'+ctx.ip,5,3600);rateLimit(ctx.db,'pilot:all',200,86400);
  const language=['hr','en','ru'].includes(body.language)?body.language:'hr',id=newId('lead'),now=nowIso();
- ctx.db.query('INSERT INTO pilot_requests(id,name,organisation,email,phone,teams,message,language,consent_at,created) VALUES(?,?,?,?,?,?,?,?,?,?)').run(id,name,organisation,email,phone,teams,message,language,now,now);
- for(const o of ctx.db.query("SELECT id FROM users WHERE role='platform_owner' AND status='active' AND id NOT LIKE 'demo-%'").all())notify(ctx.db,o.id,'pilot.request',{name,organisation});
+ ctx.db.query('INSERT INTO pilot_requests(id,name,organisation,email,phone,teams,message,language,role,consent_at,created) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(id,name,organisation,email,phone,teams,message,language,role,now,now);
+ for(const o of ctx.db.query("SELECT id FROM users WHERE role='platform_owner' AND status='active' AND id NOT LIKE 'demo-%'").all())notify(ctx.db,o.id,'pilot.request',{name,organisation,...(role==='hub'?{}:{role})});
  // The chat gets who and from where; contact details stay in the workspace.
  const origin=ctx.config.publicOrigin||new URL(ctx.request.url).origin;
- postToChat(ctx.db,'Pilot request',`${name} · ${organisation}${teams?` · ${teams} teams`:''}\n${origin}/demo#/admin/system`);
+ postToChat(ctx.db,role==='hub'?'Pilot request':`Waitlist: ${role}`,`${name}${organisation?` · ${organisation}`:''}${teams?` · ${teams} teams`:''}\n${origin}/demo#/admin/system`);
  return json({ok:true},201);
 }
 
 /** The owner's list. Demo visitors borrow program_admin accounts, so requireOwner already keeps them out. */
 export function list(ctx){
  const owner=requireOwner(ctx);if(isDemoUser(owner))fail(403,'FORBIDDEN');
- return json({demo:isDemo(ctx.db),items:ctx.db.query('SELECT id,name,organisation,email,phone,teams,message,language,created FROM pilot_requests ORDER BY created DESC LIMIT 200').all()});
+ return json({demo:isDemo(ctx.db),items:ctx.db.query('SELECT id,name,organisation,email,phone,teams,message,language,role,created FROM pilot_requests ORDER BY created DESC LIMIT 200').all()});
 }
 
 /** Deleted on request (the privacy note promises it). */

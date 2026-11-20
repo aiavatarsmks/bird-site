@@ -145,7 +145,8 @@ export const EXAMPLE_TASKS=[
 function seedTasks(db,now,programId='bird-2026'){
  for(const task of EXAMPLE_TASKS){
   const translations=Object.fromEntries(Object.entries(task.t).map(([l,[title,goal,instructions,criteria]])=>[l,{title,goal,instructions,criteria}]));
-  db.query(`INSERT INTO task_templates(id,key,program_id,type,scope,xp,counter_target,requires_review,self_report,repeat_rule,checklist,translations,status,audience,completion_mode,pick_mode,created,updated) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,'published','all_participants',?,?,?,?) ON CONFLICT(key) DO NOTHING`)
+  // example=1: a template in the library; it reaches teams by itself only in a demo (see examplesOn in tasks.mjs).
+  db.query(`INSERT INTO task_templates(id,key,program_id,type,scope,xp,counter_target,requires_review,self_report,repeat_rule,checklist,translations,status,audience,completion_mode,pick_mode,example,created,updated) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,'published','all_participants',?,?,1,?,?) ON CONFLICT(key) DO NOTHING`)
    .run('task-'+task.key,task.key,programId,task.type,task.scope,task.xp,task.counterTarget||0,task.requiresReview?1:0,task.repeatRule||'once',JSON.stringify(task.checklist||[]),JSON.stringify(translations),task.completion||'participant',task.pick||'assigned',now,now);
  }
 }

@@ -9,9 +9,11 @@ import {nowIso} from './db.mjs';
 import {newId,sha256,token} from './http.mjs';
 import {award,badgeForRule} from './progress.mjs';
 import {assignForUser,isoWeek,markDone} from './tasks.mjs';
+import {saveProfile,validateProfile,hubCatalogue} from './network.mjs';
+import {saveInvestor,validateInvestor} from './investors.mjs';
 
 // Bump when the invented cohort changes; a started demo workspace then fills itself again (see startDemo).
-export const DEMO_VERSION='3';
+export const DEMO_VERSION='6';
 export const DEMO_ORGANISER='demo-user-organiser';
 const ORGANISER_NAME='Leon Marić',MANAGER_NAME='Mia Horvat';
 
@@ -46,19 +48,19 @@ function rng(seed){let h=1779033703^seed.length;for(const c of seed){h=Math.imul
 // log: check-ins from seven weeks ago (first) to this week (last); null is a week without one.
 // [metric value, goal, blocker, needs help]. att: share of lectures each member came to. seen: days since the last visit.
 const TEAMS=[
- {slug:'greenloop',name:'GreenLoop',members:['Petra S.','Luka D.','Maja R.'],stage:'pilot',
+ {slug:'greenloop',name:'GreenLoop',members:['Petra S.','Luka D.','Maja R.'],stage:'first_customer',funding:[25000,150000,'seed'],investors:true,
   short:'Povratna ambalaža za dostavu hrane u restoranima.',problem:'Restorani bacaju tisuće jednokratnih kutija mjesečno i plaćaju sve skuplji otpad.',users:'Restorani s dostavom u Zagrebu.',solution:'Posude koje se vraćaju, peru i ponovno koriste, uz praćenje QR kodom.',
   value:'Restoran plaća manje od jednokratne ambalaže i dobiva zeleni znak na platformama za dostavu.',ask:'Tražimo još dva restorana za pilot i kontakt u gradskom uredu za otpad.',
   done:{profile:-52,'problem-users':-44,'user-interviews':-33,'pricing-hypotheses':-26,presentation:-12,'weekly-report':-2,'first-paying-customer':-9},review:['demo-day-kit'],
   metric:'Restorani u pilotu',att:.95,seen:0,
   log:[['0','Dogovoriti 10 razgovora s vlasnicima restorana.','',0],['0','Završiti razgovore i složiti listu problema.','Vlasnici odgovaraju tek navečer.',0],['1','Prvi restoran pristao je na besplatno testiranje od dva tjedna.','',0],['1','Izmjeriti koliko se posuda vrati unutar 48 sati.','Pranje posuda traje dulje nego što smo mislili.',0],['2','Drugi restoran i dogovor s praonicom.','',0],['3','Postaviti cijenu pilota: mjesečna naknada po restoranu.','',0],['4','Prvi plaćeni pilot: 200 posuda.','Treba nam kombi za dostavu posuda.',0],['5','Pripremiti paket za demo dan i zatražiti povratnu informaciju.','',0]]},
- {slug:'mednote',name:'MedNote',members:['Ivan M.','Sara P.'],stage:'prototype',
+ {slug:'mednote',name:'MedNote',members:['Ivan M.','Sara P.'],stage:'prototype',funding:[0,80000,'pre_seed'],investors:true,
   short:'Glasovne bilješke za liječnike obiteljske medicine.',problem:'Liječnik potroši trećinu pregleda na tipkanje nalaza.',users:'Ordinacije obiteljske medicine.',solution:'Aplikacija koja razgovor pretvara u nacrt nalaza koji liječnik samo potvrdi.',
   value:'Pet minuta manje tipkanja po pacijentu.',ask:'Tražimo tri ordinacije koje će testirati prototip u studenom.',
   done:{profile:-51,'problem-users':-41,'user-interviews':-30,'pricing-hypotheses':-19,'weekly-report':-3},
   metric:'Liječnici koji testiraju',att:.8,seen:1,
   log:[['0','Razgovarati s pet liječnika o tome kako pišu nalaze.','',0],['0','Snimiti tijek jednog pregleda (uz dopuštenje).','',0],['1','Prvi liječnik testira snimanje bilješki.','Pitanje zaštite podataka pacijenata.',0],null,['2','Provjeriti GDPR s pravnikom i zapisati pravila.','Čekamo odgovor pravnika.',0],['3','Ubrzati prijepis ispod 10 sekundi.','',0],['4','Mjeriti koliko vremena liječnik uštedi.','',0],['5','Ponuditi pretplatu prvoj ordinaciji.','',0]]},
- {slug:'edunest',name:'EduNest',members:['Tena V.','Filip J.','Nina B.'],stage:'prototype',
+ {slug:'edunest',name:'EduNest',members:['Tena V.','Filip J.','Nina B.'],stage:'mvp',funding:[5000,null,'none'],
   short:'Platforma za instrukcije između studenata.',problem:'Studenti prve godine ne mogu pronaći provjerenog instruktora za svoj kolegij.',users:'Studenti tehničkih fakulteta.',solution:'Stariji studenti nude termine, a ocjene i potvrde kolegija su javne.',
   value:'Instrukcija s potvrđenim znanjem kolegija, po cijeni nižoj od agencije.',ask:'Trebamo kontakt studentskog zbora FER-a.',
   done:{profile:-50,'problem-users':-39,'pricing-hypotheses':-21},review:['presentation'],
@@ -78,13 +80,13 @@ const TEAMS=[
  // A team that is on the list but has not registered yet: the organiser sees whom to invite.
  {slug:'tourloop',name:'TourLoop',members:['Karlo N.','Ivo Š.'],stage:'idea',accounts:false,
   short:'Pješačke ture koje vode lokalni stanovnici.',problem:'Turisti dobivaju iste ture, a lokalni vodiči nemaju kanal prodaje.',users:'Posjetitelji koji ostaju tri i više dana.',solution:'Katalog kratkih tura s rezervacijom i plaćanjem na jednom mjestu.'},
- {slug:'finbuddy',name:'FinBuddy',members:['Toni G.','Bruno K.'],stage:'prototype',
+ {slug:'finbuddy',name:'FinBuddy',members:['Toni G.','Bruno K.'],stage:'mvp',funding:[null,50000,'pre_seed'],investors:true,
   short:'Aplikacija za financijsku pismenost srednjoškolaca.',problem:'Mladi dobiju prvu karticu bez ikakvog znanja o budžetu i kreditima.',users:'Srednjoškolci od 15 do 19 godina i njihovi roditelji.',solution:'Kratki izazovi tjedno i virtualni budžet koji prati stvarnu potrošnju.',
   value:'Škola dobiva gotov program financijske pismenosti, roditelj uvid u navike.',ask:'Tražimo dvije srednje škole za pilot u drugom polugodištu.',
   done:{profile:-50,'problem-users':-38,'user-interviews':-24,'pricing-hypotheses':-17},
   metric:'Korisnici na listi čekanja',att:.85,seen:0,
   log:[['40','Anketa u dvije škole.','',0],['85','Prvih 100 prijava na listu čekanja.','',0],['130','Prototip prvog izazova.','',0],['180','Testirati izazov s jednim razredom.','Škola traži suglasnost roditelja.',0],['240','Pripremiti obrazac suglasnosti.','',0],['310','Drugi razred i mjerenje zadržavanja.','',0],['380','Ponuda školi: cijena po razredu.','',0],['455','Dogovoriti sastanak s ravnateljem.','',0]]},
- {slug:'solarshare',name:'SolarShare',members:['Mateo L.','Dario V.'],stage:'pilot',
+ {slug:'solarshare',name:'SolarShare',members:['Mateo L.','Dario V.'],stage:'product',funding:[60000,300000,'seed'],investors:true,
   short:'Zajednička sunčana elektrana za stambene zgrade.',problem:'Stanari zgrada ne mogu sami postaviti panele i ne znaju kako podijeliti trošak.',users:'Upravitelji i predstavnici stanara u zgradama s ravnim krovom.',solution:'Paket od projekta do raspodjele uštede po stanu, s mjesečnim izvještajem.',
   value:'Niži računi za struju bez ulaganja pojedinog stanara.',ask:'Kontakt upravitelja zgrada u Zagrebu i Rijeci.',
   done:{profile:-48,'problem-users':-37,'user-interviews':-28,'pricing-hypotheses':-14},review:['presentation'],
@@ -102,6 +104,29 @@ const MENTORS=[
  ['goran-peric','Goran P.','m','Pricing','Cijene i modeli naplate za B2B proizvode.'],
  ['jelena-matic','Jelena M.','f','Legal & IP','Osnivanje tvrtke, ugovori i zaštita intelektualnog vlasništva.'],
  ['boris-lovric','Boris L.','m','Fundraising','Priprema za razgovore s investitorima i poslovnim anđelima.'],
+];
+// The mentor network of hubvers.com (server/network.mjs): invented mentors in six cities, so the map and the filters
+// have something to show. Marked demo on their cards. [slug, name, country, city, headline, categories, hubs, languages, open to, hours, bio]
+// Invented investors of the demo: funds on reserved .example domains, so nobody real is named.
+const INVESTORS=[
+ ['adria','Nora Kovač','nora@adriaseed.example',{fund:'Adria Seed Partners (demo)',website:'https://adriaseed.example',country:'HR',city:'Zagreb',categories:['software','climate','food'],
+  stages:['prototype','mvp','product','first_customer'],ticketMin:50000,ticketMax:300000,areas:['cee','balkans'],bio:'Invented seed fund for the demo: first cheques into teams from Croatian and Slovenian incubators.'}],
+ ['danube','Jonas Bauer','jonas@danube-impact.example',{fund:'Danube Impact Ventures (demo)',website:'https://danube-impact.example',country:'AT',city:'Vienna',categories:['climate','mobility','health'],
+  stages:['product','first_customer','revenue'],ticketMin:150000,ticketMax:1000000,areas:['western','cee'],bio:'Invented impact fund for the demo: climate and health teams with their first paying customers.'}],
+];
+const NETWORK=[
+ ['tea-horvat','Tea Horvat','HR','Zagreb','Former head of sales at a B2B SaaS scale-up',['sales','product'],['bird'],['hr','en'],['messages','calls'],8,'Helps first-time founders run their first 50 sales calls and build a repeatable pipeline.'],
+ ['marin-babic','Marin Babić','HR','Zagreb','Business angel, 12 early-stage investments in the region',['fundraising','finance'],['bird'],['hr','en','de'],['messages','investing'],4,'Reviews decks, term sheets and the first round plan.'],
+ ['iva-zagar','Iva Žagar','SI','Ljubljana','Product lead in B2B fintech',['product','design'],['bird'],['sl','en','hr'],['messages','calls'],6,'Discovery interviews, roadmaps and the first paid pilot.'],
+ ['rok-kranjc','Rok Kranjc','SI','Ljubljana','Startup lawyer: company set-up, IP and contracts',['legal'],[],['sl','en'],['messages'],4,'Founders agreements, ESOP basics and IP for software teams.'],
+ ['milica-jovic','Milica Jović','RS','Beograd','Engineering director, built teams from 5 to 80',['engineering','people'],[],['sr','en','hr'],['messages','calls'],6,'Hiring the first engineers, architecture choices and on-call that does not burn people out.'],
+ ['nemanja-ilic','Nemanja Ilić','RS','Beograd','Growth marketing for mobile apps',['marketing','ai_data'],[],['sr','en'],['messages'],5,'Paid acquisition, retention cohorts and app store pages.'],
+ ['lena-gruber','Lena Gruber','AT','Wien','Ex-Big Tech partnerships lead for CEE',['big_tech','sales'],[],['de','en'],['messages','calls'],4,'Partner programmes, marketplaces and selling to large companies.'],
+ ['felix-hofer','Felix Hofer','AT','Wien','Prepares teams for seed and Series A rounds',['fundraising'],[],['de','en'],['messages','calls','investing'],3,'Investor lists, data rooms and the numbers investors ask about.'],
+ ['giulia-conti','Giulia Conti','IT','Milano','Product design and user research',['design','product'],[],['it','en'],['messages','calls'],6,'Usability tests on a budget and design systems for small teams.'],
+ ['paolo-ferri','Paolo Ferri','IT','Milano','Fractional CFO for early-stage startups',['finance','operations'],[],['it','en'],['messages'],4,'Financial models, unit economics and grant budgets.'],
+ ['jonas-weber','Jonas Weber','DE','Berlin','AI products and data, formerly at a large tech company',['ai_data','big_tech','engineering'],[],['de','en'],['messages','calls'],5,'From a demo to an AI feature people pay for: data, evaluation and costs.'],
+ ['sophie-lang','Sophie Lang','DE','Berlin','Climate startups and impact investing',['impact','fundraising'],[],['de','en','fr'],['messages','investing'],3,'Impact metrics, climate funds and public grants in the EU.'],
 ];
 // Past lectures: n-th Tuesday or Thursday before today (1 = the latest). Upcoming: n-th after today.
 const LECTURES=[
@@ -171,6 +196,8 @@ export function fillDemo(db){
  const q=(sql,...args)=>db.query(sql).run(...args);
  const users={},organiser=DEMO_ORGANISER;
  db.transaction(()=>{
+  // The invented cohort works on the example tasks, so a demo hands them out (a real workspace keeps them as templates).
+  q("INSERT INTO settings(key,value,updated) VALUES('example_tasks','assign',?) ON CONFLICT(key) DO UPDATE SET value='assign'",now);
   // Reviews, announcements and verifications are signed by an invented organiser, never by a real account.
   q("INSERT OR IGNORE INTO users(id,login,display_name,role,language,created,updated) VALUES(?,?,?,'program_admin','hr',?,?)",organiser,'demo-organiser',ORGANISER_NAME,past,past);
   // Visitors of the public demo look through this invented manager's eyes, read-only.
@@ -190,6 +217,12 @@ export function fillDemo(db){
    q('INSERT INTO teams(id,name,created) VALUES(?,?,?)',teamId,team.name,past);
    q("INSERT INTO projects(id,team_id,source,status,draft,draft_version,published,published_version,published_at,created,updated) VALUES(?,?,'curated','published',?,1,?,1,?,?,?)",projectId,teamId,content,content,past,past,past);
    q("INSERT INTO project_revisions(project_id,version,kind,content,author,created) VALUES(?,1,'published',?,NULL,?)",projectId,content,past);
+   // Stage history: the team climbed the shared list to where it is now, a step every couple of weeks.
+   const steps=['idea','prototype','mvp','product','first_customer'].slice(0,['idea','prototype','mvp','product','first_customer'].indexOf(team.stage)+1);
+   steps.forEach((st,i)=>q("INSERT INTO project_stage_history(project_id,stage,previous,changed_by,source,changed_at) VALUES(?,?,?,NULL,'team',?)",projectId,st,i?steps[i-1]:null,at(-56+Math.round(i*50/steps.length),10)));
+   if(team.funding){const [raised,raising,round]=team.funding;q('UPDATE projects SET raised_eur=?,raising_eur=?,funding_round=? WHERE id=?',raised,raising,round,projectId);}
+   // Teams that switched "visible to investors" on, so the investor dashboard of the demo has something to show.
+   if(team.investors)q('UPDATE projects SET investor_visible=1 WHERE id=?',projectId);
    users[team.slug]=[];
    team.members.forEach((name,i)=>{
     const personId=`demo-person-${team.slug}-${i+1}`,userId=`demo-user-${team.slug}-${i+1}`,joined=at(-56+i,9+i);
@@ -319,10 +352,26 @@ export function fillDemo(db){
   award(db,{type:'project',id:'demo-project-edunest',amount:15,sourceKey:'manual:demo-adj-1',reason:'manual:Pomogli FinBuddyju s anketom u školama',actor:organiser});
   q("UPDATE xp_ledger SET created=? WHERE source_key='manual:demo-adj-1'",at(-15,9));
   for(const [team,days,message] of [['parkpilot',-6,'Niste se javili već dva tjedna. Recite nam ako vam treba pomoć s planom.'],['shiftly',-3,'Podsjetnik: ovaj tjedan još se niste javili, a u četvrtak je predavanje.']])for(const userId of users[team])q("INSERT INTO notifications(id,user_id,kind,payload,read_at,created) VALUES(?,?,'nudge',?,NULL,?)",newId('ntf'),userId,JSON.stringify({message,from:ORGANISER_NAME}),at(days,9));
+  // The mentor network: accounts without a password (nobody signs in as them), each with a profile marked demo.
+  for(const [slug,name,country,city,headline,categories,hubs,languages,openTo,availability,bio] of NETWORK){
+   const id='demo-user-mentor-'+slug;
+   q("INSERT OR IGNORE INTO users(id,login,display_name,role,language,created,updated) VALUES(?,?,?,'member','en',?,?)",id,'demo-mentor-'+slug,name,past,past);
+   saveProfile(db,id,'mentor',validateProfile('mentor',{headline,bio,country,city,categories,hubs,languages,openTo,availability}),past,1);
+  }
+  // Invented investors, already approved: no password (nobody signs in as them); a visitor looks through the first one's eyes.
+  for(const [slug,name,email,profile] of INVESTORS){
+   const id='demo-user-investor-'+slug;
+   q("INSERT OR IGNORE INTO users(id,login,display_name,email,role,language,created,updated) VALUES(?,?,?,?,'member','en',?,?)",id,'demo-investor-'+slug,name,email,past,past);
+   saveProfile(db,id,'investor',validateProfile('investor',profile),past,1);
+   saveInvestor(db,id,validateInvestor(profile,email,hubCatalogue().regions.map(r=>r.id)),past,{status:'approved'});
+   q('UPDATE investor_profiles SET decided_at=? WHERE user_id=?',past,id);
+  }
+  for(const [a,b,status] of [['tea-horvat','marin-babic','accepted'],['iva-zagar','tea-horvat','accepted'],['jonas-weber','lena-gruber','accepted'],['felix-hofer','marin-babic','pending']])
+   q('INSERT OR IGNORE INTO network_connections(from_id,to_id,status,created,decided) VALUES(?,?,?,?,?)','demo-user-mentor-'+a,'demo-user-mentor-'+b,status,past,status==='accepted'?past:null);
   q("INSERT INTO settings(key,value,updated) VALUES('demo_filled',?,?)",now,now);
   q("INSERT INTO settings(key,value,updated) VALUES('demo_version',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated=excluded.updated",DEMO_VERSION,now);
  })();
- return {filled:true,teams:TEAMS.length,accounts:Object.values(users).flat().length,mentors:MENTORS.length,lectures:LECTURES.length};
+ return {filled:true,mentorNetwork:NETWORK.length,investors:INVESTORS.length,teams:TEAMS.length,accounts:Object.values(users).flat().length,mentors:MENTORS.length,lectures:LECTURES.length};
 }
 
 /** A one-page PDF with the file's name on it, so a demo download opens instead of failing. */
@@ -401,7 +450,10 @@ export const demoStale=(filled,now=Date.now())=>(Date.parse(zagrebDate(now))-Dat
  * Removes everything the filler made and fills again, so dates are fresh before a meeting.
  * Every invented row carries a "demo-" id somewhere; the workspace owner and real accounts stay.
  */
-const KEEP={task_templates:['id','key','translations','checklist'],badge_definitions:['id','translations','rule'],settings:['key']};
+// A network profile belongs to its account: only user_id says whether it is invented (a real headline may start with "demo-").
+const KEEP={task_templates:['id','key','translations','checklist'],badge_definitions:['id','translations','rule'],settings:['key'],
+ network_profiles:['kind','headline','bio','country','city','region','categories','hubs','languages','open_to','linkedin','created','updated'],
+ investor_profiles:['fund','website','email_domain','stages','areas','status','decided_at','created','updated']};
 // Tables the refill never touches: pilot requests from the landing are real people, whatever they typed.
 const SKIP=new Set(['pilot_requests']);
 export function refillDemo(db){

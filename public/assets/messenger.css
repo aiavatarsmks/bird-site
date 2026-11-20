@@ -1,0 +1,177 @@
+/* Messenger (messenger.js): conversation list, threads with bubbles, the composer pinned at the bottom.
+   Timetable rules: square corners, hairline rules, flat panels; only avatars (stations) are round.
+   Tokens follow the page: BIRD's ink and paper, the demo's tram blue (body.is-demo). */
+.msgr-app,.msgr-panel,.msgr-thread,.msgr-inbox,.msgr-menu{
+ --m-ink:var(--ink,#242a26);--m-muted:var(--muted,#5d645b);--m-line:var(--line,#dcded4);--m-bg:var(--white,#fffefa);
+ --m-wall:#f4f1e9;--m-mine:#e1ead6;--m-mine-line:#c3d1b3;--m-hover:#f1eee5;--m-accent:var(--m-ink);--m-badge:#b5432a;--m-read:#2c7a4b;
+}
+.is-demo :is(.msgr-app,.msgr-panel,.msgr-thread,.msgr-inbox),.is-demo.msgr-menu,body.is-demo>.msgr-menu{
+ --m-wall:#eef1f6;--m-mine:#dfe6ff;--m-mine-line:#bdc9f4;--m-hover:#eef1f8;--m-accent:var(--tram,#1f3fc4);--m-read:var(--tram,#1f3fc4);
+}
+[data-msgr-count][hidden],.msgr-thread [hidden],.msgr-panel [hidden],.msgr-inbox [hidden],.msgr-app [hidden]{display:none!important}
+.msgr-i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:square;stroke-linejoin:miter;flex:none}
+.msgr-i.is-fill{fill:currentColor;stroke:none}
+:is(.msgr-thread,.msgr-inbox) .msgr-ib{flex:none;position:relative;display:inline-grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:0;background:none;color:var(--m-ink);cursor:pointer;text-decoration:none}
+:is(.msgr-thread,.msgr-inbox) .msgr-ib:hover{background:var(--m-hover)}
+:is(.msgr-thread,.msgr-inbox) .msgr-ib:focus-visible,:is(.msgr-thread,.msgr-inbox) .msgr-conv:focus-visible,.msgr-menu>:focus-visible,:is(.msgr-thread,.msgr-inbox) .msgr-older:focus-visible,:is(.msgr-thread,.msgr-inbox) .msgr-retry:focus-visible{outline:2px solid var(--m-ink);outline-offset:-2px}
+
+/* The account pages and the demo skin style every button and field; inside the messenger they stay flat and square. */
+:is(.msgr-thread,.msgr-inbox) :is(button,a,input,textarea,label){border-radius:0!important;transform:none!important;box-shadow:none!important;transition:none}
+:is(.msgr-thread,.msgr-inbox) :is(.msgr-conv,.msgr-older,.msgr-search .msgr-ib):hover{border-color:var(--m-line)!important}
+
+/* Avatars: initials in a roundel; a chat has its group or globe drawing. */
+.msgr-ava{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:hsl(calc(var(--h,0) * 47 + 140) 18% 30%);color:#fff;font:700 15px/1 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.3px}
+.msgr-ava.is-group{background:var(--m-ink)}
+.msgr-ava .msgr-i{stroke:#fff;width:22px;height:22px;stroke-width:1.8}
+.is-demo .msgr-ava.is-group{background:var(--tram-night,#0b1a55)}
+
+/* Thread ------------------------------------------------------------------------------------------------ */
+.msgr-thread{display:flex;flex-direction:column;flex:1;height:100%;min-height:0;background:var(--m-wall);color:var(--m-ink);font-size:15px}
+.msgr-head{flex:none;display:flex;align-items:center;gap:10px;min-height:60px;padding:6px 6px 6px 14px;background:var(--m-bg);border-bottom:1px solid var(--m-line)}
+.msgr-back{margin-left:-10px}
+.msgr-head-ava:empty{display:none}
+.msgr-head-ava .msgr-ava{width:40px;height:40px;font-size:14px}
+.msgr-title{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.msgr-title b{font-size:16px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msgr-title small{font-size:12.5px;color:var(--m-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msgr-title small:empty{display:none}
+.msgr-thread.is-slim .msgr-head{min-height:44px;padding:0 0 0 14px}
+.msgr-slim-title{flex:1;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:var(--m-muted)}
+.msgr-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:10px 14px 12px;outline:none}
+.msgr-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
+:is(.msgr-thread,.msgr-inbox) .msgr-older{display:block;margin:0 auto 8px;min-height:36px;padding:0 12px;border:1px solid var(--m-line);background:var(--m-bg);color:var(--m-ink);font:inherit;font-size:13px;cursor:pointer}
+.msgr-empty{margin:24px 8px;text-align:center;color:var(--m-muted);font-size:14px}
+.msgr-day{align-self:center;margin:12px 0 6px;font-size:12px;font-weight:600;color:var(--m-muted)}
+.msgr-day span{display:inline-block;padding:3px 10px;background:var(--m-bg);border:1px solid var(--m-line)}
+.msgr-day:first-child{margin-top:0}
+
+/* Bubbles: flat blocks, mine on the right. Time and ticks sit inside the bubble, at the end of the last line. */
+.msgr-b{position:relative;align-self:flex-start;max-width:min(80%,560px);padding:6px 10px 7px;background:#fff;border:1px solid var(--m-line);line-height:1.4;overflow-wrap:anywhere}
+.msgr-b.is-mine{align-self:flex-end;background:var(--m-mine);border-color:var(--m-mine-line)}
+.msgr-b:not(.is-mine)+.msgr-b.is-mine,.msgr-b.is-mine+.msgr-b:not(.is-mine){margin-top:8px}
+.msgr-b p{margin:0;white-space:pre-wrap}
+.msgr-b p a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.msgr-from{display:block;margin-bottom:1px;font-size:12.5px;font-weight:700;color:var(--m-accent)}
+.msgr-meta{float:right;position:relative;top:5px;display:inline-flex;align-items:center;gap:2px;margin-left:10px;font-size:11px;line-height:1;color:var(--m-muted);font-variant-numeric:tabular-nums;white-space:nowrap;user-select:none}
+.msgr-b>.msgr-meta{float:none;top:0;display:flex;justify-content:flex-end;margin:2px 0 0}
+.msgr-tick{display:inline-flex}
+.msgr-tick .msgr-i{width:16px;height:16px;stroke-width:2.2}
+.msgr-tick .is-read{color:var(--m-read)}
+.msgr-b.is-pending{opacity:.8}
+.msgr-b.is-failed{border-color:#d08a74;background:#fbece6}
+.msgr-b.is-failed .msgr-tick{color:#b5432a}
+:is(.msgr-thread,.msgr-inbox) .msgr-retry{display:block;margin:4px 0 -2px auto;min-height:32px;padding:0;border:0;background:none;color:#a33a22;font:inherit;font-size:13px;font-weight:600;text-decoration:underline;cursor:pointer}
+.msgr-b.is-hidden{background:transparent;border-style:dashed;color:var(--m-muted);font-style:italic;font-size:13px}
+.msgr-img{display:block;margin:-2px -6px 4px;line-height:0}
+.msgr-img img{display:block;max-width:100%;max-height:280px;object-fit:contain}
+.msgr-file{display:flex;align-items:center;gap:8px;min-height:44px;margin:0 0 4px;padding:6px 10px;border:1px solid var(--m-line);background:rgba(255,255,255,.7);color:inherit;text-decoration:none}
+.msgr-file span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.msgr-file small{color:var(--m-muted);font-size:12px;white-space:nowrap}
+.msgr-file:hover span{text-decoration:underline}
+/* Per message ⋯: appears on hover next to the bubble; on touch screens a long press opens the same menu. */
+:is(.msgr-thread,.msgr-inbox) .msgr-mb{position:absolute;top:50%;right:-42px;width:36px;height:36px;min-height:0;margin-top:-18px;display:grid;place-items:center;padding:0;border:0;background:none;color:var(--m-muted);opacity:0;cursor:pointer}
+:is(.msgr-thread,.msgr-inbox) .msgr-mb .msgr-i{width:18px;height:18px}
+.msgr-b:hover .msgr-mb,:is(.msgr-thread,.msgr-inbox) .msgr-mb:focus-visible{opacity:1}
+:is(.msgr-thread,.msgr-inbox) .msgr-mb:hover{color:var(--m-ink);background:var(--m-hover)}
+@media(hover:none){.msgr-mb{display:none}.msgr-b{-webkit-touch-callout:none}}
+
+.msgr-note{flex:none;margin:0;padding:8px 14px;font-size:13px;line-height:1.45;color:var(--m-muted);background:var(--m-bg);border-top:1px solid var(--m-line)}
+.msgr-note.is-error{color:#8a2b12;background:#fbe9e2}
+
+/* Composer: one line that grows to five, a paperclip on the left, the send arrow on the right. */
+.msgr-compose{flex:none;display:flex;align-items:flex-end;gap:4px;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));background:var(--m-bg);border-top:1px solid var(--m-line)}
+.msgr-clip{cursor:pointer}
+:is(.msgr-thread,.msgr-inbox) .msgr-clip input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.msgr-clip:focus-within{outline:2px solid var(--m-ink);outline-offset:-2px}
+.msgr-field{flex:1;min-width:0;display:flex;flex-direction:column;background:#fff;border:1px solid var(--m-line)}
+.msgr-field:focus-within{border-color:var(--m-ink);box-shadow:inset 0 0 0 1px var(--m-ink)}
+:is(.msgr-thread,.msgr-inbox) .msgr-field textarea{display:block;width:100%;min-height:42px;max-height:132px;margin:0;padding:11px 12px 10px;border:0;outline:0;resize:none;background:transparent;color:var(--m-ink);font:inherit;font-size:16px;line-height:20px}
+.msgr-chip{display:flex;align-items:center;gap:6px;padding:0 0 0 10px;border-bottom:1px solid var(--m-line);font-size:13px}
+.msgr-chip span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.msgr-chip small{color:var(--m-muted)}
+.msgr-chip .msgr-i{width:16px;height:16px}
+:is(.msgr-thread,.msgr-inbox) .msgr-send{background:var(--m-accent);color:#fff}
+:is(.msgr-thread,.msgr-inbox) .msgr-send:hover{background:var(--m-accent);filter:brightness(1.15)}
+:is(.msgr-thread,.msgr-inbox) .msgr-send .msgr-i{stroke:#fff}
+.msgr-compose.is-off{opacity:.55}
+.msgr-compose :disabled{cursor:not-allowed}
+
+/* Conversation list ------------------------------------------------------------------------------------------ */
+.msgr-inbox{display:flex;flex-direction:column;flex:1;min-width:0;height:100%;min-height:0;background:var(--m-bg);color:var(--m-ink)}
+.msgr-search{flex:none;display:flex;gap:4px;padding:8px;border-bottom:1px solid var(--m-line);background:var(--m-bg)}
+.msgr-search-box{flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 10px;border:1px solid var(--m-line);background:#fff;color:var(--m-muted)}
+.msgr-search-box:focus-within{border-color:var(--m-ink);box-shadow:inset 0 0 0 1px var(--m-ink)}
+.msgr-search-box .msgr-i{width:18px;height:18px}
+:is(.msgr-thread,.msgr-inbox) .msgr-search-box input{flex:1;min-width:0;height:42px;border:0;outline:0;background:transparent;color:var(--m-ink);font:inherit;font-size:16px}
+:is(.msgr-thread,.msgr-inbox) .msgr-search .msgr-ib{border:1px solid var(--m-line)}
+.msgr-convs{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.msgr-sec{margin:0;padding:12px 14px 6px;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--m-muted)}
+.msgr-hint{margin:0;padding:18px 14px;color:var(--m-muted);font-size:14px;line-height:1.5}
+:is(.msgr-thread,.msgr-inbox) .msgr-conv{display:flex;align-items:center;gap:12px;width:100%;min-height:68px;padding:10px 12px;border:0;border-bottom:1px solid var(--m-line);border-radius:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+:is(.msgr-thread,.msgr-inbox) .msgr-conv:hover{background:var(--m-hover)}
+:is(.msgr-thread,.msgr-inbox) .msgr-conv.is-active{background:var(--m-mine)}
+:is(.msgr-thread,.msgr-inbox) .msgr-conv:disabled{opacity:.6}
+.msgr-conv-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.msgr-conv-top,.msgr-conv-bot{display:flex;align-items:center;gap:6px;min-width:0}
+.msgr-conv-top b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:600}
+.msgr-conv-top time{margin-left:auto;flex:none;padding-left:6px;font-size:12px;color:var(--m-muted);font-variant-numeric:tabular-nums}
+.msgr-tag{flex:none;font-size:11px;color:var(--m-muted);white-space:nowrap}
+.msgr-prev{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;color:var(--m-muted)}
+:is(.msgr-thread,.msgr-inbox) .msgr-conv.is-unread .msgr-conv-top b{font-weight:800}
+:is(.msgr-thread,.msgr-inbox) .msgr-conv.is-unread .msgr-prev{color:var(--m-ink)}
+:is(.msgr-thread,.msgr-inbox) .msgr-conv.is-unread time{color:var(--m-badge);font-weight:700}
+.msgr-badge{flex:none;min-width:22px;height:22px;padding:0 6px;background:var(--m-badge);color:#fff;font-size:12px;font-weight:700;line-height:22px;text-align:center}
+
+/* Menu ⋯ -------------------------------------------------------------------------------------------------------- */
+.msgr-menu{position:fixed;z-index:3000;min-width:210px;max-width:calc(100vw - 16px);display:flex;flex-direction:column;padding:4px 0;background:var(--m-bg);border:1px solid var(--m-ink);box-shadow:4px 4px 0 rgba(36,42,38,.18);font:14px/1.3 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.msgr-menu>*{display:flex;align-items:center;min-height:44px;padding:0 16px;border:0;background:none;color:var(--m-ink);font:inherit;text-align:left;text-decoration:none;cursor:pointer}
+.msgr-menu>:hover:not(:disabled){background:var(--m-hover)}
+.msgr-menu>.is-danger{color:#a33a22}
+.msgr-menu>:disabled{color:var(--m-muted);cursor:default}
+
+/* One panel: list, then the conversation with a back arrow (own office card, office dock). */
+.msgr-panel{display:flex;flex-direction:column;height:100%;min-height:0}
+.msgr-pane-list,.msgr-pane-thread{flex:1;min-height:0;display:flex;flex-direction:column}
+
+/* #/account/messages: two columns that fill the screen below the page header. */
+.msgr-app{display:grid;grid-template-columns:minmax(270px,340px) minmax(0,1fr);height:var(--msgr-h,640px);border:1px solid var(--m-line);background:var(--m-bg)}
+.msgr-side{min-width:0;min-height:0;display:flex;overflow:hidden;border-right:1px solid var(--m-line)}
+.msgr-main{min-width:0;min-height:0;display:flex;flex-direction:column;background:var(--m-wall)}
+.msgr-pick{margin:auto;padding:24px;max-width:340px;text-align:center;color:var(--m-muted);font-size:14.5px;line-height:1.5}
+.msgr-app .msgr-back{display:none}
+@media(max-width:760px){
+ .msgr-app{display:block;height:auto;border:0;background:none}
+ .msgr-app .msgr-side{border:1px solid var(--m-line);border-right:1px solid var(--m-line)}
+ .msgr-app .msgr-inbox{height:auto}
+ .msgr-app .msgr-convs{overflow:visible}
+ .msgr-app .msgr-main{display:none}
+ /* The conversation covers the screen and follows the visual viewport, so the composer stays above the keyboard. */
+ .msgr-app.is-thread .msgr-main{display:flex;position:fixed;z-index:2500;left:0;right:0;top:var(--msgr-vt,0px);height:var(--msgr-vh,100dvh)}
+ .msgr-app .msgr-back{display:inline-grid}
+ html.msgr-page:has(.msgr-app.is-thread),html.msgr-page:has(.msgr-app.is-thread) body{overflow:hidden}
+ .msgr-b{max-width:86%}
+ :is(.msgr-thread,.msgr-inbox) .msgr-mb{display:none}
+}
+
+/* Inside a person's card in the office: the chat sits under the name and fills the panel down to its bottom edge. */
+.ps-chat{margin:0 -18px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);height:var(--chat-h,440px);display:flex;flex-direction:column}
+.ps-chat>.msgr-thread,.ps-chat>.msgr-panel{flex:1}
+#office-card.has-chat .ps-stage .cs-xl{--h:clamp(110px,16vh,150px)}
+#office-card.has-chat .ps-stage .cs-stage{padding:12px 12px 8px}
+#office-card.has-chat .ps-id{padding:10px 18px 2px}
+#office-card.has-chat .ps-id h2{font-size:24px}
+#office-card.has-chat .ps-role{margin-top:2px}
+@media(max-width:720px){
+ #office-card.has-chat .ps-stage .cs-xl{--h:clamp(84px,12dvh,120px)}
+}
+
+/* Office dock: the messenger opens in the dock panel, taller than the other panels. */
+.hud-panel.is-chat{height:calc(100% - 170px);max-height:720px;width:min(400px,calc(100% - 100px))}
+.hud-panel.is-chat .hud-body{flex:1;min-height:0;display:flex;flex-direction:column;padding:0;overflow:hidden}
+.hud-msgr-box{flex:1;min-height:0;display:flex;flex-direction:column}
+@media(max-width:720px){.hud-panel.is-chat{height:min(70%,calc(100% - 16px));max-height:none;width:auto}}
+
+@media(prefers-reduced-motion:no-preference){
+ .msgr-list>.msgr-b:last-child{animation:msgr-in .18s cubic-bezier(.16,1,.3,1)}
+}
+@keyframes msgr-in{from{opacity:0;transform:translateY(6px)}}

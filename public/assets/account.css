@@ -13,6 +13,7 @@
 .acc-switch{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
 .acc-switch a{text-decoration:none;border:1px solid var(--line);border-radius:0;padding:9px 14px;min-height:44px;display:inline-flex;align-items:center;font-size:14px}
 .acc-switch a[aria-current=page]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.acc-forgot{margin:14px 0 0;font-size:15px}.acc-forgot a{display:inline-flex;align-items:center;min-height:44px}
 .acc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:18px;align-items:start}
 .acc-card{background:var(--white);border:1px solid var(--line);border-radius:0;padding:20px;margin-bottom:18px;min-width:0}
 .acc-grid .acc-card{margin-bottom:0}
@@ -167,8 +168,8 @@ tr[hidden]{display:none}
  .acc-attendance-table{min-width:0}
  .acc-attendance-table tr>:nth-child(n+5){display:none}
  .acc-teams-table{min-width:0}
- .acc-teams-table tr>:nth-child(5),.acc-teams-table tr>:nth-child(6),.acc-teams-table tr>:nth-child(7),.acc-teams-table tr>:nth-child(9){display:none}
- .acc-teams-table td:nth-child(8) small{display:none}
+ .acc-teams-table tr>:nth-child(6),.acc-teams-table tr>:nth-child(7),.acc-teams-table tr>:nth-child(8),.acc-teams-table tr>:nth-child(10){display:none}
+ .acc-teams-table td:nth-child(9) small{display:none}
  .acc-matrix th[scope=row]{min-width:0}
 }
 .acc-date{position:relative;display:block}
@@ -377,7 +378,7 @@ tr[hidden]{display:none}
 .viz-bars b{text-align:right;font-size:13px;font-weight:700}
 .viz-note{display:flex;align-items:center;gap:6px;margin:10px 0 0;font-size:12px;color:var(--muted)}
 .viz-note::before{content:"";width:14px;border-top:2px dashed var(--ink)}
-.viz-stages{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;align-items:end;min-height:150px}
+.viz-stages{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;align-items:end;min-height:150px}
 .viz-stages li{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:0}
 .viz-stages b{font:650 24px/1 Inter,sans-serif;letter-spacing:-.8px}
 .viz-stages li.is-empty b{color:#b3b0a5}
@@ -414,12 +415,12 @@ tr[hidden]{display:none}
 .dash-link::after{content:"";position:absolute;inset:0;z-index:1}
 .dash-link:focus-visible{outline:none}
 .dash-card .acc-light{padding-top:4px}
-.dash-stage{list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;margin:0;padding:0}
+.dash-stage{list-style:none;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin:0;padding:0}
 .dash-stage li{position:relative;height:6px;background:var(--track)}
 .dash-stage li::after{content:"";position:absolute;inset:0;background:transparent;transform-origin:left}
 .dash-stage li.is-done::after{background:#9db8a4}
 .dash-stage li.is-now::after{background:var(--ink)}
-.dash-stage li:nth-child(2){--j:1}.dash-stage li:nth-child(3){--j:2}.dash-stage li:nth-child(4){--j:3}
+.dash-stage li:nth-child(2){--j:1}.dash-stage li:nth-child(3){--j:2}.dash-stage li:nth-child(4){--j:3}.dash-stage li:nth-child(5){--j:4}.dash-stage li:nth-child(6){--j:5}.dash-stage li:nth-child(7){--j:6}
 .dash-stage-name{display:flex;justify-content:space-between;gap:8px;margin-top:-8px;font-size:12px;color:var(--muted)}
 .dash-stage-name b{color:var(--ink);font-weight:650}
 .dash-body{display:flex;align-items:center;gap:16px}
@@ -611,8 +612,8 @@ tr[hidden]{display:none}
  /* Teams: every column fits as a three-across card; status and signals take the last row. */
  .acc .acc-teams-table tr{grid-template-columns:repeat(3,minmax(0,1fr))}
  .acc .acc-teams-table tr>:nth-child(n+3){display:block}
- .acc .acc-teams-table tr>td:nth-child(8){grid-column:1/-1;order:9}
- .acc .acc-teams-table td:nth-child(8) small{display:block}
+ .acc .acc-teams-table tr>td:nth-child(9){grid-column:1/-1;order:9}
+ .acc .acc-teams-table td:nth-child(9) small{display:block}
  /* People: role and points side by side, the role switch and disable button below. */
  .acc .acc-matrix:not(.acc-teams-table):not(.acc-attendance-table) tr>td:nth-child(5){grid-column:1/-1;display:flex;flex-wrap:nowrap;gap:8px}
  .acc .acc-matrix:not(.acc-teams-table):not(.acc-attendance-table) tr>td:nth-child(5)::before{flex-basis:100%;margin:0}
@@ -651,3 +652,39 @@ tr[hidden]{display:none}
 .rec-project-fields dd{margin:2px 0 0}
 .rec-project-links{display:flex;flex-wrap:wrap;gap:8px 16px;padding:0;list-style:none}
 .rec-project-deck a{overflow-wrap:anywhere}
+/* Project stage (one list for every hub) and financing in the project editor; stage and money on organiser views. */
+.acc-stages legend .acc-req{color:var(--accent)}
+.acc-stage-list{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:6px}
+.acc-stage{display:flex;gap:10px;align-items:flex-start;min-height:44px;padding:9px 12px;border:1px solid var(--line);background:#fff;cursor:pointer;transition:border-color .12s,background-color .12s}
+.acc-stage:hover{border-color:var(--ink)}
+.acc-stage input{width:20px;height:20px;margin:1px 0 0;flex:none;accent-color:var(--ink)}
+.acc-stage-n{flex:none;min-width:1.4em;font:650 13px/22px Inter,sans-serif;color:var(--muted);font-variant-numeric:tabular-nums}
+.acc-stage-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.acc-stage-text strong{font-size:15px;font-weight:600}
+.acc-stage-text small{font-size:13px;line-height:1.4}
+.acc-stage:has(input:checked){border-color:var(--ink);background:#f3f1ea}
+.acc-stage:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:1px}
+.acc-fin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:0 12px}
+.acc-investors{border-top:1px solid var(--line);margin-top:4px;padding-top:12px}
+.acc-investors span{display:flex;flex-direction:column;gap:3px}
+.acc-investors small{color:var(--muted);font-size:13px;line-height:1.5}
+.acc-stage-history{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.acc-stage-history li{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line)}
+.acc-stage-history li>span{display:flex;flex-direction:column;gap:2px}
+.acc-stage-history small{color:var(--muted);font-size:13px}
+.rec-fin{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:8px 20px;margin:0 0 14px}
+.rec-fin dt{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.rec-fin dd{margin:2px 0 0;font-weight:600;font-variant-numeric:tabular-nums}
+.rec-stages{margin:12px 0}
+.acc-stage-cell .m-tag{white-space:normal}
+.acc-stage-cell small{display:block}
+.acc-stage-filter{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:4px 20px;align-items:start;padding:14px 16px}
+.acc-stage-filter fieldset{border:0;margin:0;padding:0;min-width:0}
+.acc-stage-filter legend{font-size:13px;font-weight:600;margin-bottom:6px}
+.acc-stage-filter .tk-chips{max-height:none}
+.acc-stage-filter .acc-field{margin:0}
+.acc-stage-filter .acc-actions{grid-column:1/-1;align-items:center}
+@media(max-width:700px){
+ .acc-stage-filter{grid-template-columns:minmax(0,1fr)}
+ .acc .acc-teams-table tr>td.acc-stage-cell{grid-column:1/-1}
+}

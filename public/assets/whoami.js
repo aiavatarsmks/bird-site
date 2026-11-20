@@ -13,7 +13,7 @@
 const L=(en,hr,ru)=>({en,hr,ru});
 const W={
  signIn:L('Sign in','Prijava','Войти'),signOut:L('Sign out','Odjava','Выйти'),leave:L('Leave the demo','Izađi iz dema','Выйти из демо'),
- account:L('My account','Moj račun','Мой аккаунт'),menu:L('Account menu','Izbornik računa','Меню аккаунта'),signedAs:L('Signed in as','Prijavljeni ste kao','Вы вошли как'),
+ account:L('My account','Moj račun','Мой аккаунт'),messages:L('Messages','Poruke','Сообщения'),menu:L('Account menu','Izbornik računa','Меню аккаунта'),signedAs:L('Signed in as','Prijavljeni ste kao','Вы вошли как'),
  role_member:L('Participant','Sudionik','Участник'),role_program_admin:L('Programme admin','Administrator programa','Администратор программы'),role_platform_owner:L('Platform owner','Vlasnik platforme','Владелец платформы'),role_demo:L('Demo','Demo','Демо'),
  you:L('This is you','Ovo ste vi','Это вы'),
  meAdmin:L('This is me: link my account','Ovo sam ja: poveži moj račun','Это я: связать мой аккаунт'),
@@ -48,9 +48,9 @@ const demoUser=u=>String(u?.id||'').startsWith('demo-user-');
 const inDemo=()=>demoUser(state.user)||!!document.body?.classList?.contains('is-demo')||String(location.pathname).startsWith('/demo');
 
 // Who is signed in: one request per page, refreshed when account.js signs someone in or out.
-const state={user:undefined,csrf:'',p:null};
+const state={user:undefined,csrf:'',dm:0,p:null};
 function load(fresh){
- if(fresh||!state.p)state.p=fetch('/api/auth/me',{credentials:'same-origin'}).then(r=>r.ok?r.json():{}).catch(()=>({})).then(d=>{state.user=d.user||null;state.csrf=d.csrf||'';return state;});
+ if(fresh||!state.p)state.p=fetch('/api/auth/me',{credentials:'same-origin'}).then(r=>r.ok?r.json():{}).catch(()=>({})).then(d=>{state.user=d.user||null;state.csrf=d.csrf||'';state.dm=d.messages||0;return state;});
  return state.p;
 }
 async function call(method,url,body){
@@ -70,8 +70,8 @@ async function menu(slot,{lang:l,fresh}={}){
  const u=state.user;
  if(!u){slot.innerHTML=`<a class="wm-in" href="${esc(href(slot,'#/account/login'))}"><span class="wm-ini is-out" aria-hidden="true"></span><span>${tr('signIn')}</span></a>`;return;}
  const id='wm-pop-'+(++seq),role=demoUser(u)?tr('role_demo'):tr('role_'+u.role);
- slot.innerHTML=`<div class="wm"><button type="button" class="wm-btn" aria-expanded="false" aria-haspopup="true" aria-controls="${id}" title="${esc(tr('signedAs')+' '+u.displayName)}"><span class="wm-ini" aria-hidden="true">${esc(initials(u.displayName))}</span><span class="wm-name">${esc(u.displayName)}</span><span class="wm-sr">, ${esc(tr('menu'))}</span></button>
- <div class="wm-pop" id="${id}" hidden><p class="wm-who"><small>${tr('signedAs')}</small><b>${esc(u.displayName)}</b><span>${esc(role)}${u.login&&!demoUser(u)?' · '+esc(u.login):''}</span></p><a class="wm-item" href="${esc(href(slot,'#/account'))}">${tr('account')}</a><button type="button" class="wm-item" data-wm-out>${tr(demoUser(u)?'leave':'signOut')}</button></div></div>`;
+ slot.innerHTML=`<div class="wm"><button type="button" class="wm-btn" aria-expanded="false" aria-haspopup="true" aria-controls="${id}" title="${esc(tr('signedAs')+' '+u.displayName)}"><span class="wm-ini" aria-hidden="true">${esc(initials(u.displayName))}</span><b class="wm-dot" data-msgr-count aria-label="${esc(tr('messages'))}" ${state.dm?'':'hidden'}>${state.dm}</b><span class="wm-name">${esc(u.displayName)}</span><span class="wm-sr">, ${esc(tr('menu'))}</span></button>
+ <div class="wm-pop" id="${id}" hidden><p class="wm-who"><small>${tr('signedAs')}</small><b>${esc(u.displayName)}</b><span>${esc(role)}${u.login&&!demoUser(u)?' · '+esc(u.login):''}</span></p><a class="wm-item" href="${esc(href(slot,'#/account/messages'))}">${tr('messages')}<b class="wm-count" data-msgr-count ${state.dm?'':'hidden'}>${state.dm}</b></a><a class="wm-item" href="${esc(href(slot,'#/account'))}">${tr('account')}</a><button type="button" class="wm-item" data-wm-out>${tr(demoUser(u)?'leave':'signOut')}</button></div></div>`;
  const btn=slot.querySelector('.wm-btn'),pop=slot.querySelector('.wm-pop');if(!btn||!pop)return;
  // On a phone the button may sit left of the corner: the menu slides back into the screen.
  const show=on=>{pop.hidden=!on;btn.setAttribute('aria-expanded',String(on));pop.style.right='';if(on){const x=pop.getBoundingClientRect().left;if(x<8)pop.style.right=(x-8)+'px';}};
@@ -93,6 +93,8 @@ async function signOut(e){
  location.reload();
 }
 function mountAll(l){document.querySelectorAll('[data-account-menu]').forEach(slot=>menu(slot,{lang:l}));}
+// messenger.js polls the unread count and fills every [data-msgr-count]; the next draw starts from it.
+window.addEventListener?.('bird:messages',e=>{state.dm=e.detail?.unread||0;});
 window.addEventListener?.('bird:auth',e=>{state.user=e.detail?.user||null;state.csrf=e.detail?.csrf||'';state.p=Promise.resolve(state);mountAll();});
 document.addEventListener?.('click',e=>{document.querySelectorAll('.wm-pop:not([hidden])').forEach(p=>{const s=p.closest('.wm');if(s&&!s.contains(e.target)){p.hidden=true;s.querySelector('.wm-btn')?.setAttribute('aria-expanded','false');}});});
 // The landing page switches language by changing <html lang>; the control follows.
@@ -171,6 +173,6 @@ function enhance(root,{lang:l,csrf,refresh}={}){
 }
 
 window.BirdWhoami={menu,mountAll,card,enhance,signOut,text:tr};
-// The landing page has no shell script of its own to call this.
-if(document.querySelector?.('.top [data-account-menu]'))mountAll();
+// The landing page has no shell script of its own to call this (.top: its old header; .sm: the shared site menu, server/site.mjs).
+if(document.querySelector?.('.top [data-account-menu],.sm [data-account-menu]'))mountAll();
 })();

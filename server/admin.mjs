@@ -3,17 +3,23 @@ import {fail,json,readJson,oneOf,page,text} from './http.mjs';
 import {nowIso} from './db.mjs';
 import {audit,requireAdmin,PERMISSION_MATRIX} from './permissions.mjs';
 import {publicUser} from './auth.mjs';
-import {projectXp,userXp} from './progress.mjs';
+import {projectXp,userXp,teamPoints} from './progress.mjs';
 import {notify} from './notifications.mjs';
 import {riskSignals,streak,teamPercent,teamSince} from './cohort.mjs';
 import {onlyDemoPeople} from './demo-visit.mjs';
+import {stageOf,fundingOf,stageSince,teamFilter,matchesTeam} from './stages.mjs';
 
-/** One row per project: status, team and personal points, attendance, open and waiting tasks. */
+/**
+ * One row per project: status, stage and financing, team and personal points, attendance, open and waiting tasks.
+ * ?stage=idea,mvp&raisedMin=&raisedMax= narrows the list (stages.mjs, matchesTeam); `total` counts before the filter.
+ */
 export function projectsOverview(ctx){
  requireAdmin(ctx);
  const rows=ctx.db.query("SELECT * FROM projects WHERE status<>'archived' OR ?=1 ORDER BY json_extract(draft,'$.name')").all(ctx.url.searchParams.get('archived')==='1'?1:0);
  const lectures=ctx.db.query("SELECT count(*) n FROM lectures WHERE status='published' AND date<=?").get(new Date().toISOString().slice(0,10)).n;
- const items=rows.map(p=>{
+ // Filter first: the per-team numbers below are the expensive part.
+ const filter=teamFilter(ctx.url.searchParams),chosen=rows.filter(p=>matchesTeam({stage:stageOf(JSON.parse(p.draft).stage),funding:fundingOf(p)},filter));
+ const items=chosen.map(p=>{
   const members=ctx.db.query("SELECT u.id,u.display_name FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.project_id=? AND m.revoked_at IS NULL AND m.role IN ('owner','editor','member')").all(p.id);
   const ids=members.map(m=>m.id),marks=ids.map(()=>'?').join(',');
   const personal=members.reduce((n,m)=>n+userXp(ctx.db,m.id),0);
@@ -22,19 +28,20 @@ export function projectsOverview(ctx){
   // Most urgent first: overdue, then the nearest deadline, then work sent back; tasks without a date last.
   const open=assignments.filter(a=>['not_started','draft','changes_requested'].includes(a.sub)).sort(byUrgency),since=teamSince(ctx.db,p.id);
   return {
-   id:p.id,name:JSON.parse(p.draft).name,status:p.status,source:p.source,stage:JSON.parse(p.draft).stage,updated:p.updated,
+   id:p.id,name:JSON.parse(p.draft).name,status:p.status,source:p.source,stage:stageOf(JSON.parse(p.draft).stage),stageSince:stageSince(ctx.db,p.id),funding:fundingOf(p),updated:p.updated,
    members:members.map(m=>m.display_name),
    // People on the roster who have not registered yet, so the dashboard can say whom to invite.
    noAccount:p.team_id?ctx.db.query('SELECT p.display_name n FROM team_people t JOIN people p ON p.id=t.person_id WHERE t.team_id=? AND NOT EXISTS(SELECT 1 FROM users u WHERE u.person_id=p.id) ORDER BY p.display_name').all(p.team_id).map(r=>r.n):[],
    percent:teamPercent(ctx.db,p.id,ids),overdue:open.filter(a=>a.due_at&&a.due_at<nowIso()&&a.due_at>since).length,pitch:pitchOf(ctx.db,p.id),mentorSessions:ctx.db.query('SELECT count(*) n FROM office_hour_bookings WHERE project_id=?').get(p.id).n,
-   teamXp:projectXp(ctx.db,p.id),personalXp:personal,totalXp:projectXp(ctx.db,p.id)+personal,
+   // totalXp is the team's one points number (teamPoints), as on the team's own screens and in the ranking.
+   ...(pts=>({teamXp:pts.own,personalXp:pts.members,totalXp:pts.total}))(teamPoints(ctx.db,p.id)),
    attendance:{selfReported:attendance.find(a=>a.kind==='self_reported')?.n||0,verified:attendance.find(a=>a.kind==='verified_by_admin')?.n||0,lecturesHeld:lectures},
    tasks:{total:assignments.length,done:assignments.filter(a=>a.sub==='accepted').length,waitingReview:assignments.filter(a=>a.sub==='submitted').length,open:open.length},
    risk:riskSignals(ctx.db,p.id,ids),streak:streak(ctx.db,p.id),lastSeen:ids.map(id=>lastSeen(ctx.db,id)).filter(Boolean).sort().at(-1)||null,
    todo:todoList(open),
   };
  });
- return json({items,generated:nowIso()});
+ return json({items,total:rows.length,filter,generated:nowIso()});
 }
 
 // One line per task: a personal task open for three members is one next step with open:3.
@@ -73,7 +80,16 @@ export async function nudge(ctx){
 export function listUsers(ctx){
  requireAdmin(ctx);const {limit,offset}=page(ctx.url,100);const q=(ctx.url.searchParams.get('q')||'').slice(0,60).toLowerCase();
  const rows=ctx.db.query("SELECT * FROM users WHERE (?1='' OR lower(login) LIKE ?2 OR lower(display_name) LIKE ?2) AND (?5=0 OR id LIKE 'demo-user-%') ORDER BY created DESC LIMIT ?3 OFFSET ?4").all(q,'%'+q+'%',limit+1,offset,onlyDemoPeople(ctx)?1:0);
- return json({items:rows.slice(0,limit).map(u=>({...publicUser(u),email:undefined,status:u.status,created:u.created,lastSeen:lastSeen(ctx.db,u.id),xp:userXp(ctx.db,u.id),lectures:ctx.db.query('SELECT count(*) n FROM attendance WHERE user_id=?').get(u.id).n,tasksDone:ctx.db.query("SELECT count(*) n FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.user_id=? AND s.status='accepted'").get(u.id).n,projects:ctx.db.query("SELECT json_extract(p.draft,'$.name') name FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL").all(u.id).map(r=>r.name)})),hasMore:rows.length>limit});
+ return json({items:rows.slice(0,limit).map(u=>({...publicUser(u),email:undefined,status:u.status,created:u.created,programmeManager:!!u.programme_manager,lastSeen:lastSeen(ctx.db,u.id),xp:userXp(ctx.db,u.id),lectures:ctx.db.query('SELECT count(*) n FROM attendance WHERE user_id=?').get(u.id).n,tasksDone:ctx.db.query("SELECT count(*) n FROM assignments a JOIN submissions s ON s.assignment_id=a.id WHERE a.user_id=? AND s.status='accepted'").get(u.id).n,projects:ctx.db.query("SELECT json_extract(p.draft,'$.name') name FROM memberships m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND m.revoked_at IS NULL").all(u.id).map(r=>r.name)})),hasMore:rows.length>limit});
+}
+/** Marks an organiser as a programme manager: teams' "Write to the programme manager" goes to the marked ones. */
+export async function setManager(ctx,userId){
+ const admin=requireAdmin(ctx),body=await readJson(ctx.request);
+ const u=ctx.db.query('SELECT * FROM users WHERE id=?').get(userId);if(!u)fail(404,'NOT_FOUND');
+ if(!['program_admin','platform_owner'].includes(u.role))fail(409,'INVALID_STATE');
+ ctx.db.query('UPDATE users SET programme_manager=?,updated=? WHERE id=?').run(body.on?1:0,nowIso(),userId);
+ audit(ctx.db,admin.id,'user.manager','user',userId,{on:!!body.on});
+ return json({ok:true});
 }
 /** Organisers change program roles, the platform owner stays as it is. The changed user's sessions are revoked. */
 export async function setRole(ctx,userId){

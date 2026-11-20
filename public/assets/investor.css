@@ -1,0 +1,49 @@
+/* Investor cabinet (investor.js): what network.css does not have yet. Same "warm room" as the other section pages
+   (site-page.css tokens); cards, filters and the map reuse the mentor network's classes. */
+.inv-demo{margin:24px 0 0}
+/* network.css gives these a display, which would beat the hidden attribute */
+.net-list[hidden],.net-mapview[hidden],.net-side[hidden],.inv-wait[hidden],[data-inv-dash][hidden]{display:none}
+.net-pill.is-risk{background:#f6d9d2}
+/* Ticket and amount ranges: two number fields side by side */
+.inv-ranges{display:grid;gap:12px}
+@media(min-width:720px){.inv-ranges{grid-template-columns:1fr 1fr}}
+.inv-range{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px;border:0;margin:0;padding:0;min-width:0}
+.inv-range legend{grid-column:1/-1;font-weight:600;font-size:14px;margin-bottom:8px;padding:0}
+.net-form .inv-range legend{font-size:15px}
+.inv-range label{min-width:0}
+.inv-range input{width:100%;min-height:46px;padding:8px 12px;border:1.5px solid var(--rule-strong);border-radius:10px;background:#fff;font-size:16px}
+.inv-selects{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(min-width:900px){.inv-selects{grid-template-columns:repeat(5,minmax(0,1fr))}}
+/* Project cards */
+.inv-grid{display:grid;gap:12px}
+@media(min-width:640px){.inv-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:1100px){.inv-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.inv-card{display:grid;gap:6px;align-content:start;padding:18px;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-m);text-decoration:none;min-width:0;transition:border-color .15s ease}
+.inv-card:hover{border-color:var(--tram)}
+.inv-card:focus-visible{outline:3px solid var(--tram);outline-offset:2px}
+.inv-card-top{display:flex;gap:8px;align-items:center;justify-content:space-between;min-width:0}
+.inv-card-top b{font-size:18px;line-height:1.3;overflow-wrap:anywhere}
+.inv-card-short{color:var(--ink-soft);font-size:15px;line-height:1.45;overflow-wrap:anywhere}
+.inv-card .fine{margin:0;overflow-wrap:anywhere}
+.inv-stage{justify-self:start;padding:2px 10px;border-radius:999px;background:var(--tram-wash);color:var(--tram-deep);font:600 13px/1.6 var(--sans)}
+.inv-money{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:6px 0 0;padding:10px 0 0;border-top:1px solid var(--rule)}
+.inv-money div{min-width:0}
+.inv-money dt{font-size:12px;color:var(--muted)}
+.inv-money dd{margin:2px 0 0;font-weight:600;font-size:15px;overflow-wrap:anywhere}
+.inv-money.is-big{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:24px 0;padding:16px;background:var(--panel);border:0;border-radius:var(--r-l)}
+@media(min-width:720px){.inv-money.is-big{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.inv-money.is-big dd{font-size:18px}
+.net-side .inv-card{background:var(--ground);border-color:transparent}
+.inv-side-stages{margin:0}
+.inv-side-stages b{margin-left:4px}
+/* Waiting for approval */
+.inv-wait-in{border:1.5px solid var(--watch-soft)}
+.inv-wait-in p{color:var(--ink-soft)!important;max-width:68ch}
+.inv-email{margin:0}
+/* Project page */
+.inv-project h1{font-size:clamp(32px,5vw,48px);overflow-wrap:anywhere}
+.inv-project header .lead{margin:10px 0 0}
+.inv-interest{margin-top:24px}
+.inv-interest>p{color:var(--ink-soft);max-width:68ch}
+.inv-interest .note:focus{outline:none}
+.net-pin .net-pin-name.is-left{text-anchor:end}

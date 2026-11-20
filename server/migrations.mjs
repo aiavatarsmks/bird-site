@@ -249,5 +249,88 @@ ALTER TABLE people ADD COLUMN email TEXT;
 `}, // Croatian grammar in an example task already stored in existing databases; only the untouched wording changes.
  {id:24,name:'hr-tell-friends',sql:`
 UPDATE task_templates SET translations=json_set(translations,'$.hr.title','Ispričajte petorici prijatelja o projektu') WHERE key='tell-friends' AND json_extract(translations,'$.hr.title')='Ispričajte petero prijatelja o projektu';
+`}, // Pilot phase 2. Example tasks become a template library: in a real workspace they no longer reach teams by themselves
+ // (a demo keeps them). Their untouched assignments leave the teams' lists; anything with a submission, points, a task the
+ // organiser edited (version>1) or assigned by hand stays. A task names the kinds of proof it takes; teams accept or decline
+ // an assigned task; an organiser can be marked as the programme manager whom teams write to.
+ {id:25,name:'example-library-responses',sql:`
+ALTER TABLE task_templates ADD COLUMN example INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE task_templates ADD COLUMN proof TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN programme_manager INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS task_responses(assignment_id TEXT PRIMARY KEY REFERENCES assignments(id),decision TEXT NOT NULL CHECK(decision IN ('accepted','declined')),reason TEXT NOT NULL DEFAULT '',user_id TEXT NOT NULL REFERENCES users(id),created TEXT NOT NULL,updated TEXT NOT NULL);
+UPDATE task_templates SET example=1 WHERE created_by IS NULL AND version=1 AND key IN ('profile','problem-users','presentation','one-lecture','three-lectures','tell-friends','investor-pitches','user-interviews','pricing-hypotheses','project-update','help-team','weekly-report','pitch-ten-people','linkedin-post','video-pitch','landing-test','mentor-session','first-paying-customer','demo-day-ready','demo-day-kit');
+INSERT INTO settings(key,value,updated) SELECT 'example_tasks','assign',datetime('now') WHERE EXISTS(SELECT 1 FROM settings WHERE key='demo_filled') ON CONFLICT(key) DO NOTHING;
+DELETE FROM assignments WHERE NOT EXISTS(SELECT 1 FROM settings WHERE key='example_tasks' AND value='assign')
+ AND task_id IN (SELECT id FROM task_templates WHERE example=1 AND pick_mode='assigned')
+ AND NOT EXISTS(SELECT 1 FROM submissions s WHERE s.assignment_id=assignments.id)
+ AND NOT EXISTS(SELECT 1 FROM audit_log l WHERE l.action IN ('task.assign','task.mark') AND l.target_id=assignments.task_id)
+ AND NOT EXISTS(SELECT 1 FROM xp_ledger x WHERE x.source_key LIKE 'task:'||assignments.task_id||':%');
+`}, // Forgot password: single-use links sent by email. Only the hash is kept; the address the link went to is kept so
+ // that clicking it verifies exactly that address.
+ {id:26,name:'password-resets',sql:`
+CREATE TABLE IF NOT EXISTS password_resets(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),token_hash TEXT NOT NULL UNIQUE,email TEXT NOT NULL,expires INTEGER NOT NULL,used_at TEXT,created TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS password_resets_user ON password_resets(user_id,created);
+`},
+ // Hubvers: the same table takes the waitlists of /mentors and /investors; a pilot request from the landing is a hub.
+ {id:27,name:'lead-role',sql:`
+ALTER TABLE pilot_requests ADD COLUMN role TEXT NOT NULL DEFAULT 'hub';
+`},
+ // One stage list for every hub (idea → prototype → mvp → product → first_customer → revenue → scaling) and the
+ // team's financing. Old stage keys in the draft and published text are mapped (research → idea, pilot → mvp,
+ // launched → product; unknown or missing → idea). Each project gets its first stage-history line, which keeps the
+ // old key in `previous` so the mapping can be traced. Funding columns start empty, investor visibility off.
+ // Revisions stay as they were written; the server maps old keys when it reads them.
+ {id:28,name:'project-stage-funding',up(db,now){
+  db.exec(`ALTER TABLE projects ADD COLUMN raised_eur INTEGER CHECK(raised_eur IS NULL OR raised_eur>=0);
+ALTER TABLE projects ADD COLUMN raising_eur INTEGER CHECK(raising_eur IS NULL OR raising_eur>=0);
+ALTER TABLE projects ADD COLUMN funding_round TEXT CHECK(funding_round IS NULL OR funding_round IN ('none','pre_seed','seed','series_a'));
+ALTER TABLE projects ADD COLUMN investor_visible INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS project_stage_history(id INTEGER PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(id),stage TEXT NOT NULL,previous TEXT,changed_by TEXT REFERENCES users(id),source TEXT NOT NULL DEFAULT 'team' CHECK(source IN ('team','organiser','migration')),changed_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS project_stage_history_project ON project_stage_history(project_id,id);`);
+  const keys=['idea','prototype','mvp','product','first_customer','revenue','scaling'],old={research:'idea',discovery:'idea',pilot:'mvp',launched:'product'};
+  const map=s=>keys.includes(s)?s:old[s]||'idea';
+  const fix=text=>{if(!text)return text;let c;try{c=JSON.parse(text);}catch{return text;}if(!c||typeof c!=='object')return text;const s=map(c.stage);if(c.stage===s)return text;c.stage=s;return JSON.stringify(c);};
+  for(const p of db.query('SELECT id,draft,published FROM projects').all()){
+   let before=null;try{before=JSON.parse(p.draft)?.stage??null;}catch{}
+   const draft=fix(p.draft),published=fix(p.published);
+   if(draft!==p.draft||published!==p.published)db.query('UPDATE projects SET draft=?,published=? WHERE id=?').run(draft,published,p.id);
+   const stage=map(before);
+   db.query("INSERT INTO project_stage_history(project_id,stage,previous,changed_by,source,changed_at) VALUES(?,?,?,NULL,'migration',?)").run(p.id,stage,typeof before==='string'&&before!==stage?before:null,now);
+  }
+ }},
+ // Hubvers network: a public profile beside an account of the public (demo) workspace. kind says whose profile it is
+ // (mentor now, investor next); lists are JSON arrays of fixed keys. Connections are requests between two accounts.
+ {id:29,name:'network-profiles',sql:`
+CREATE TABLE IF NOT EXISTS network_profiles(
+ user_id TEXT PRIMARY KEY REFERENCES users(id),kind TEXT NOT NULL CHECK(kind IN ('mentor','investor')),
+ headline TEXT NOT NULL DEFAULT '',bio TEXT NOT NULL DEFAULT '',country TEXT NOT NULL DEFAULT '',city TEXT NOT NULL DEFAULT '',region TEXT NOT NULL DEFAULT '',
+ categories TEXT NOT NULL DEFAULT '[]',hubs TEXT NOT NULL DEFAULT '[]',languages TEXT NOT NULL DEFAULT '[]',open_to TEXT NOT NULL DEFAULT '[]',
+ linkedin TEXT NOT NULL DEFAULT '',availability INTEGER NOT NULL DEFAULT 0,demo INTEGER NOT NULL DEFAULT 0,created TEXT NOT NULL,updated TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS network_profiles_kind ON network_profiles(kind,country);
+CREATE TABLE IF NOT EXISTS network_connections(
+ from_id TEXT NOT NULL REFERENCES users(id),to_id TEXT NOT NULL REFERENCES users(id),
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted','declined')),created TEXT NOT NULL,decided TEXT,
+ PRIMARY KEY(from_id,to_id));
+CREATE INDEX IF NOT EXISTS network_connections_to ON network_connections(to_id,status);
+`},
+ // Investors (server/investors.mjs). The fund beside an investor's network profile (kind 'investor'): the fund, its
+ // website and the domain of the work email that matched it, the ticket, stages and regions of interest, and the owner's
+ // decision (pending until the platform owner approves). investor_interest: an investor asked about a project of this
+ // workspace; the organisers read it. investor_ref is "<workspace>:<account>" of the investor, whose account may live
+ // in another workspace's database, so there is no foreign key and the row keeps what the organisers need to reply.
+ {id:30,name:'investors',sql:`
+CREATE TABLE IF NOT EXISTS investor_profiles(
+ user_id TEXT PRIMARY KEY REFERENCES users(id),fund TEXT NOT NULL,website TEXT NOT NULL,email_domain TEXT NOT NULL,
+ ticket_min INTEGER CHECK(ticket_min IS NULL OR ticket_min>=0),ticket_max INTEGER CHECK(ticket_max IS NULL OR ticket_max>=0),
+ stages TEXT NOT NULL DEFAULT '[]',areas TEXT NOT NULL DEFAULT '[]',
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),decided_by TEXT,decided_at TEXT,
+ created TEXT NOT NULL,updated TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS investor_profiles_status ON investor_profiles(status,created);
+CREATE TABLE IF NOT EXISTS investor_interest(
+ id TEXT PRIMARY KEY,project_id TEXT NOT NULL,investor_ref TEXT NOT NULL,via TEXT NOT NULL CHECK(via IN ('message','organisers')),
+ name TEXT NOT NULL,fund TEXT NOT NULL,website TEXT NOT NULL DEFAULT '',email TEXT NOT NULL DEFAULT '',linkedin TEXT NOT NULL DEFAULT '',
+ hub TEXT NOT NULL DEFAULT '',message TEXT NOT NULL DEFAULT '',created TEXT NOT NULL,
+ UNIQUE(project_id,investor_ref));
+CREATE INDEX IF NOT EXISTS investor_interest_created ON investor_interest(created);
 `},
 ];

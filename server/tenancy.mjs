@@ -41,8 +41,19 @@ export function createPlatform(config,{log=console.log,appOptions={}}={}){
  function appFor(ws){
   if(!ws||ws.status!=='active')return null;
   let app=apps.get(ws.id);
-  if(!app){app=createApp(workspaceConfig(config,ws),{log:m=>log(`[${ws.slug}] ${m}`),...appOptions});apps.set(ws.id,app);}
+  if(!app){app=createApp(workspaceConfig(config,ws),{log:m=>log(`[${ws.slug}] ${m}`),...appOptions,peers});apps.set(ws.id,app);}
   return app;
+ }
+ /**
+  * Every active workspace with its database, its name and where its organisation sits. Only the investor dashboard
+  * (server/investors.mjs) reads across workspaces, and only projects whose team opted in; it is given this list.
+  */
+ function peers(){
+  return list().map(ws=>{
+   const app=appFor(ws);if(!app)return null;
+   const org=db.query('SELECT city,country FROM organisations WHERE id=?').get(ws.organisation_id)||{};
+   return {id:ws.id,name:ws.name,city:org.city||'',country:org.country||'',db:app.db};
+  }).filter(Boolean);
  }
  // Opened at start, so a failing migration stops the start instead of the first visitor's request.
  for(const ws of list())appFor(ws);
@@ -85,6 +96,15 @@ export function createPlatform(config,{log=console.log,appOptions={}}={}){
   return {id:slug,host:h,dataPath,ownerInvitation:join(app.config.privateDir,'bootstrap-owner.txt')};
  }
 
+ /** Where a workspace's organisation sits (the investor map puts its hub there). Country: ISO code such as HR. */
+ function setPlace(workspaceId,{city='',country=''}={}){
+  const ws=row(workspaceId);if(!ws)bad('Unknown workspace: '+workspaceId);
+  if(country&&!/^[A-Z]{2}$/.test(country))bad('Country: a two-letter code such as HR');
+  if(String(city).length>80)bad('City: up to 80 characters');
+  db.query('UPDATE organisations SET city=?,country=? WHERE id=?').run(city,country,ws.organisation_id);
+  audit('workspace.place','workspace',workspaceId,{city,country});
+ }
+
  function health(){
   const items=[...apps.values()].map(a=>schemaStatus(a.db));
   const own=schemaStatus(db,PLATFORM_MIGRATIONS),ready=own.ready&&items.every(s=>s.ready);
@@ -111,7 +131,7 @@ export function createPlatform(config,{log=console.log,appOptions={}}={}){
  }
 
  return {
-  fetch,db,config,resolve,addHost,createWorkspace,dailyBackup,
+  fetch,db,config,resolve,addHost,createWorkspace,setPlace,dailyBackup,
   workspaces:list,
   app:id=>appFor(row(id)),
   /** Runs fn(app, workspace) for every active workspace; one failing workspace does not stop the others. */

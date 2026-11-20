@@ -4,16 +4,19 @@ import {nowIso} from './db.mjs';
 import {audit,isAdmin,projectAccess,requireProject} from './permissions.mjs';
 import {requireUser} from './auth.mjs';
 import {notify} from './notifications.mjs';
+import {teamPoints} from './progress.mjs';
+import {STAGES,cleanStage,stageOf,cleanFunding,fundingOf,recordStage,stageHistory} from './stages.mjs';
 
-export const STAGES=['idea','research','prototype','pilot','launched'];
+export {STAGES};
 // Optional fields. An early project is never asked for revenue or investment.
 const FIELDS={name:[1,100],short:[0,280],problem:[0,3000],users:[0,3000],solution:[0,3000],value:[0,2000],ask:[0,2000],nextSteps:[0,2000],details:[0,8000]};
 
-export function cleanContent(input){
+/** `stageFallback`: the stage kept when none is sent (a save keeps the current one, a new project starts as idea). */
+export function cleanContent(input,stageFallback='idea'){
  if(!input||typeof input!=='object')fail(400,'INVALID_FIELDS');
  const out={};
  for(const [key,[min,max]] of Object.entries(FIELDS))out[key]=text(input[key]??'',{min,max,multiline:key!=='name'},key);
- out.stage=STAGES.includes(input.stage)?input.stage:'idea';
+ out.stage=cleanStage(input.stage,stageFallback);
  const links=Array.isArray(input.links)?input.links.slice(0,10):[];
  out.links=links.map((l,i)=>({label:text(l?.label??'',{max:80},'links.'+i),url:httpUrl(l?.url,'links.'+i)})).filter(l=>l.url);
  return out;
@@ -27,7 +30,8 @@ function view(db,project,access){
  const team=db.query("SELECT m.user_id,m.role,u.display_name,u.person_id FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.project_id=? AND m.revoked_at IS NULL ORDER BY m.created").all(project.id);
  const people=db.query('SELECT p.id,p.display_name FROM team_people t JOIN people p ON p.id=t.person_id WHERE t.team_id=?').all(project.team_id);
  const out={id:project.id,teamId:project.team_id,source:project.source,status:project.status,published:project.published?JSON.parse(project.published):null,publishedVersion:project.published_version,publishedAt:project.published_at,people:people.map(p=>({id:p.id,displayName:p.display_name})),access:{role:access.role,edit:access.edit,manage:access.manage,team:access.team}};
- if(access.team||access.edit){out.draft=JSON.parse(project.draft);out.draftVersion=project.draft_version;out.members=team.map(m=>({userId:m.user_id,role:m.role,displayName:m.display_name,personId:m.person_id}));out.updated=project.updated;}
+ if(out.published)out.published.stage=stageOf(out.published.stage);
+ if(access.team||access.edit){out.draft=JSON.parse(project.draft);out.draft.stage=stageOf(out.draft.stage);out.funding=fundingOf(project);out.stageHistory=stageHistory(db,project.id,10);out.draftVersion=project.draft_version;out.members=team.map(m=>({userId:m.user_id,role:m.role,displayName:m.display_name,personId:m.person_id}));out.updated=project.updated;}
  return out;
 }
 
@@ -40,11 +44,13 @@ export function listProjects(ctx){
   return json({items:rows.slice(0,limit).map(p=>({id:p.id,role:p.role,status:p.status,source:p.source,name:JSON.parse(p.draft).name,updated:p.updated})),hasMore:rows.length>limit});
  }
  const rows=ctx.db.query("SELECT * FROM projects WHERE status='published' ORDER BY published_at DESC LIMIT ? OFFSET ?").all(limit+1,offset);
- return json({items:rows.slice(0,limit).map(p=>{const c=JSON.parse(p.published);return {id:p.id,source:p.source,name:c.name,short:c.short,stage:c.stage,publishedAt:p.published_at};}),hasMore:rows.length>limit});
+ return json({items:rows.slice(0,limit).map(p=>{const c=JSON.parse(p.published);return {id:p.id,source:p.source,name:c.name,short:c.short,stage:stageOf(c.stage),publishedAt:p.published_at};}),hasMore:rows.length>limit});
 }
 export function getProject(ctx,id){
  const {project,access}=requireProject(ctx.db,ctx.user,id,'read');
- return json({project:view(ctx.db,project,access)},200,{ETag:`"${project.draft_version}"`});
+ // The team's points for the page header: the same number for the team, an organiser and the ranking.
+ const out=view(ctx.db,project,access);if(ctx.user)out.points=teamPoints(ctx.db,project.id).total;
+ return json({project:out},200,{ETag:`"${project.draft_version}"`});
 }
 
 export async function createProject(ctx){
@@ -59,6 +65,8 @@ export async function createProject(ctx){
    ctx.db.query("INSERT INTO memberships(project_id,user_id,role,created) VALUES(?,?,'owner',?)").run(id,user.id,now);
    if(user.person_id)ctx.db.query('INSERT OR IGNORE INTO team_people(team_id,person_id) VALUES(?,?)').run(teamId,user.person_id);
    ctx.db.query("INSERT INTO project_revisions(project_id,version,kind,content,author,created) VALUES(?,1,'draft',?,?,?)").run(id,JSON.stringify(content),user.id,now);
+   recordStage(ctx.db,id,content.stage,{by:user.id,at:now});
+   if(body.funding)saveFunding(ctx.db,user,id,null,cleanFunding(body.funding));
    audit(ctx.db,user.id,'project.create','project',id,{});
    ctx.hooks?.onEvent?.(ctx,{type:'project.created',userId:user.id,projectId:id});
   })();
@@ -68,20 +76,35 @@ export async function createProject(ctx){
 }
 const respond=r=>json(r.body,r.status||200);
 
+/** Financing columns and the investor switch. Each change is in the audit log with the old and new values. */
+function saveFunding(db,user,id,project,f){
+ const old=project?fundingOf(project):{raisedEur:null,raisingEur:null,round:null,investorVisible:false};
+ if(old.raisedEur===f.raisedEur&&old.raisingEur===f.raisingEur&&old.round===f.round&&old.investorVisible===f.investorVisible)return;
+ db.query('UPDATE projects SET raised_eur=?,raising_eur=?,funding_round=?,investor_visible=? WHERE id=?').run(f.raisedEur,f.raisingEur,f.round,f.investorVisible?1:0,id);
+ audit(db,user.id,'project.funding','project',id,{from:old,to:f});
+ if(old.investorVisible!==f.investorVisible)audit(db,user.id,f.investorVisible?'project.investors.on':'project.investors.off','project',id,{});
+}
+
 /** Saves the draft. A stale version gets 409 and the sent text is kept as a conflict revision. */
 export async function saveDraft(ctx,id){
  const user=requireUser(ctx);const {project}=requireProject(ctx.db,user,id,'edit');
  const body=await readJson(ctx.request);
- const content=cleanContent(body.content);
+ const before=stageOf(JSON.parse(project.draft).stage);
+ const content=cleanContent(body.content,before),funding=body.funding?cleanFunding(body.funding):null;
  const expected=Number(String(ctx.request.headers.get('if-match')||body.version||'').replace(/"/g,''));
  const now=nowIso();
  if(expected!==project.draft_version){
   ctx.db.query("INSERT INTO project_revisions(project_id,version,kind,content,author,created) VALUES(?,?,'conflict',?,?,?)").run(id,project.draft_version,JSON.stringify(content),user.id,now);
   fail(409,'CONFLICT',{currentVersion:project.draft_version,current:JSON.parse(project.draft),yours:content});
  }
- const r=ctx.db.query('UPDATE projects SET draft=?,draft_version=draft_version+1,updated=? WHERE id=? AND draft_version=?').run(JSON.stringify(content),now,id,expected);
- if(!r.changes)fail(409,'CONFLICT',{yours:content});
- ctx.db.query("INSERT INTO project_revisions(project_id,version,kind,content,author,created) VALUES(?,?,'draft',?,?,?)").run(id,expected+1,JSON.stringify(content),user.id,now);
+ ctx.db.transaction(()=>{
+  const r=ctx.db.query('UPDATE projects SET draft=?,draft_version=draft_version+1,updated=? WHERE id=? AND draft_version=?').run(JSON.stringify(content),now,id,expected);
+  if(!r.changes)fail(409,'CONFLICT',{yours:content});
+  ctx.db.query("INSERT INTO project_revisions(project_id,version,kind,content,author,created) VALUES(?,?,'draft',?,?,?)").run(id,expected+1,JSON.stringify(content),user.id,now);
+  // The stage counts from the moment it is saved, published or not: the hub follows progress, not the public text.
+  recordStage(ctx.db,id,content.stage,{previous:before,by:user.id,source:isAdmin(user)&&!projectAccess(ctx.db,user,project).role?'organiser':'team',at:now});
+  if(funding)saveFunding(ctx.db,user,id,project,funding);
+ })();
  ctx.hooks?.onEvent?.(ctx,{type:'project.draft',userId:user.id,projectId:id,content});
  const fresh=ctx.db.query('SELECT * FROM projects WHERE id=?').get(id);
  return json({project:view(ctx.db,fresh,projectAccess(ctx.db,user,fresh))},200,{ETag:`"${fresh.draft_version}"`});
@@ -107,16 +130,19 @@ export function revisions(ctx,id){
  const user=requireUser(ctx);requireProject(ctx.db,user,id,'edit');
  const {limit,offset}=page(ctx.url);
  const rows=ctx.db.query('SELECT r.id,r.version,r.kind,r.content,r.created,u.display_name FROM project_revisions r LEFT JOIN users u ON u.id=r.author WHERE r.project_id=? ORDER BY r.id DESC LIMIT ? OFFSET ?').all(id,limit+1,offset);
- return json({items:rows.slice(0,limit).map(r=>({id:r.id,version:r.version,kind:r.kind,content:JSON.parse(r.content),created:r.created,author:r.display_name||''})),hasMore:rows.length>limit});
+ return json({items:rows.slice(0,limit).map(r=>{const content=JSON.parse(r.content);content.stage=stageOf(content.stage);return {id:r.id,version:r.version,kind:r.kind,content,created:r.created,author:r.display_name||''};}),hasMore:rows.length>limit});
 }
 /** Copies an old revision into the draft (as a new version). */
 export async function restoreRevision(ctx,id,revisionId){
  const user=requireUser(ctx);const {project}=requireProject(ctx.db,user,id,'edit');
  const rev=ctx.db.query('SELECT * FROM project_revisions WHERE id=? AND project_id=?').get(Number(revisionId),id);if(!rev)fail(404,'NOT_FOUND');
- const now=nowIso();
+ const now=nowIso(),old=JSON.parse(rev.content),before=stageOf(JSON.parse(project.draft).stage);
+ // A revision written before schema 28 carries an old stage key: it comes back on the shared list.
+ const content=old.stage===stageOf(old.stage)?rev.content:JSON.stringify({...old,stage:stageOf(old.stage)}),stage=stageOf(old.stage);
  ctx.db.transaction(()=>{
-  ctx.db.query('UPDATE projects SET draft=?,draft_version=draft_version+1,updated=? WHERE id=?').run(rev.content,now,id);
-  ctx.db.query("INSERT INTO project_revisions(project_id,version,kind,content,author,created) VALUES(?,?,'restored',?,?,?)").run(id,project.draft_version+1,rev.content,user.id,now);
+  ctx.db.query('UPDATE projects SET draft=?,draft_version=draft_version+1,updated=? WHERE id=?').run(content,now,id);
+  ctx.db.query("INSERT INTO project_revisions(project_id,version,kind,content,author,created) VALUES(?,?,'restored',?,?,?)").run(id,project.draft_version+1,content,user.id,now);
+  recordStage(ctx.db,id,stage,{previous:before,by:user.id,at:now});
  })();
  const fresh=ctx.db.query('SELECT * FROM projects WHERE id=?').get(id);
  return json({project:view(ctx.db,fresh,projectAccess(ctx.db,user,fresh))});
