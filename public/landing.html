@@ -19,7 +19,7 @@
    /* the hero painting of the chosen art variant starts loading now (landing-paint.js asks for it with the same srcset and sizes) */
    if(h.dataset.art){const f=h.dataset.art==='oil'?'oil-hero':'wc-hero',l=document.createElement('link');l.rel='preload';l.as='image';l.type='image/avif';l.fetchPriority='low';l.setAttribute('imagesrcset',[800,1200,1600].map(w=>'assets/art/'+f+'-'+w+'.avif '+w+'w').join(', '));l.setAttribute('imagesizes','(min-width: 1024px) 66vw, 100vw');document.head.appendChild(l);}if(!matchMedia('(prefers-reduced-motion: reduce)').matches)h.classList.add('mo-intro');setTimeout(()=>{h.classList.remove('mo-intro');if(!h.classList.contains('js-ok'))h.classList.remove('js');},4000);})();</script>
 <script src="assets/anime.js" defer></script><script src="assets/bird-motion.js" defer></script><script src="assets/landing-world.js" defer></script><script src="assets/incubators-hr.js" defer></script><script src="assets/landing.js" defer></script><script src="assets/whoami.js" defer></script><script src="assets/landing-paint.js" defer></script>
-<meta name="bird-release" content="bird-265a1f5bca82991b"></head><body>
+<meta name="bird-release" content="bird-79381a15ff93ca08"></head><body>
 <!-- Art direction "Programme line": a cohort is a transit line, weeks are stations, teams ride it. Zagreb-tram blue field,
      line colours are the status colours (green on track, amber watch, red risk). Type: Onest for headings and text, Martian Mono for figures and labels. Square corners, hairline rules (timetable pass, 17 Nov).
      Painted plates (data-paint, landing-paint.js): real public-domain paintings (assets/art/, docs/ART-CREDITS.md),

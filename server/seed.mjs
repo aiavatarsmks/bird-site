@@ -15,6 +15,7 @@ const MENTORS=[
 ];
 // Owner-provided dates. Pitch day (3 November) is not a lecture.
 const LECTURES=[
+ {id:'mvp-cost-of-change',date:'2026-11-17',speaker:'Marko Linke',title:{en:'MVP and the cost of change',hr:'MVP i cijena promjene',ru:'MVP и цена изменений'}},
  {id:'lecture-0228d52c9e6699ebd06df49a',date:'2026-11-12',speaker:'BDV',title:{en:'AI Act & Regulatory Reality — BDV workshop',hr:'AI Act i regulatorna stvarnost — radionica BDV-a',ru:'AI Act и регуляторная практика — воркшоп BDV'}},
  {id:'vc-fundraising',date:'2026-11-09',speaker:'',title:{en:'How venture investors choose startups',hr:'Kako VC investitori biraju startupe',ru:'Как венчурные инвесторы выбирают стартапы'}},
  {id:'startup-stories-2',date:'2026-11-05',speaker:'Boris Sesar',title:{en:'Startup Stories #2: Boris Sesar',hr:'Startup Stories #2: Boris Sesar',ru:'Startup Stories #2: Boris Sesar'}},
